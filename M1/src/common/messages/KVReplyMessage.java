@@ -13,6 +13,28 @@ public class KVReplyMessage implements KVMessage
         this.status = status;
     }
 
+    public KVReplyMessage(String key, String value, String status){
+        switch(status){
+            case "PUT_SUCCESS":
+                this.status = StatusType.PUT_SUCCESS;
+                break;
+            case "PUT_ERROR":
+                this.status = StatusType.PUT_ERROR;
+                break;
+            case "DELETE_SUCCESS":
+                this.status = StatusType.DELETE_SUCCESS;
+                break;
+            case "DELETE_ERROR":
+                this.status = StatusType.DELETE_ERROR;
+                break;
+            default:
+                this.status = StatusType.PUT_ERROR;
+                break;
+        }
+        this.key = key;
+        this.value = value;
+    }
+
 	/**
 	 * @return the key that is associated with this message, 
 	 * 		null if not key is associated.
@@ -40,38 +62,37 @@ public class KVReplyMessage implements KVMessage
         return status;
     }
 	
-    @Override
     public String getStatusString() {
 	switch(this.getStatus()) {
-	    case this.StatusType.GET:
+	    case GET:
 		return "GET";
 	      
-	    case this.StatusType.GET_SUCCESS:
+	    case GET_SUCCESS:
 		return "GET_SUCCESS";
 	    
-	    case this.StatusType.GET_ERROR:
+	    case GET_ERROR:
 		return "GET_ERROR";
 	  
-	    case this.StatusType.PUT:
+	    case PUT:
 		return "PUT";
 	
-	    case this.StatusType.PUT_SUCCESS:
+	    case PUT_SUCCESS:
 		return "PUT_SUCCESS";
 
-	    case this.StatusType.PUT_ERROR:
+	    case PUT_ERROR:
 		return "PUT_ERROR";
 
-	    case this.StatusType.PUT_UPDATE:
+	    case PUT_UPDATE:
 		return "PUT_UPDATE";
 
-	    case this.StatusType.DELETE_SUCCESS:
+	    case DELETE_SUCCESS:
 		return "DELETE_SUCCESS";
 
-	    case this.StatusType.DELETE_ERROR:
+	    case DELETE_ERROR:
 		return "DELETE_ERROR";
 
 	    default:
-		return NULL;
+		return null;
 	}
 	
     }	

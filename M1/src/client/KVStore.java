@@ -7,7 +7,10 @@ import java.util.HashSet;
 import java.util.Set;
 
 import common.messages.KVMessage;
-import client.ClientSocketListener.SocketStatus;
+import common.messages.TextMessage;
+import common.messages.KVReplyMessage;
+//TODO implement this library?
+//import client.ClientSocketListener.SocketStatus;
 
 import java.net.UnknownHostException;
 import java.io.IOException;
@@ -17,7 +20,7 @@ import org.apache.log4j.Logger;
 
 public class KVStore implements KVCommInterface {
     private static Logger logger = Logger.getRootLogger();
-    private Set<ClientSocketListener> listeners;
+    //private Set<ClientSocketListener> listeners;
     
     private String serverAddr;
     private int serverPort;
@@ -29,7 +32,10 @@ public class KVStore implements KVCommInterface {
 
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
-
+    private static final int MAX_KEY_LENGTH = 20; 
+    private static final int MAX_VALUE_LENGTH = 122880; //120KB
+    private static final String COMMA = ",";
+    private static final String PUT_CMD = "PUT";
     /**
      * Initialize KVStore with address and port of KVServer
      * @param address the address of the KVServer
@@ -47,7 +53,7 @@ public class KVStore implements KVCommInterface {
             throws UnknownHostException, IOException {
         // TODO Auto-generated method stub
         this.clientSocket = new Socket(this.serverAddr, this.serverPort);
-        this.listeners = new HashSet<ClientSocketListener>();
+        //this.listeners = new HashSet<ClientSocketListener>();
         setRunning(true);
         logger.info("Connection established with address " + this.serverAddr + 
             " at port " + this.serverPort);
@@ -62,9 +68,9 @@ public class KVStore implements KVCommInterface {
         
         try {
             tearDownConnection();
-            for(ClientSocketListener listener : listeners) {
-                listener.handleStatus(SocketStatus.DISCONNECTED);
-            }
+            //for(ClientSocketListener listener : listeners) {
+            //    listener.handleStatus(SocketStatus.DISCONNECTED);
+            //}
         } 
         catch (IOException ioe) {
             logger.error("Unable to close connection!");
@@ -84,8 +90,23 @@ public class KVStore implements KVCommInterface {
 
     @Override
     public KVMessage put(String key, String value) throws Exception {
-        // TODO Auto-generated method stub
-        return null;
+        // step 1 - input validation
+        if(key.length() > MAX_KEY_LENGTH){
+            logger.error("Error: maximum key length allowed is " + MAX_KEY_LENGTH + " but key has length " + key.length());
+            return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
+        }
+        if(value.length() > MAX_VALUE_LENGTH){
+            logger.error("Error: maximum value length allowed is 120K Bytes but value has length " + value.length());
+            return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
+        }
+        // step 2 - send a PUT request to the server
+        TextMessage message = new TextMessage(PUT_CMD + COMMA + key + COMMA + value);
+        sendMessage(message);
+
+
+        // step 3 - get the server's response and forward it to the client
+        TextMessage reply = receiveMessage();
+        return new KVReplyMessage(key, value, reply.getMsg());
     }
 
     @Override
@@ -101,11 +122,11 @@ public class KVStore implements KVCommInterface {
     public void setRunning(boolean run) {
         running = run;
     }
-
+/*
     public void addListener(ClientSocketListener listener){
         listeners.add(listener);
     }
-
+*/
 	/**
 	 * Method sends a TextMessage using this socket.
 	 * @param msg the message that is to be sent.
