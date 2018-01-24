@@ -2,8 +2,9 @@ package app_kvClient;
 
 import client.KVCommInterface;
 import client.KVStore;
-import client.ClientSocketListener;
+//import client.ClientSocketListener;
 import common.messages.TextMessage;
+import common.messages.KVMessage;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -81,16 +82,54 @@ public class KVClient implements IKVClient {
 
             case "put":
                 if(tokens.length >= 3){
-                    ;
-                }
+			String key = tokens[1];
+			if(clientStore != null && clientStore.isRunning()) {
+				StringBuilder msg = new StringBuilder();
+				for(int i = 2; i < tokens.length; i++) {
+					msg.append(tokens[i]);
+					if (i != tokens.length -1 ) {
+						msg.append(" ");
+					}
+				}
+
+				try {	
+					KVMessage reply = clientStore.put(key, msg.toString());		
+                			if (reply.getStatus() == KVMessage.StatusType.PUT_ERROR)
+						logger.error(reply.getStatusString() + " with <key, value>: <" + reply.getKey() + ", " + reply.getValue() + ">");  
+					else
+						logger.info(reply.getStatusString() + " with <key, value>: <" + reply.getKey() + ", " + reply.getValue() + ">");  
+				} catch (Exception ex) {
+					logger.error("Put Failed. ERROR: " + ex);		
+				}
+			 
+                	}
+			else {
+				printError("Not connected");
+			}
+		}
+		else {
+			printError("Invalid number of parameters for command \"put\"");
+			printHelp();
+		}
                 break;
 
             case "get":
                 if(tokens.length == 2){
-                    ;
+			String key = tokens[1];
+			try {
+				KVMessage reply = clientStore.get(key);
+				if(reply.getStatus == KVMessage.StatusType.GET_ERROR)
+					logger.error(reply.getStatusString() + " using key: " + key);
+				else
+					logger.info(reply.getStatusString() + " using key: " + key);
+			} catch (Exception ex) {
+				logger.error("Get Failed. ERROR: " + ex);	
+			}
+			
                 }
                 else {
-                    ;
+			printError("Invalid number of parameters for command \"get\"");
+			printHelp();                   
                 }
                 break;
 
