@@ -55,52 +55,6 @@ public class KVStore implements KVCommInterface {
         this.input = clientSocket.getInputStream();  
     }
 
-    /**
-     * Initializes and starts the client connection. 
-     * Loops until the connection is closed or aborted by the client.
-     */
-    public void run() {
-        try {
-            this.output = clientSocket.getOutputStream();
-            this.input = clientSocket.getInputStream();
-           
-            /* 
-            while(isRunning()) {
-                try {
-                    //TODO receiveMessage
-                    TextMessage latestMsg = receiveMessage();
-                    //TODO implement ClientSocketListener
-                    for(ClientSocketListener listener : listeners) {
-                        listener.handleNewMessage(latestMsg);
-                    }
-                } catch (IOException ioe) {
-                    if(isRunning()) {
-                        logger.error("Connection lost!");
-                        try {
-                            tearDownConnection();
-                            for(ClientSocketListener listener : listeners) {
-                                listener.handleStatus(
-                                        SocketStatus.CONNECTION_LOST);
-                            }
-                        } catch (IOException e) {
-                            logger.error("Unable to close connection!");
-                        }
-                    }
-                }
-            }
-            */
-        }
-        catch (IOException ioe) {
-            logger.error("Connection could not be established!");
-            
-        }
-        finally {
-            if(isRunning()) {
-                disconnect();
-            }
-        }
-    }
-
     @Override
     public synchronized void disconnect() {
         // TODO Auto-generated method stub
