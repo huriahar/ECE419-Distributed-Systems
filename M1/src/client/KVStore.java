@@ -36,6 +36,7 @@ public class KVStore implements KVCommInterface {
     private static final int MAX_VALUE_LENGTH = 122880; //120KB
     private static final String COMMA = ",";
     private static final String PUT_CMD = "PUT";
+    private static final String GET_CMD = "GET";
     /**
      * Initialize KVStore with address and port of KVServer
      * @param address the address of the KVServer
@@ -111,8 +112,19 @@ public class KVStore implements KVCommInterface {
 
     @Override
     public KVMessage get(String key) throws Exception {
-        // TODO Auto-generated method stub
-        return null;
+        // step 1 - input validation
+        if(key.length() > MAX_KEY_LENGTH){
+            logger.error("Error: maximum key length allowed is " + MAX_KEY_LENGTH + " but key has length " + key.length());
+            return new KVReplyMessage(key, null, KVMessage.StatusType.PUT_ERROR);
+        }
+        // step 2 - send a PUT request to the server
+        TextMessage message = new TextMessage(GET_CMD + COMMA + key);
+        sendMessage(message);
+
+
+        // step 3 - get the server's response and forward it to the client
+        TextMessage reply = receiveMessage();
+        return new KVReplyMessage(key, null, reply.getMsg());
     }
 
     public boolean isRunning() {

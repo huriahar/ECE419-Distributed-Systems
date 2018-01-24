@@ -15,8 +15,23 @@ public class KVReplyMessage implements KVMessage
 
     public KVReplyMessage(String key, String value, String status){
         switch(status){
+            case "GET":
+                this.status = StatusType.GET;
+                break;
+            case "GET_SUCCESS":
+                this.status = StatusType.GET_SUCCESS;
+                break;
+            case "GET_ERROR":
+                this.status = StatusType.GET_ERROR;
+                break;
+            case "PUT":
+                this.status = StatusType.PUT;
+                break;
             case "PUT_SUCCESS":
                 this.status = StatusType.PUT_SUCCESS;
+                break;
+            case "PUT_UPDATE":
+                this.status = StatusType.PUT_UPDATE;
                 break;
             case "PUT_ERROR":
                 this.status = StatusType.PUT_ERROR;
