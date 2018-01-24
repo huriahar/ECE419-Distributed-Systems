@@ -2,8 +2,12 @@ package app_kvClient;
 
 import client.KVCommInterface;
 import client.KVStore;
+import client.ClientSocketListener;
+import common.messages.TextMessage;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.net.UnknownHostException;
 import java.io.IOException;
 
 import logger.LogSetup;
@@ -16,10 +20,9 @@ public class KVClient implements IKVClient {
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "KVClient> ";
     private BufferedReader stdin;
-
+    private KVStore clientStore = null;
     private boolean stop = false;
 
-    private KVStore clientStore = null;
     private String serverAddress;
     private int serverPort;
 
@@ -78,6 +81,8 @@ public class KVClient implements IKVClient {
 
             case "put":
                 if(tokens.length >= 3){
+                    ;
+                }
                 break;
 
             case "get":
@@ -91,6 +96,19 @@ public class KVClient implements IKVClient {
 
 
             case "logLevel":
+                if (tokens.length == 2) {
+                    String level = setLevel(tokens[1]);
+                    if (level.equals(LogSetup.UNKNOWN_LEVEL)) {
+                        printError("No valid log level!");
+                        printPossibleLogLevels();
+                    }
+                    else {
+                        System.out.println(PROMPT + "Log level changed to level " + level);
+                    }
+                }
+                else {
+                    printError("Invalid number of parameters for command \"logLevel\"");
+                }
                 break;
             case "help":
                 printHelp(); 
@@ -110,8 +128,12 @@ public class KVClient implements IKVClient {
         sb.append("::::::::::::::::::::::::::::::::\n");
         sb.append(PROMPT).append("connect <host> <port>");
         sb.append("\t establishes a connection to a server\n");
-        sb.append(PROMPT).append("send <text message>");
-        sb.append("\t\t sends a text message to the server \n");
+        sb.append(PROMPT).append("put <key> <value>");
+        sb.append("\t\t 1) Inserts a key-value pair into a server data strusture. \n");
+        sb.append("\t\t\t\t 2) Updates current value if server already contains key \n");
+        sb.append("\t\t\t\t 3) Deletes entry for given key if <value> equals null \n");
+        sb.append(PROMPT).append("get <key>");
+        sb.append("\t\t Retrieves the value for the given key from the storage server. \n");
         sb.append(PROMPT).append("disconnect");
         sb.append("\t\t\t disconnects from the server \n");
         
@@ -125,6 +147,41 @@ public class KVClient implements IKVClient {
         System.out.println(sb.toString());
     }
 
+    private void printPossibleLogLevels() {
+        System.out.println(PROMPT 
+                + "Possible log levels are:");
+        System.out.println(PROMPT 
+                + "ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF");
+    }
+
+    private String setLevel(String levelString) {
+        
+        if(levelString.equals(Level.ALL.toString())) {
+            logger.setLevel(Level.ALL);
+            return Level.ALL.toString();
+        } else if(levelString.equals(Level.DEBUG.toString())) {
+            logger.setLevel(Level.DEBUG);
+            return Level.DEBUG.toString();
+        } else if(levelString.equals(Level.INFO.toString())) {
+            logger.setLevel(Level.INFO);
+            return Level.INFO.toString();
+        } else if(levelString.equals(Level.WARN.toString())) {
+            logger.setLevel(Level.WARN);
+            return Level.WARN.toString();
+        } else if(levelString.equals(Level.ERROR.toString())) {
+            logger.setLevel(Level.ERROR);
+            return Level.ERROR.toString();
+        } else if(levelString.equals(Level.FATAL.toString())) {
+            logger.setLevel(Level.FATAL);
+            return Level.FATAL.toString();
+        } else if(levelString.equals(Level.OFF.toString())) {
+            logger.setLevel(Level.OFF);
+            return Level.OFF.toString();
+        } else {
+            return LogSetup.UNKNOWN_LEVEL;
+        }
+    }
+
     private void disconnect() {
         if(clientStore != null) {
             clientStore.disconnect();
@@ -132,18 +189,19 @@ public class KVClient implements IKVClient {
         }
     }
 
-
     private void sendMessage(String msg){
-        try {
+        /*try {
             client.sendMessage(new TextMessage(msg));
         } catch (IOException e) {
             printError("Unable to send message!");
             disconnect();
-        }
+        }*/
+        ;
     }
 
     @Override
-    public void newConnection(String hostname, int port) throws Exception{
+    public void newConnection(String hostname, int port) 
+        throws UnknownHostException, IOException {
         // TODO Auto-generated method stub
         clientStore = new KVStore(hostname, port);
         try {
@@ -161,6 +219,31 @@ public class KVClient implements IKVClient {
     public KVCommInterface getStore(){
         // TODO Auto-generated method stub
         return this.clientStore;
+    }
+
+    @Override
+    public void handleNewMessage(TextMessage msg) {
+        if(!stop) {
+            System.out.println(msg.getMsg());
+            System.out.print(PROMPT);
+        }
+    }
+
+    @Override
+    public void handleStatus(SocketStatus status) {
+        if(status == SocketStatus.CONNECTED) {
+
+        } else if (status == SocketStatus.DISCONNECTED) {
+            System.out.print(PROMPT);
+            System.out.println("Connection terminated: " 
+                    + serverAddress + " / " + serverPort);
+            
+        } else if (status == SocketStatus.CONNECTION_LOST) {
+            System.out.println("Connection lost: " 
+                    + serverAddress + " / " + serverPort);
+            System.out.print(PROMPT);
+        }
+        
     }
 
     private void printError(String error){

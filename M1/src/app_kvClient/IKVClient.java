@@ -1,8 +1,17 @@
 package app_kvClient;
 
 import client.KVCommInterface;
+import common.messages.TextMessage;
 
 public interface IKVClient {
+
+    public enum SocketStatus{CONNECTED, DISCONNECTED, CONNECTION_LOST};
+
+    /**
+     * Reads and processes commands entered by the client on terminal prompt
+     */
+    public void run();
+
     /**
      * Creates a new connection to hostname:port
      * @throws Exception
@@ -15,4 +24,8 @@ public interface IKVClient {
      * @return  instance of KVCommInterface
      */
     public KVCommInterface getStore();
+
+    public void handleNewMessage(TextMessage msg);
+    
+    public void handleStatus(SocketStatus status);
 }
