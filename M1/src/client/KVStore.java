@@ -69,7 +69,7 @@ public class KVStore implements KVCommInterface {
         
         try {
             tearDownConnection();
-            for(IKVClient listener : listeners) {
+            for (IKVClient listener : listeners) {
                 listener.handleStatus(IKVClient.SocketStatus.DISCONNECTED);
             }
         } 

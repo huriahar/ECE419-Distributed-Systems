@@ -205,8 +205,8 @@ public class KVClient implements IKVClient {
         sb.append("\t establishes a connection to a server\n");
         sb.append(PROMPT).append("put <key> <value>");
         sb.append("\t\t 1) Inserts a key-value pair into a server data strusture. \n");
-        sb.append("\t\t\t\t 2) Updates current value if server already contains key \n");
-        sb.append("\t\t\t\t 3) Deletes entry for given key if <value> equals null \n");
+        sb.append("\t\t\t\t\t\t 2) Updates current value if server already contains key \n");
+        sb.append("\t\t\t\t\t\t 3) Deletes entry for given key if <value> equals null \n");
         sb.append(PROMPT).append("get <key>");
         sb.append("\t\t Retrieves the value for the given key from the storage server. \n");
         sb.append(PROMPT).append("disconnect");
