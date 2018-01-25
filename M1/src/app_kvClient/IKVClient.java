@@ -25,7 +25,7 @@ public interface IKVClient {
      */
     public KVCommInterface getStore();
 
-    public void handleNewMessage(TextMessage msg);
+    //public void handleNewMessage(TextMessage msg);
     
     public void handleStatus(SocketStatus status);
 }
