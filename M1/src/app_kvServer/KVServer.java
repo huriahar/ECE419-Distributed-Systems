@@ -1,6 +1,13 @@
 package app_kvServer;
 
+import cache.KVCache;
+import org.apache.log4j.Logger;
+
 public class KVServer implements IKVServer {
+
+    private static Logger logger = Logger.getRootLogger();
+    private int port;
+    private KVCache cache;
 
 	/**
 	 * Start KV Server at given port
@@ -13,13 +20,14 @@ public class KVServer implements IKVServer {
 	 *           and "LFU".
 	 */
 	public KVServer(int port, int cacheSize, String strategy) {
-		// TODO Auto-generated method stub
+        this.port = port;
+        if(cacheSize == 0) this.cache = null;
+        else this.cache = new KVCache(cacheSize, strategy);
 	}
 
 	@Override
 	public int getPort(){
-		// TODO Auto-generated method stub
-		return -1;
+        return this.port;
 	}
 
 	@Override
@@ -30,14 +38,12 @@ public class KVServer implements IKVServer {
 
 	@Override
     public CacheStrategy getCacheStrategy(){
-		// TODO Auto-generated method stub
-		return IKVServer.CacheStrategy.None;
+        return this.cache.getStrategy();
 	}
 
 	@Override
     public int getCacheSize(){
-		// TODO Auto-generated method stub
-		return -1;
+        return this.cache.getCacheSize();
 	}
 
 	@Override

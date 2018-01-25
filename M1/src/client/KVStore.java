@@ -43,7 +43,6 @@ public class KVStore implements KVCommInterface {
      */
     public KVStore(String address, int port) 
             throws UnknownHostException, IOException {
-        // TODO Auto-generated method stub
         this.serverAddr = address;
         this.serverPort = port;
     }
@@ -69,7 +68,7 @@ public class KVStore implements KVCommInterface {
         try {
             tearDownConnection();
             for(IKVClient listener : listeners) {
-                listener.handleStatus(SocketStatus.DISCONNECTED);
+                listener.handleStatus(IKVClient.SocketStatus.DISCONNECTED);
             }
         } 
         catch (IOException ioe) {
