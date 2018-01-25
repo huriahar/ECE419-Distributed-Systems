@@ -118,7 +118,7 @@ public class KVClient implements IKVClient {
 			String key = tokens[1];
 			try {
 				KVMessage reply = clientStore.get(key);
-				if(reply.getStatus == KVMessage.StatusType.GET_ERROR)
+				if(reply.getStatus() == KVMessage.StatusType.GET_ERROR)
 					logger.error(reply.getStatusString() + " using key: " + key);
 				else
 					logger.info(reply.getStatusString() + " using key: " + key);
