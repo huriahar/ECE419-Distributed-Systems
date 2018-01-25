@@ -295,13 +295,13 @@ public class KVClient implements IKVClient {
         return this.clientStore;
     }
 
-    /*@Override
+    @Override
     public void handleNewMessage(TextMessage msg) {
         if(!stop) {
             System.out.println(msg.getMsg());
             System.out.print(PROMPT);
         }
-    }*/
+    }
 
     @Override
     public void handleStatus(SocketStatus status) {
