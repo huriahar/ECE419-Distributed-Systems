@@ -35,13 +35,32 @@ public class KVServer extends Thread implements IKVServer {
      */
     public KVServer (int port, int cacheSize, String strategy) {
         this.port = port;
-        if (cacheSize <= 0) {
+        if(cacheSize <= 0){
             logger.warn("Invalid cacheSize -> cache is null");
             this.cache = null;
         }
-        else 
-            this.cache = KVCache.createKVCache(cacheSize, strategy);
+<<<<<<< HEAD
+        /*else if (strategy.equals("FIFO")) {
+            logger.info("Creating FIFO cache with size " + cacheSize);
+            this.cache = new KVCacheFIFO(cacheSize, strategy);
+        }
+        else if (strategy.equals("LRU")) {
+            logger.info("Creating LRU cache with size " + cacheSize);
+            this.cache = new KVCacheLRU(cacheSize, strategy);
+        }
+        else if (strategy.equals("LFU")) {
+            logger.info("Creating LFU cache with size " + cacheSize);
+            this.cache = new KVCacheLFU(cacheSize, strategy);
+        }
+        else {
+            logger.warn("Invalid cache replacement strategy -> cache is null");
+            this.cache = null;
+        }*/
+    }
+=======
+        else this.cache = KVCache.createKVCache(cacheSize, strategy);
 	}
+>>>>>>> origin/master
 
     @Override
     public int getPort(){
