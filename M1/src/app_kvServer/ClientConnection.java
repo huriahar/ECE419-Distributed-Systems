@@ -4,6 +4,10 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 
 import common.messages.TextMessage;
 
@@ -30,14 +34,20 @@ public class ClientConnection implements Runnable {
     private Socket clientSocket;
     private InputStream input;
     private OutputStream output;
+	private Path storagePath;
+//	private KVCache kvCache;
+	
+	
     
     /**
      * Constructs a new CientConnection object for a given TCP socket.
      * @param clientSocket the Socket object for the client connection.
      */
-    public ClientConnection (Socket clientSocket) {
+    public ClientConnection (Socket clientSocket, Path storagePath /*,KVCache kvCache*/) {
         this.clientSocket = clientSocket;
         this.isOpen = true;
+		this.storagePath = storagePath;
+//		this.kvCache = kvCache;
     }
     
     /**
@@ -93,13 +103,85 @@ public class ClientConnection implements Runnable {
     }
 
     private void handlePutCmd (String key, String value) {
-        ;
+        //Done in KVServer;
     }
 
     private void handleGetCmd (String key) {
+        //Done in KVServer;
+
         ;
     }
-    
+   
+
+	public void storeKV(String key, String value) throws IOException {
+		//TODO : Cache it in KVServer
+		//Store it to file 
+		//Make file if not there
+		//If there, check contents inside and figure out where to update
+		String filePath = this.storagePath.getFileName() + System.getProperty("file.separator") + key;
+		Path path = Paths.get(filePath);
+		byte[] value_bytes = value.getBytes("utf-8");
+		Files.write(path, value_bytes);
+
+		logger.info("Server: " + clientSocket.getInetAddress() + " at port: " + 
+		clientSocket.getLocalPort() + "\tStored <" + key + ", " + value + "> on Disk");		
+	}
+
+	public boolean deleteKV(String key) {
+		//TODO: Delete it from Cache in KVServer
+		//delete KV Pair from the persistent memory
+		String filePath = this.storagePath.getFileName() + System.getProperty("file.separator") + key;
+		Path path = Paths.get(filePath);
+		boolean delete_successful = false;
+
+		if(Files.notExists(path)) {
+			//return message that key doesn't exist
+			logger.error("Server: " + clientSocket.getInetAddress() + " at port: " + 
+		clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");			
+		}
+		else {
+			//delete file and return message that deletion successful
+			try {
+				Files.delete(path);
+				logger.info("Server: "+ clientSocket.getInetAddress() + " at port: " + 
+		clientSocket.getLocalPort() + "\tDELETE SUCCESS for key: " + key);
+				delete_successful = true;
+
+			} catch (IOException x) {
+				logger.error("Server: "+ clientSocket.getInetAddress() + " at port: " + 
+		clientSocket.getLocalPort() + "\tDELETE ERROR for key: " + key);			
+			}
+		}
+
+		return delete_successful;
+	}
+	
+	public String getValue(String key){
+		//TODO: Check is value in Cache in KVServer
+		//If not there, check value in files and return value
+		String filePath = this.storagePath.getFileName() + System.getProperty("file.separator") + key;
+		Path path = Paths.get(filePath);
+		String value = null;
+
+		if(Files.exists(path)) {
+			try{
+				//open file and read contents. Return content as a string
+				value = new String(Files.readAllBytes(path));
+
+			} catch (Exception ex) {
+				logger.error("Unable to open file. ERROR: " + ex);
+			}
+		}			
+		else {
+			logger.info("Server: " + clientSocket.getInetAddress() + " at port: " + 
+		clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");		
+		}		
+		return value;
+	}
+
+
+		
+ 
     /**
      * Method sends a TextMessage using this socket.
      * @param msg the message that is to be sent.
