@@ -31,7 +31,7 @@ public class KVCacheLRU extends KVCache {
         // if the cache is full, evict according to replacement policy
         if(fifo.size() == this.getCacheSize()) {
             //LRU replacement
-            String key first = fifo.removeFirst();
+            String first = fifo.removeFirst();
             kvp_map.remove(first);
         }
         fifo.add(key);
