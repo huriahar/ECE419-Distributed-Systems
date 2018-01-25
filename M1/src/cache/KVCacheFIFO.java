@@ -33,6 +33,7 @@ public class KVCacheFIFO extends KVCache {
         if(fifo.size() == this.getCacheSize()) {
             //FIFO replacement
             fifo.removeFirst();
+            kvp_map.remove(first);
         }
         fifo.add(key);
         kvp_map.put(key, value);
