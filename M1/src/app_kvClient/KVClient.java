@@ -2,12 +2,13 @@ package app_kvClient;
 
 import client.KVCommInterface;
 import client.KVStore;
-//import client.ClientSocketListener;
 import common.messages.TextMessage;
 import common.messages.KVMessage;
+import common.messages.KVMessage.StatusType;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+
 import java.net.UnknownHostException;
 import java.io.IOException;
 
@@ -35,7 +36,8 @@ public class KVClient implements IKVClient {
             try {
                 String cmdLine = stdin.readLine();
                 this.handleCommand(cmdLine);
-            } catch (IOException e) {
+            }
+            catch (IOException e) {
                 stop = true;
                 printError("Client Application does not respond - Application terminated ");
                 logger.error("Client Application does not respond - Application terminated ");
@@ -59,13 +61,16 @@ public class KVClient implements IKVClient {
                         serverAddress = tokens[1];
                         serverPort    = Integer.parseInt(tokens[2]);
                         newConnection(serverAddress, serverPort);
-                    } catch(NumberFormatException nfe) {
+                    }
+                    catch(NumberFormatException nfe) {
                         printError("No valid address. Port must be a number!");
                         logger.error("Unable to parse argument <port>", nfe);
-                    } catch (UnknownHostException e) {
+                    }
+                    catch (UnknownHostException e) {
                         printError("Unknown Host!");
                         logger.error("Unknown Host!", e);
-                    } catch (IOException e) {
+                    }
+                    catch (IOException e) {
                         printError("Could not establish connection!");
                         logger.error("Could not establish connection!", e);
                     }
@@ -81,58 +86,87 @@ public class KVClient implements IKVClient {
                 break;
 
             case "put":
-                if(tokens.length >= 3){
-			String key = tokens[1];
-			if(clientStore != null && clientStore.isRunning()) {
-				StringBuilder msg = new StringBuilder();
-				for(int i = 2; i < tokens.length; i++) {
-					msg.append(tokens[i]);
-					if (i != tokens.length -1 ) {
-						msg.append(" ");
-					}
-				}
+                if (tokens.length >= 3) {
+                    String key = tokens[1];
+                    if (clientStore != null && clientStore.isRunning()) {
+                        StringBuilder msg = new StringBuilder();
+                        for (int i = 2; i < tokens.length; i++) {
+                            msg.append(tokens[i]);
+                            if (i != tokens.length - 1) {
+                                msg.append(" ");
+                            }
+                        }
 
-				try {	
-					KVMessage reply = clientStore.put(key, msg.toString());		
-                			if (reply.getStatus() == KVMessage.StatusType.PUT_ERROR)
-						logger.error(reply.getStatusString() + " with <key, value>: <" + reply.getKey() + ", " + reply.getValue() + ">");  
-					else
-						logger.info(reply.getStatusString() + " with <key, value>: <" + reply.getKey() + ", " + reply.getValue() + ">");  
-				} catch (Exception ex) {
-					logger.error("Put Failed. ERROR: " + ex);		
-				}
-			 
-                	}
-			else {
-				printError("Not connected");
-			}
-		}
-		else {
-			printError("Invalid number of parameters for command \"put\"");
-			printHelp();
-		}
+                        try {   
+                            KVMessage reply = clientStore.put(key, msg.toString());
+                            StatusType status = reply.getStatus();
+                            if (status == KVMessage.StatusType.PUT_ERROR) {
+                                System.out.println(PROMPT + "PUT_ERROR! Unable to put key value on server");
+                                logger.error(reply.getStatusString() + " with <key, value>: <" +
+                                    reply.getKey() + ", " + reply.getValue() + ">");
+                            }
+                            else if (status == KVMessage.StatusType.PUT_UPDATE) {
+                                System.out.println(PROMPT + "PUT_UPDATE! Unable to update key value on server");
+                                logger.error(reply.getStatusString() + " with <key, value>: <" +
+                                    reply.getKey() + ", " + reply.getValue() + ">");
+                            }
+                            else if (status == KVMessage.StatusType.PUT_SUCCESS) {
+                                System.out.println(PROMPT + "PUT_SUCCESS! Successfully added key value pair on server");
+                                logger.info(reply.getStatusString() + " with <key, value>: <" +
+                                    reply.getKey() + ", " + reply.getValue() + ">");
+                            }
+                            else if (status == KVMessage.StatusType.DELETE_SUCCESS) {
+                                System.out.println(PROMPT + "DELETE_SUCCESS! Successfully deleted key value pair on server");
+                                logger.info(reply.getStatusString() + " with <key, value>: <" +
+                                    reply.getKey() + ", " + reply.getValue() + ">");
+                            }
+                            else if (status == KVMessage.StatusType.DELETE_ERROR) {
+                                System.out.println(PROMPT + "DELETE_ERROR! Unable to delete key value pair on server");
+                                logger.error(reply.getStatusString() + " with <key, value>: <" +
+                                    reply.getKey() + ", " + reply.getValue() + ">");
+                            }
+                        }
+                        catch (Exception ex) {
+                            printError("Put Failed. Exception: " + ex);
+                            logger.error("Put Failed. Exception: " + ex);
+                        }
+                    }
+                    else {
+                        printError("Put Failed. Not connected");
+                        logger.error("Put Failed. Not connected");
+                    }
+                }
+                else {
+                    printError("Invalid number of parameters for command \"put\"");
+                    printHelp();
+                }
                 break;
 
             case "get":
-                if(tokens.length == 2){
-			String key = tokens[1];
-			try {
-				KVMessage reply = clientStore.get(key);
-				if(reply.getStatus == KVMessage.StatusType.GET_ERROR)
-					logger.error(reply.getStatusString() + " using key: " + key);
-				else
-					logger.info(reply.getStatusString() + " using key: " + key);
-			} catch (Exception ex) {
-				logger.error("Get Failed. ERROR: " + ex);	
-			}
-			
+                if (tokens.length == 2) {
+                    String key = tokens[1];
+                    try {
+                        KVMessage reply = clientStore.get(key);
+                        StatusType status = reply.getStatus();
+                        if (status == KVMessage.StatusType.GET_ERROR) {
+                            System.out.println(PROMPT + "GET_ERROR! Unable to get value with given key");
+                            logger.error(reply.getStatusString() + " using key: " + key);
+                        }
+                        else if (status == KVMessage.StatusType.GET_SUCCESS) {
+                            System.out.println(PROMPT + "GET_SUCCESS! Successfully retrieved value with given key");
+                            logger.info(reply.getStatusString() + " using key: " + key + " Value: " + reply.getValue());
+                        }
+                    }
+                    catch (Exception ex) {
+                        printError("Get Failed. Exception" + ex);
+                        logger.error("Get Failed. Exception: " + ex);   
+                    }
                 }
                 else {
-			printError("Invalid number of parameters for command \"get\"");
-			printHelp();                   
+                    printError("Invalid number of parameters for command \"get\"");
+                    printHelp();                   
                 }
                 break;
-
 
             case "logLevel":
                 if (tokens.length == 2) {
@@ -149,9 +183,11 @@ public class KVClient implements IKVClient {
                     printError("Invalid number of parameters for command \"logLevel\"");
                 }
                 break;
+
             case "help":
                 printHelp(); 
                 break;
+
             default:
                 printError("Unknown command");
                 printHelp();            
@@ -228,15 +264,14 @@ public class KVClient implements IKVClient {
         }
     }
 
-    private void sendMessage(String msg){
-        /*try {
+    /*private void sendMessage(String msg){
+        try {
             client.sendMessage(new TextMessage(msg));
         } catch (IOException e) {
             printError("Unable to send message!");
             disconnect();
-        }*/
-        ;
-    }
+        }
+    }*/
 
     @Override
     public void newConnection(String hostname, int port) 
@@ -255,18 +290,18 @@ public class KVClient implements IKVClient {
     }
 
     @Override
-    public KVCommInterface getStore(){
+    public KVCommInterface getStore() {
         // TODO Auto-generated method stub
         return this.clientStore;
     }
 
-    @Override
+    /*@Override
     public void handleNewMessage(TextMessage msg) {
         if(!stop) {
             System.out.println(msg.getMsg());
             System.out.print(PROMPT);
         }
-    }
+    }*/
 
     @Override
     public void handleStatus(SocketStatus status) {
@@ -285,7 +320,7 @@ public class KVClient implements IKVClient {
         
     }
 
-    private void printError(String error){
+    private void printError(String error) {
         System.out.println(PROMPT + "Error! " +  error);
     }
 
