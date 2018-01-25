@@ -35,31 +35,12 @@ public class KVServer extends Thread implements IKVServer {
      */
     public KVServer (int port, int cacheSize, String strategy) {
         this.port = port;
-        createCache(cacheSize, strategy);
-    }
-
-    private void createCache (int cacheSize, String strategy) {
-        if (cacheSize <= 0) {
+        if(cacheSize <= 0){
             logger.warn("Invalid cacheSize -> cache is null");
             this.cache = null;
         }
-        /*else if (strategy.equals("FIFO")) {
-            logger.info("Creating FIFO cache with size " + cacheSize);
-            this.cache = new KVCacheFIFO(cacheSize, strategy);
-        }
-        else if (strategy.equals("LRU")) {
-            logger.info("Creating LRU cache with size " + cacheSize);
-            this.cache = new KVCacheLRU(cacheSize, strategy);
-        }
-        else if (strategy.equals("LFU")) {
-            logger.info("Creating LFU cache with size " + cacheSize);
-            this.cache = new KVCacheLFU(cacheSize, strategy);
-        }
-        else {
-            logger.warn("Invalid cache replacement strategy -> setting Default cache strategy to FIFO");
-            this.cache = KVCacheFIFO(cacheSize, "FIFO");
-        }*/
-    }
+        else this.cache = KVCache.createKVCache(cacheSize, strategy);
+	}
 
     @Override
     public int getPort(){
@@ -84,31 +65,38 @@ public class KVServer extends Thread implements IKVServer {
 
     @Override
     public boolean inStorage(String key){
-        // TODO Auto-generated method stub
-        return false;
-    }
+        if(inCache(key)) return true;
+        //TODO check if it is in storage (but not in cache)
+		return false;
+	}
 
     @Override
     public boolean inCache(String key){
-        // TODO Auto-generated method stub
-        return false;
-    }
+        return this.cache.hasKey(key);
+	}
 
     @Override
     public String getKV(String key) throws Exception{
-        // TODO Auto-generated method stub
-        return "";
-    }
+        String value = this.cache.getValue(key);
+        if(value.equals("")){
+            // 1- retrieve from disk
+            // TODO
+            // 2 - insert in cache
+            this.cache.insert(key, value);
+        }
+		return value;
+	}
 
     @Override
     public void putKV(String key, String value) throws Exception{
-        // TODO Auto-generated method stub
-    }
+        //TODO write in storage
+        this.cache.insert(key, value);
+	}
 
     @Override
     public void clearCache(){
-        // TODO Auto-generated method stub
-    }
+        this.cache.clearCache();
+	}
 
     @Override
     public void clearStorage(){
