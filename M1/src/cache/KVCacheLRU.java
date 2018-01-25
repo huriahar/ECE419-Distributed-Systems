@@ -6,15 +6,15 @@ import java.util.Map;
 
 import app_kvServer.IKVServer;
 
-public class KVCacheFIFO extends KVCache {
-
+public class KVCacheLRU extends KVCache {
     // Using a linked list implementation of a queue
     // Maintians FIFO order but allows random deletion
     private LinkedList<String> fifo = new LinkedList<String>();
     private Map<String, String> kvp_map = new HashMap();
 
-    public KVCacheFIFO(int cacheSize) {
-        super(cacheSize, "FIFO");
+
+    public KVCacheLRU(int cacheSize) {
+        super(cacheSize, "LRU");
     }
 
     @Override
@@ -23,15 +23,14 @@ public class KVCacheFIFO extends KVCache {
 
         // check if it already exists
         if (kvp_map.containsKey(key)) {
-            //update the value
-            kvp_map.put(key, value);
-            return;
+            //update the key's position in the FIFO
+            fifo.remove(key);
         }
             
         // if it doesn't exist, cache it
         // if the cache is full, evict according to replacement policy
         if(fifo.size() == this.getCacheSize()) {
-            //FIFO replacement
+            //LRU replacement
             fifo.removeFirst();
         }
         fifo.add(key);
@@ -65,5 +64,5 @@ public class KVCacheFIFO extends KVCache {
         fifo.clear(); 
         kvp_map.clear();
     }
-
 }
+
