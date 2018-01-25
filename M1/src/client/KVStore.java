@@ -9,8 +9,7 @@ import java.util.Set;
 import common.messages.KVMessage;
 import common.messages.TextMessage;
 import common.messages.KVReplyMessage;
-//TODO implement this library?
-//import client.ClientSocketListener.SocketStatus;
+import app_kvClient.IKVClient;
 
 import java.net.UnknownHostException;
 import java.io.IOException;
@@ -20,7 +19,7 @@ import org.apache.log4j.Logger;
 
 public class KVStore implements KVCommInterface {
     private static Logger logger = Logger.getRootLogger();
-    //private Set<ClientSocketListener> listeners;
+    private Set<IKVClient> listeners;
     
     private String serverAddr;
     private int serverPort;
@@ -54,7 +53,7 @@ public class KVStore implements KVCommInterface {
             throws UnknownHostException, IOException {
         // TODO Auto-generated method stub
         this.clientSocket = new Socket(this.serverAddr, this.serverPort);
-        //this.listeners = new HashSet<ClientSocketListener>();
+        this.listeners = new HashSet<IKVClient>();
         setRunning(true);
         logger.info("Connection established with address " + this.serverAddr + 
             " at port " + this.serverPort);
@@ -69,9 +68,9 @@ public class KVStore implements KVCommInterface {
         
         try {
             tearDownConnection();
-            //for(ClientSocketListener listener : listeners) {
-            //    listener.handleStatus(SocketStatus.DISCONNECTED);
-            //}
+            for(IKVClient listener : listeners) {
+                listener.handleStatus(SocketStatus.DISCONNECTED);
+            }
         } 
         catch (IOException ioe) {
             logger.error("Unable to close connection!");
@@ -134,11 +133,11 @@ public class KVStore implements KVCommInterface {
     public void setRunning(boolean run) {
         running = run;
     }
-/*
-    public void addListener(ClientSocketListener listener){
+
+    public void addListener(IKVClient listener){
         listeners.add(listener);
     }
-*/
+
 	/**
 	 * Method sends a TextMessage using this socket.
 	 * @param msg the message that is to be sent.
