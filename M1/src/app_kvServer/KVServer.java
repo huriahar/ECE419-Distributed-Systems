@@ -22,7 +22,7 @@ public class KVServer implements IKVServer {
 	public KVServer(int port, int cacheSize, String strategy) {
         this.port = port;
         if(cacheSize == 0) this.cache = null;
-        else this.cache = new KVCache(cacheSize, strategy);
+        else this.cache = KVCache.createKVCache(cacheSize, strategy);
 	}
 
 	@Override
@@ -48,30 +48,37 @@ public class KVServer implements IKVServer {
 
 	@Override
     public boolean inStorage(String key){
-		// TODO Auto-generated method stub
+        if(inCache(key)) return true;
+        //TODO check if it is in storage (but not in cache)
 		return false;
 	}
 
 	@Override
     public boolean inCache(String key){
-		// TODO Auto-generated method stub
-		return false;
+        return this.cache.hasKey(key);
 	}
 
 	@Override
     public String getKV(String key) throws Exception{
-		// TODO Auto-generated method stub
-		return "";
+        String value = this.cache.getValue(key);
+        if(value.equals("")){
+            // 1- retrieve from disk
+            // TODO
+            // 2 - insert in cache
+            this.cache.insert(key, value);
+        }
+		return value;
 	}
 
 	@Override
     public void putKV(String key, String value) throws Exception{
-		// TODO Auto-generated method stub
+        //TODO write in storage
+        this.cache.insert(key, value);
 	}
 
 	@Override
     public void clearCache(){
-		// TODO Auto-generated method stub
+        this.cache.clearCache();
 	}
 
 	@Override
