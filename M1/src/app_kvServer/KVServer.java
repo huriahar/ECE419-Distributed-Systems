@@ -2,15 +2,14 @@ package app_kvServer;
 
 import java.net.Socket;
 import java.net.ServerSocket;
+import java.net.InetAddress;
 
 import java.io.IOException;
+import java.net.BindException;
 
 import logger.LogSetup;
 
-import cache.KVCache;
-//import cache.KVCacheFIFO;
-//import cache.KVCacheLRU;
-//import cache.KVCacheLFU;
+import cache.*;
 import common.messages.TextMessage;
 
 import org.apache.log4j.Logger;
@@ -22,6 +21,7 @@ public class KVServer extends Thread implements IKVServer {
     private int port;
     private ServerSocket serverSocket;
     private KVCache cache;
+    private boolean running;
 
     /**
      * Start KV Server at given port
@@ -56,8 +56,8 @@ public class KVServer extends Thread implements IKVServer {
             this.cache = new KVCacheLFU(cacheSize, strategy);
         }
         else {
-            logger.warn("Invalid cache replacement strategy -> setting Default cache strategy to FIFO");
-            this.cache = KVCacheFIFO(cacheSize, "FIFO");
+            logger.warn("Invalid cache replacement strategy -> cache is null");
+            this.cache = null;
         }*/
     }
 
@@ -67,7 +67,7 @@ public class KVServer extends Thread implements IKVServer {
     }
 
     @Override
-    public String getHostname(){
+    public String getHostname() {
         // TODO Auto-generated method stub
         return null;
     }
@@ -116,42 +116,84 @@ public class KVServer extends Thread implements IKVServer {
     }
 
     @Override
-    public void run(){
+    public void run() {
+        // TODO Auto-generated method stub
+        running = initializeServer();
+
+        if (serverSocket != null) {
+            while (isRunning()) {
+                try {
+                    Socket client = serverSocket.accept();
+                    ClientConnection connection = new ClientConnection(client);
+                    new Thread(connection).start();
+
+                    logger.info("Connected to " + client.getInetAddress().getHostName() + 
+                        " on port " + client.getPort());
+                }
+                catch (IOException e) {
+                    logger.error("Error! " + "Unable to establish connection. \n", e);
+                }
+            }
+        }
+        logger.error("Server stopped.");
+    }
+
+    private boolean isRunning() {
+        return this.running;
+    }
+
+    private boolean initializeServer() {
+        logger.info("Initialize server ...");
+        try {
+            serverSocket = new ServerSocket(port);
+            logger.info("Server listening on port: " 
+                    + serverSocket.getLocalPort());    
+            return true;
+        }
+        catch (IOException e) {
+            logger.error("Error! Cannot open server socket:");
+            if (e instanceof BindException) {
+                logger.error("Port " + port + " is already bound!");
+            }
+            return false;
+        }
+    }
+
+    @Override
+    public void kill() {
         // TODO Auto-generated method stub
     }
 
     @Override
-    public void kill(){
-        // TODO Auto-generated method stub
-    }
-
-    @Override
-    public void close(){
+    public void close() {
         // TODO Auto-generated method stub
     }
 
     /**
      * Main entry point for the KV server application. 
-     * @param args contains the port number at args[0].
+     * @param args contains the port number at args[0]
+     * cacheSize at args[1] and replacementPolicy at args[1]
      */
     public static void main(String[] args) {
         try {
             new LogSetup("logs/server.log", Level.ALL);
-            if(args.length != 1) {
+            if(args.length != 3) {
                 System.out.println("Error! Invalid number of arguments!");
-                System.out.println("Usage: Server <port>!");
+                System.out.println("Usage: Server <port> <cacheSize> <replacementPolicy>!");
             }
             else {
                 int port = Integer.parseInt(args[0]);
-                //new KVServer(port).start();
+                int cacheSize = Integer.parseInt(args[1]);
+                String replacementPolicy = args[2];
+                new KVServer(port, cacheSize, replacementPolicy).start();
             }
         } catch (IOException e) {
             System.out.println("Error! Unable to initialize logger!");
             e.printStackTrace();
             System.exit(1);
         } catch (NumberFormatException nfe) {
-            System.out.println("Error! Invalid argument <port>! Not a number!");
-            System.out.println("Usage: Server <port>!");
+            System.out.println("Error! Invalid argument <port> or <cacheSize>! Not a number!");
+            System.out.println("Usage: Server <port> <cacheSize> <replacementPolicy>!");
             System.exit(1);
         }
     }
