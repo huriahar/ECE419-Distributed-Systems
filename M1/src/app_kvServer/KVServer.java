@@ -2,9 +2,10 @@ package app_kvServer;
 
 import java.net.Socket;
 import java.net.ServerSocket;
-
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.io.IOException;
-
+import java.net.BindException;
 import logger.LogSetup;
 
 import cache.KVCache;
@@ -22,6 +23,8 @@ public class KVServer extends Thread implements IKVServer {
     private int port;
     private ServerSocket serverSocket;
     private KVCache cache;
+    private boolean running;
+	private Path storagePath;
 
     /**
      * Start KV Server at given port
@@ -33,8 +36,9 @@ public class KVServer extends Thread implements IKVServer {
      *           currently not contained in the cache. Options are "FIFO", "LRU",
      *           and "LFU".
      */
-    public KVServer (int port, int cacheSize, String strategy) {
+    public KVServer(int port, int cacheSize, String strategy) {
         this.port = port;
+		this.storagePath = Paths.get(String.valueOf(port));
         if(cacheSize <= 0){
             logger.warn("Invalid cacheSize -> cache is null");
             this.cache = null;
@@ -66,7 +70,7 @@ public class KVServer extends Thread implements IKVServer {
     @Override
     public boolean inStorage(String key){
         if(inCache(key)) return true;
-        //TODO check if it is in storage (but not in cache)
+		
 		return false;
 	}
 
@@ -79,8 +83,10 @@ public class KVServer extends Thread implements IKVServer {
     public String getKV(String key) throws Exception{
         String value = this.cache.getValue(key);
         if(value.equals("")){
-            // 1- retrieve from disk
+            // 1- retrieve from disk	
             // TODO
+			
+			
             // 2 - insert in cache
             this.cache.insert(key, value);
         }
@@ -91,6 +97,7 @@ public class KVServer extends Thread implements IKVServer {
     public void putKV(String key, String value) throws Exception{
         //TODO write in storage
         this.cache.insert(key, value);
+		
 	}
 
     @Override
@@ -106,6 +113,28 @@ public class KVServer extends Thread implements IKVServer {
     @Override
     public void run(){
         // TODO Auto-generated method stub
+        
+    	running = initializeServer();
+        
+        if(serverSocket != null) {
+	        while(isRunning()){
+	            try {
+	                Socket client = serverSocket.accept();                
+	                ClientConnection connection = 
+	                		new ClientConnection(client, this.storagePath, this.cache);
+	                new Thread(connection).start();
+	                
+	                logger.info("Connected to " 
+	                		+ client.getInetAddress().getHostName() 
+	                		+  " on port " + client.getPort());
+	            } catch (IOException e) {
+	            	logger.error("Error! " +
+	            			"Unable to establish connection. \n", e);
+	            }
+	        }
+        }
+        logger.info("Server stopped.");
+
     }
 
     @Override
@@ -117,6 +146,29 @@ public class KVServer extends Thread implements IKVServer {
     public void close(){
         // TODO Auto-generated method stub
     }
+
+    private boolean initializeServer() {
+    	logger.info("Initialize server ...");
+    	try {
+            serverSocket = new ServerSocket(port);
+            logger.info("Server listening on port: " 
+            		+ serverSocket.getLocalPort());    
+            return true;
+        
+        } catch (IOException e) {
+        	logger.error("Error! Cannot open server socket:");
+            if(e instanceof BindException){
+            	logger.error("Port " + port + " is already bound!");
+            }
+            return false;
+        }
+    }
+    
+   
+    private boolean isRunning() {
+        return this.running;
+    }
+
 
     /**
      * Main entry point for the KV server application. 

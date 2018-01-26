@@ -5,10 +5,15 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.io.FileWriter;  
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
-
+//import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
+import cache.KVCache;
 import common.messages.TextMessage;
 
 import org.apache.log4j.*;
@@ -35,7 +40,7 @@ public class ClientConnection implements Runnable {
     private InputStream input;
     private OutputStream output;
 	private Path storagePath;
-//	private KVCache kvCache;
+	private KVCache cache;
 	
 	
     
@@ -43,11 +48,11 @@ public class ClientConnection implements Runnable {
      * Constructs a new CientConnection object for a given TCP socket.
      * @param clientSocket the Socket object for the client connection.
      */
-    public ClientConnection (Socket clientSocket, Path storagePath /*,KVCache kvCache*/) {
+    public ClientConnection (Socket clientSocket, Path storagePath ,KVCache cache) {
         this.clientSocket = clientSocket;
         this.isOpen = true;
 		this.storagePath = storagePath;
-//		this.kvCache = kvCache;
+//		this.cache = cache;
     }
     
     /**
@@ -112,61 +117,42 @@ public class ClientConnection implements Runnable {
         ;
     }
    
+	public boolean onDisk(String key) {
+		boolean foundOnDisk = false;
+
+		if(Files.exists(storagePath)) {
+			//return message that key found in Storage
+			foundOnDisk = true;
+		}
+		return foundOnDisk;
+	}
 
 	public void storeKV(String key, String value) throws IOException {
 		//TODO : Cache it in KVServer
-		//Store it to file 
-		//Make file if not there
-		//If there, check contents inside and figure out where to update
-		String filePath = this.storagePath.getFileName() + System.getProperty("file.separator") + key;
-		Path path = Paths.get(filePath);
-		byte[] value_bytes = value.getBytes("utf-8");
-		Files.write(path, value_bytes);
+ 
+		FileWriter file = new FileWriter(this.storagePath.toString());		
+		String input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
+		JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
+		kvStorage.put(key, value);
 
-		logger.info("Server: " + clientSocket.getInetAddress() + " at port: " + 
-		clientSocket.getLocalPort() + "\tStored <" + key + ", " + value + "> on Disk");		
+		String output = JSONValue.toJSONString(kvStorage);
+		Files.write(this.storagePath, output.getBytes(StandardCharsets.UTF_8));
+
 	}
 
-	public boolean deleteKV(String key) {
-		//TODO: Delete it from Cache in KVServer
-		//delete KV Pair from the persistent memory
-		String filePath = this.storagePath.getFileName() + System.getProperty("file.separator") + key;
-		Path path = Paths.get(filePath);
-		boolean delete_successful = false;
-
-		if(Files.notExists(path)) {
-			//return message that key doesn't exist
-			logger.error("Server: " + clientSocket.getInetAddress() + " at port: " + 
-		clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");			
-		}
-		else {
-			//delete file and return message that deletion successful
-			try {
-				Files.delete(path);
-				logger.info("Server: "+ clientSocket.getInetAddress() + " at port: " + 
-		clientSocket.getLocalPort() + "\tDELETE SUCCESS for key: " + key);
-				delete_successful = true;
-
-			} catch (IOException x) {
-				logger.error("Server: "+ clientSocket.getInetAddress() + " at port: " + 
-		clientSocket.getLocalPort() + "\tDELETE ERROR for key: " + key);			
-			}
-		}
-
-		return delete_successful;
-	}
-	
-	public String getValue(String key){
+	public String getValue(String key) throws IOException {
 		//TODO: Check is value in Cache in KVServer
-		//If not there, check value in files and return value
-		String filePath = this.storagePath.getFileName() + System.getProperty("file.separator") + key;
-		Path path = Paths.get(filePath);
-		String value = null;
-
-		if(Files.exists(path)) {
+		String value = "";
+		String input;
+		
+		if(Files.exists(this.storagePath)) {
 			try{
-				//open file and read contents. Return content as a string
-				value = new String(Files.readAllBytes(path));
+//				value = new String(Files.readAllBytes(storagePath));
+
+				input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
+				JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
+//				value =	kvStorage.getString(key);
+
 
 			} catch (Exception ex) {
 				logger.error("Unable to open file. ERROR: " + ex);
@@ -259,3 +245,50 @@ public class ClientConnection implements Runnable {
         return msg;
     }    
 }
+
+
+
+//	public boolean deleteKV(String key) throws IOException {
+//		//TODO: Delete it from Cache in KVServer
+//		//delete KV Pair from the persistent memory
+//		boolean delete_successful = false;
+//		String input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
+//		JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
+//		if(kvStorage.has(key)) {
+//			kvStorage.remove(key);	
+//			logger.info("Server: "+ clientSocket.getInetAddress().getHostName() + " at port: " + 
+//						clientSocket.getLocalPort() + "\tDELETE SUCCESS for key: " + key);
+//			delete_successful = true;
+//	
+//		}
+//		else {
+//			logger.error("Server: " + clientSocket.getInetAddress().getHostName() + " at port: " + 
+//						clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");
+//		}
+//
+//		String output = JSONValue.toJSONString(kvStorage);
+//		Files.write(this.storagePath, output.getBytes(StandardCharsets.UTF_8));
+//
+//
+//		if(Files.notExists(this.storagePath.toString())) {
+//			//return message that key doesn't exist
+//			logger.error("Server: " + clientSocket.getInetAddress().getHostName() + " at port: " + 
+//		clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");			
+//		}
+//		else {
+//			//delete file and return message that deletion successful
+//			try {
+//				Files.delete(storagePath);
+//				logger.info("Server: "+ clientSocket.getInetAddress().getHostName() + " at port: " + 
+//		clientSocket.getLocalPort() + "\tDELETE SUCCESS for key: " + key);
+//				delete_successful = true;
+//
+//			} catch (IOException x) {
+//				logger.error("Server: "+ clientSocket.getInetAddress().getHostName() + " at port: " + 
+//		clientSocket.getLocalPort() + "\tDELETE ERROR for key: " + key);			
+//			}
+//		}
+//
+//		return delete_successful;
+//	}
+	
