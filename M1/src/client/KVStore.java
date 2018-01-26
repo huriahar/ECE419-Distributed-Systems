@@ -89,7 +89,7 @@ public class KVStore extends Thread implements KVCommInterface {
             
         }
         finally {
-            if(isRunning()) {
+            if (isRunning()) {
                 disconnect();
             }
         }

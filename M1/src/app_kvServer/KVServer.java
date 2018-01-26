@@ -22,11 +22,11 @@ import org.apache.log4j.Level;
 public class KVServer extends Thread implements IKVServer {
 
     private static Logger logger = Logger.getRootLogger();
-    private int port;
+    private int serverPort;
     private ServerSocket serverSocket;
     private KVCache cache;
     private boolean running;
-	private Path storagePath;
+    private Path storagePath;
 
     /**
      * Start KV Server at given port
@@ -39,74 +39,75 @@ public class KVServer extends Thread implements IKVServer {
      *           and "LFU".
      */
     public KVServer(int port, int cacheSize, String strategy) {
-        this.port = port;
-		this.storagePath = Paths.get(String.valueOf(port));
+        this.serverPort = port;
+        this.storagePath = Paths.get(String.valueOf(port));
         if (cacheSize <= 0) {
             logger.warn("Invalid cacheSize -> cache is null");
             this.cache = null;
         }
         else 
             this.cache = KVCache.createKVCache(cacheSize, strategy);
-	}
+    }
 
     @Override
-    public int getPort(){
-        return this.port;
+    public int getPort() {
+        return this.serverPort;
     }
 
     @Override
     public String getHostname() {
         // TODO Auto-generated method stub
-        return null;
+        return (serverSocket != null) ? serverSocket.getInetAddress().getHostAddress() : "";
     }
 
     @Override
-    public CacheStrategy getCacheStrategy(){
+    public CacheStrategy getCacheStrategy() {
         return this.cache.getStrategy();
     }
 
     @Override
-    public int getCacheSize(){
+    public int getCacheSize() {
         return this.cache.getCacheSize();
     }
 
     @Override
-    public boolean inStorage(String key){
-        if(inCache(key)) return true;
-		
-		return false;
-	}
+    public boolean inStorage(String key) {
+        if (inCache(key)) return true;
+        // TODO: We need to check if key is in permanant disk storage as well!
+        return false;
+    }
 
     @Override
-    public boolean inCache(String key){
+    public boolean inCache(String key) {
         return this.cache.hasKey(key);
-	}
+    }
 
     @Override
-    public String getKV(String key) throws Exception{
+    public String getKV(String key)
+            throws Exception {
         String value = this.cache.getValue(key);
         if(value.equals("")){
-            // 1- retrieve from disk	
+            // 1- retrieve from disk    
             // TODO
-			
-			
+            
+            
             // 2 - insert in cache
             this.cache.insert(key, value);
         }
-		return value;
-	}
+        return value;
+    }
 
     @Override
-    public void putKV(String key, String value) throws Exception{
+    public void putKV(String key, String value)
+            throws Exception{
         //TODO write in storage
         this.cache.insert(key, value);
-		
-	}
+    }
 
     @Override
-    public void clearCache(){
+    public void clearCache() {
         this.cache.clearCache();
-	}
+    }
 
     @Override
     public void clearStorage(){
@@ -116,24 +117,24 @@ public class KVServer extends Thread implements IKVServer {
     @Override
     public void run() {
         // TODO Auto-generated method stub
-    	running = initializeServer();
+        running = initializeServer();
         
-        if(serverSocket != null) {
-	        while(isRunning()){
-	            try {
-	                Socket client = serverSocket.accept();                
-	                ClientConnection connection = 
-	                		new ClientConnection(client, this.storagePath, this.cache);
-	                new Thread(connection).start();
-	                
-	                logger.info("Connected to " 
-	                		+ client.getInetAddress().getHostName() 
-	                		+  " on port " + client.getPort());
-	            } catch (IOException e) {
-	            	logger.error("Error! " +
-	            			"Unable to establish connection. \n", e);
-	            }
-	        }
+        if (serverSocket != null) {
+            while(isRunning()){
+                try {
+                    Socket client = serverSocket.accept();                
+                    ClientConnection connection = 
+                            new ClientConnection(this, client, this.storagePath, this.cache);
+                    new Thread(connection).start();
+
+                    logger.info("Connected to " 
+                            + client.getInetAddress().getHostName() 
+                            +  " on port " + client.getPort());
+                } catch (IOException e) {
+                    logger.error("Error! " +
+                            "Unable to establish connection. \n", e);
+                }
+            }
         }
         logger.info("Server stopped.");
     }
@@ -145,7 +146,7 @@ public class KVServer extends Thread implements IKVServer {
     private boolean initializeServer() {
         logger.info("Initialize server ...");
         try {
-            serverSocket = new ServerSocket(port);
+            serverSocket = new ServerSocket(serverPort);
             logger.info("Server listening on port: " 
                     + serverSocket.getLocalPort());    
             return true;
@@ -153,7 +154,7 @@ public class KVServer extends Thread implements IKVServer {
         catch (IOException e) {
             logger.error("Error! Cannot open server socket:");
             if (e instanceof BindException) {
-                logger.error("Port " + port + " is already bound!");
+                logger.error("Port " + serverPort + " is already bound!");
             }
             return false;
         }
@@ -162,11 +163,26 @@ public class KVServer extends Thread implements IKVServer {
     @Override
     public void kill() {
         // TODO Auto-generated method stub
+        running = false;
+        try {
+            serverSocket.close();
+        }
+        catch (IOException ex) {
+            logger.error("Error! Unable to close socket on port: " + serverPort, ex);
+        }
     }
 
     @Override
     public void close() {
-        // TODO Auto-generated method stub
+        // TODO Auto-generated method 
+        // TODO: Wait for all threads, save any remainder stuff in cache to memory
+        running = false;
+        try {
+            serverSocket.close();
+        }
+        catch (IOException ex) {
+            logger.error("Error! Unable to close socket on port: " + serverPort, ex);
+        }
     }
 
 
@@ -175,26 +191,32 @@ public class KVServer extends Thread implements IKVServer {
      * @param args contains the port number at args[0]
      * cacheSize at args[1] and replacementPolicy at args[1]
      */
-    public static void main(String[] args) {
+    public static void main (String[] args) {
         try {
             new LogSetup("logs/server.log", Level.ALL);
-            if(args.length != 3) {
+            if(args.length < 2 || args.length > 3) {
                 System.out.println("Error! Invalid number of arguments!");
-                System.out.println("Usage: Server <port> <cacheSize> <replacementPolicy>!");
+                System.out.println("Usage: Server <port> <cacheSize> [<replacementPolicy>]!");
             }
             else {
                 int port = Integer.parseInt(args[0]);
                 int cacheSize = Integer.parseInt(args[1]);
-                String replacementPolicy = args[2];
+                String replacementPolicy = "";
+                // Cache Replacement policy is supplied
+                if (args.length == 3) {
+                    replacementPolicy = args[2];
+                }
                 new KVServer(port, cacheSize, replacementPolicy).start();
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             System.out.println("Error! Unable to initialize logger!");
             e.printStackTrace();
             System.exit(1);
-        } catch (NumberFormatException nfe) {
+        }
+        catch (NumberFormatException nfe) {
             System.out.println("Error! Invalid argument <port> or <cacheSize>! Not a number!");
-            System.out.println("Usage: Server <port> <cacheSize> <replacementPolicy>!");
+            System.out.println("Usage: Server <port> <cacheSize> [<replacementPolicy>]!");
             System.exit(1);
         }
     }

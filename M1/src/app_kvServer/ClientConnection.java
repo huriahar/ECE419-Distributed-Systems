@@ -37,6 +37,7 @@ public class ClientConnection implements Runnable {
     private static final String DELIM = "|";
     
     private Socket clientSocket;
+    private KVServer server;
     private InputStream input;
     private OutputStream output;
     private Path storagePath;
@@ -46,7 +47,8 @@ public class ClientConnection implements Runnable {
      * Constructs a new CientConnection object for a given TCP socket.
      * @param clientSocket the Socket object for the client connection.
      */
-    public ClientConnection (Socket clientSocket, Path storagePath, KVCache cache) {
+    public ClientConnection (KVServer server, Socket clientSocket, Path storagePath, KVCache cache) {
+        this.server = server;
         this.clientSocket = clientSocket;
         this.isOpen = true;
         this.storagePath = storagePath;
@@ -71,13 +73,17 @@ public class ClientConnection implements Runnable {
                 try {
                     TextMessage msgReceived = receiveMessage();
                     // Unmarshalling of received message
-                    String[] msgContent = msgReceived.getMsg().split(DELIM);
+                    String[] msgContent = msgReceived.getMsg().split("\\" + DELIM);
                     String command = msgContent[0];
                     if (command.equals("PUT")) {
-                        handlePutCmd(msgContent[1], msgContent[1]);
+                        handlePutCmd(msgContent[1], msgContent[2]);
                     }
                     else if (command.equals("GET")) {
                         handleGetCmd(msgContent[1]);
+                    }
+                    else {
+                        logger.error("Received invalid message type from client.");
+                        System.out.println("Received invalid message type from client.");
                     }
                 }
                 /* connection either terminated by the client or lost due to 
@@ -106,12 +112,31 @@ public class ClientConnection implements Runnable {
     }
 
     private void handlePutCmd (String key, String value) {
+        String result = "";
         //Done in KVServer;
+        System.out.println("PUT Key " + key + " Value " + value);
+        // If Value is not null or empty, insert in $ and disk
+        if (value != null && !value.equals("") && !value.equals("null")) {
+            try {
+                server.putKV(key, value);
+                result = "PUT_SUCCESS";
+                logger.info("Successfully added key " + key + " and value " 
+                    + value + " on server");
+            }
+            catch (Exception ex) {
+                result = "PUT_ERROR";
+                logger.error("PUT Error! Unable to add key " + key + " and value "
+                    + value + " to server");
+            }
+        }
+        else {
+            // Delete the value from $ and disk
+        }
     }
 
     private void handleGetCmd (String key) {
         //Done in KVServer;
-        ;
+        System.out.println("GET Key " + key);
     }
    
     public boolean onDisk(String key) {
