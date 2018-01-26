@@ -93,6 +93,7 @@ public class KVClient implements IKVClient {
                 if (tokens.length >= 2) {
                     String key = tokens[1];
                     if (clientStore != null && clientStore.isRunning()) {
+                        // If value is null, msg will be an empty string
                         StringBuilder msg = new StringBuilder();
                         for (int i = 2; i < tokens.length; i++) {
                             msg.append(tokens[i]);
@@ -129,6 +130,10 @@ public class KVClient implements IKVClient {
                                 logger.error(reply.getStatusString() + " with <key, value>: <" +
                                     reply.getKey() + ", " + reply.getValue() + ">");
                             }
+                            else {
+                                System.out.println(PROMPT + "Invalid Message Type from server!");
+                                logger.error("Invalid Message Type from server!");
+                            }
                         }
                         catch (Exception ex) {
                             printError("Put Failed. Exception: " + ex);
@@ -159,6 +164,10 @@ public class KVClient implements IKVClient {
                         else if (status == KVMessage.StatusType.GET_SUCCESS) {
                             System.out.println(PROMPT + "GET_SUCCESS! Successfully retrieved value with given key");
                             logger.info(reply.getStatusString() + " using key: " + key + " Value: " + reply.getValue());
+                        }
+                        else {
+                                System.out.println(PROMPT + "Invalid Message Type from server!");
+                                logger.error("Invalid Message Type from server!");
                         }
                     }
                     catch (Exception ex) {

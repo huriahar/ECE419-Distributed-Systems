@@ -34,7 +34,7 @@ public class KVStore extends Thread implements KVCommInterface {
     private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
     private static final int MAX_KEY_LENGTH = 20; 
     private static final int MAX_VALUE_LENGTH = 122880; //120KB
-    private static final String COMMA = ",";
+    private static final String DELIM = "|";
     private static final String PUT_CMD = "PUT";
     private static final String GET_CMD = "GET";
 
@@ -43,11 +43,12 @@ public class KVStore extends Thread implements KVCommInterface {
      * @param address the address of the KVServer
      * @param port the port of the KVServer
      */
-    public KVStore(String address, int port) 
-            throws UnknownHostException, IOException {
+    public KVStore(String address, int port) {
         this.serverAddr = address;
         this.serverPort = port;
         setRunning(true);
+        logger.info("Connection established with address " + this.serverAddr + 
+            " at port " + this.serverPort);
     }
 
     /**
@@ -100,8 +101,6 @@ public class KVStore extends Thread implements KVCommInterface {
         // TODO Auto-generated method stub
         this.clientSocket = new Socket(this.serverAddr, this.serverPort);
         this.listeners = new HashSet<IKVClient>();
-        logger.info("Connection established with address " + this.serverAddr + 
-            " at port " + this.serverPort);
         this.output = clientSocket.getOutputStream();
         this.input = clientSocket.getInputStream();
     }
@@ -147,17 +146,27 @@ public class KVStore extends Thread implements KVCommInterface {
             logger.error("Error: maximum value length allowed is 120K Bytes but value has length " + value.length());
             return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
         }
+        if (key.contains(" ")) {
+            logger.error("Error: Key should not contain space");
+            return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
+        }
+        // Might not need this - Need to test!!
+        if (key.contains(DELIM) || value.contains(DELIM)) {
+            logger.error("Error: Key/Value should not contain delimiter " + DELIM);
+            return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
+        }
 
         // step 2 - send a PUT request to the server
         // Marshall the sending message
-        TextMessage message = new TextMessage(PUT_CMD + COMMA + key + COMMA + value);
+        String msg = PUT_CMD + DELIM + key;
+        if (value != null && !value.equals("")) {
+            msg = msg + DELIM + value;
+        }
+        TextMessage message = new TextMessage(msg);
         sendMessage(message);
 
         // step 3 - get the server's response and forward it to the client
         TextMessage reply = receiveMessage();
-
-        // TODO: Might want to check if the message received from server is actually
-        // a valid Status code or not
         return new KVReplyMessage(key, value, reply.getMsg());
     }
 
@@ -167,17 +176,24 @@ public class KVStore extends Thread implements KVCommInterface {
         // step 1 - input validation
         if (key.length() > MAX_KEY_LENGTH) {
             logger.error("Error: maximum key length allowed is " + MAX_KEY_LENGTH + " but key has length " + key.length());
-            return new KVReplyMessage(key, null, KVMessage.StatusType.PUT_ERROR);
+            return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
+        }
+        if (key.contains(" ")) {
+            logger.error("Error: Key should not contain space");
+            return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
+        }
+        // Might not need this - Need to test!!
+        if (key.contains(DELIM)) {
+            logger.error("Error: Key/Value should not contain delimiter " + DELIM);
+            return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
         }
 
         // step 2 - send a PUT request to the server
-        TextMessage message = new TextMessage(GET_CMD + COMMA + key);
+        TextMessage message = new TextMessage(GET_CMD + DELIM + key);
         sendMessage(message);
 
         // step 3 - get the server's response and forward it to the client
         TextMessage reply = receiveMessage();
-        // TODO: Might want to check if the message received from server is actually
-        // a valid Status code or not
         return new KVReplyMessage(key, null, reply.getMsg());
     }
 
