@@ -18,7 +18,7 @@ import java.io.IOException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-public class KVStore implements KVCommInterface {
+public class KVStore extends Thread implements KVCommInterface {
     private static Logger logger = Logger.getRootLogger();
     private Set<IKVClient> listeners;
     
@@ -47,6 +47,50 @@ public class KVStore implements KVCommInterface {
             throws UnknownHostException, IOException {
         this.serverAddr = address;
         this.serverPort = port;
+    }
+
+    /**
+     * Initializes and starts the client connection. 
+     * Loops until the connection is closed or aborted by the client.
+     */
+    public void run() {
+        try {
+            this.output = clientSocket.getOutputStream();
+            this.input = clientSocket.getInputStream();
+            
+            while (isRunning()) {
+                try {
+                    TextMessage latestMsg = receiveMessage();
+                    for(IKVClient listener : listeners) {
+                        listener.handleNewMessage(latestMsg);
+                    }
+                }
+                catch (IOException ioe) {
+                    if (isRunning()) {
+                        logger.error("Connection lost!");
+                        try {
+                            tearDownConnection();
+                            for(IKVClient listener : listeners) {
+                                listener.handleStatus(
+                                        SocketStatus.CONNECTION_LOST);
+                            }
+                        }
+                        catch (IOException e) {
+                            logger.error("Unable to close connection!");
+                        }
+                    }
+                }
+            }
+        }
+        catch (IOException ioe) {
+            logger.error("Connection could not be established!");
+            
+        }
+        finally {
+            if(isRunning()) {
+                disconnect();
+            }
+        }
     }
 
     @Override

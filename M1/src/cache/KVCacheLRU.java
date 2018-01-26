@@ -39,7 +39,7 @@ public class KVCacheLRU extends KVCache {
     }
 
     @Override
-    public void delete(String key){
+    public void delete(String key) {
         if( kvp_map.containsKey(key)) {
             kvp_map.remove(key);
 
