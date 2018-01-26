@@ -3,6 +3,8 @@ package cache;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Iterator;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import app_kvServer.IKVServer;
 
@@ -85,5 +87,19 @@ public class KVCacheLFU extends KVCache {
         kfp_map.clear();
     }
 
+    @Override
+    public void print() {
+        System.out.println("LFU kvp: ");
+        Set<Entry<String,String>> kvp_set = kvp_map.entrySet();
+        for(Entry entry: kvp_set) {
+            System.out.println("Key="+entry.getKey()+", Value="+entry.getValue());
+        }
+
+        System.out.println("LFU kfp: ");
+        Set<Entry<String,Integer>> kfp_set = kfp_map.entrySet();
+        for(Entry entry: kfp_set) {
+            System.out.println("Key="+entry.getKey()+", Value="+entry.getValue());
+        }
+    }
 }
 

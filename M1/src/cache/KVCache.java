@@ -16,6 +16,10 @@ public class KVCache implements IKVCache {
         switch(strategy) {
             case "FIFO":
                 return new KVCacheFIFO(cacheSize);
+            case "LRU":
+                return new KVCacheLRU(cacheSize);
+            case "LFU":
+                return new KVCacheLFU(cacheSize);
             default:
                 return new KVCacheFIFO(cacheSize);
         }
@@ -64,5 +68,9 @@ public class KVCache implements IKVCache {
 
     @Override
     public void clearCache(){
+    }
+
+    @Override
+    public void print(){
     }
 }

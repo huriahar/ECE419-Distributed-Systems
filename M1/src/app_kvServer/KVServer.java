@@ -94,6 +94,7 @@ public class KVServer extends Thread implements IKVServer {
             // 2 - insert in cache
             this.cache.insert(key, value);
         }
+        this.cache.print();
         return value;
     }
 
@@ -102,6 +103,7 @@ public class KVServer extends Thread implements IKVServer {
             throws Exception{
         //TODO write in storage
         this.cache.insert(key, value);
+        this.cache.print();
     }
 
     @Override

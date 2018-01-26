@@ -3,6 +3,9 @@ package cache;
 import java.util.LinkedList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Iterator;
+import java.util.Set;
 
 import app_kvServer.IKVServer;
 
@@ -67,4 +70,17 @@ public class KVCacheFIFO extends KVCache {
         kvp_map.clear();
     }
 
+    @Override
+    public void print(){
+        System.out.println("FIFO queue: ");
+        Iterator i = fifo.iterator();
+        while (i.hasNext()) {
+            System.out.println(i.next());
+        }
+        System.out.println("FIFO kvp: ");
+        Set<Entry<String,String>> kvp_set = kvp_map.entrySet();
+        for(Entry entry: kvp_set) {
+            System.out.println("Key="+entry.getKey()+", Value="+entry.getValue());
+        }
+    }
 }

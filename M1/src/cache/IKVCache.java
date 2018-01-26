@@ -16,5 +16,7 @@ public interface IKVCache {
     public String getValue(String key);
 
     public void clearCache();
+
+    public void print();
 }
 
