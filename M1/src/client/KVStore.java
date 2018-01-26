@@ -197,7 +197,15 @@ public class KVStore /*extends Thread */implements KVCommInterface {
 
         // step 3 - get the server's response and forward it to the client
         TextMessage reply = receiveMessage();
-        return new KVReplyMessage(key, null, reply.getMsg());
+        String[] tokens = (reply.getMsg()).split("\\|");
+        if( tokens.length == 2 ) {
+            return new KVReplyMessage(key, tokens[1], KVMessage.StatusType.GET_SUCCESS);
+        } else if ( tokens.length == 1 ) {
+            return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
+        } else {
+            //TODO throw exception
+            return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
+        }
     }
 
     public boolean isRunning() {

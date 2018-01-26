@@ -162,7 +162,7 @@ public class KVClient implements IKVClient {
                             logger.error(reply.getStatusString() + " using key: " + key);
                         }
                         else if (status == KVMessage.StatusType.GET_SUCCESS) {
-                            System.out.println(PROMPT + "GET_SUCCESS! Successfully retrieved value with given key");
+                            System.out.println(PROMPT + "GET_SUCCESS! Successfully retrieved value \"" + reply.getValue() + "\" with given key");
                             logger.info(reply.getStatusString() + " using key: " + key + " Value: " + reply.getValue());
                         }
                         else {

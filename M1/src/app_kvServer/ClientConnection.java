@@ -146,8 +146,8 @@ public class ClientConnection implements Runnable {
         //Done in KVServer;
         try {
             String value = server.getKV(key);
-            result = value;
-            logger.info("Successfully fetched the value " + value + "for the key " + key + " on server");
+            result = "GET_SUCCESS" + DELIM + value;
+            logger.info("Successfully fetched the value " + value + " for the key " + key + " on server");
         }
         catch (Exception ex) {
             result = "GET_ERROR";
