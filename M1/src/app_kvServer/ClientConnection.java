@@ -112,9 +112,9 @@ public class ClientConnection implements Runnable {
     }
 
     private void handlePutCmd (String key, String value) {
-        String result = "";
+        String result = "PUT_ERROR";
         //Done in KVServer;
-        System.out.println("PUT Key " + key + " Value " + value);
+        System.out.println("DEBUG: PUT Key " + key + " Value " + value);
         // If Value is not null or empty, insert in $ and disk
         if (value != null && !value.equals("") && !value.equals("null")) {
             try {
@@ -132,11 +132,36 @@ public class ClientConnection implements Runnable {
         else {
             // Delete the value from $ and disk
         }
+
+
+        // Send PUT Ack to the user
+        try {
+            sendMessage(new TextMessage(result));
+        } catch (Exception ex) {
+            logger.error("SEND Error! Server unable to send PUT Ack message back to the client");
+        }
     }
 
     private void handleGetCmd (String key) {
+        String result;
         //Done in KVServer;
-        System.out.println("GET Key " + key);
+        try {
+            String value = server.getKV(key);
+            result = value;
+            logger.info("Successfully fetched the value " + value + "for the key " + key + " on server");
+        }
+        catch (Exception ex) {
+            result = "GET_ERROR";
+            logger.info("GET_ERROR: Unable to fetch the value for the key " + key + " on server");
+        }
+
+        // Send PUT Ack to the user
+        try {
+            sendMessage(new TextMessage(result));
+        } catch (Exception ex) {
+            logger.error("SEND Error! Server unable to send PUT Ack message back to the client");
+        }
+        
     }
    
     public boolean onDisk(String key) {
