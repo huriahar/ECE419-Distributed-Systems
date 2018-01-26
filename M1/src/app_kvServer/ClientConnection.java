@@ -34,25 +34,23 @@ public class ClientConnection implements Runnable {
     private boolean isOpen;
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 128 * BUFFER_SIZE;
-    private static final String COMMA = ",";
+    private static final String DELIM = "|";
     
     private Socket clientSocket;
     private InputStream input;
     private OutputStream output;
-	private Path storagePath;
-	private KVCache cache;
-	
-	
-    
+    private Path storagePath;
+    private KVCache cache;
+
     /**
      * Constructs a new CientConnection object for a given TCP socket.
      * @param clientSocket the Socket object for the client connection.
      */
-    public ClientConnection (Socket clientSocket, Path storagePath ,KVCache cache) {
+    public ClientConnection (Socket clientSocket, Path storagePath, KVCache cache) {
         this.clientSocket = clientSocket;
         this.isOpen = true;
-		this.storagePath = storagePath;
-//		this.cache = cache;
+        this.storagePath = storagePath;
+//      this.cache = cache;
     }
     
     /**
@@ -73,7 +71,7 @@ public class ClientConnection implements Runnable {
                 try {
                     TextMessage msgReceived = receiveMessage();
                     // Unmarshalling of received message
-                    String[] msgContent = msgReceived.getMsg().split(COMMA);
+                    String[] msgContent = msgReceived.getMsg().split(DELIM);
                     String command = msgContent[0];
                     if (command.equals("PUT")) {
                         handlePutCmd(msgContent[1], msgContent[1]);
@@ -113,61 +111,57 @@ public class ClientConnection implements Runnable {
 
     private void handleGetCmd (String key) {
         //Done in KVServer;
-
         ;
     }
    
-	public boolean onDisk(String key) {
-		boolean foundOnDisk = false;
+    public boolean onDisk(String key) {
+        boolean foundOnDisk = false;
 
-		if(Files.exists(storagePath)) {
-			//return message that key found in Storage
-			foundOnDisk = true;
-		}
-		return foundOnDisk;
-	}
+        if(Files.exists(storagePath)) {
+            //return message that key found in Storage
+            foundOnDisk = true;
+        }
+        return foundOnDisk;
+    }
 
-	public void storeKV(String key, String value) throws IOException {
-		//TODO : Cache it in KVServer
+    public void storeKV(String key, String value) throws IOException {
+        //TODO : Cache it in KVServer
  
-		FileWriter file = new FileWriter(this.storagePath.toString());		
-		String input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
-		JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
-		kvStorage.put(key, value);
+        FileWriter file = new FileWriter(this.storagePath.toString());      
+        String input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
+        JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
+        kvStorage.put(key, value);
 
-		String output = JSONValue.toJSONString(kvStorage);
-		Files.write(this.storagePath, output.getBytes(StandardCharsets.UTF_8));
+        String output = JSONValue.toJSONString(kvStorage);
+        Files.write(this.storagePath, output.getBytes(StandardCharsets.UTF_8));
 
-	}
+    }
 
-	public String getValue(String key) throws IOException {
-		//TODO: Check is value in Cache in KVServer
-		String value = "";
-		String input;
-		
-		if(Files.exists(this.storagePath)) {
-			try{
-//				value = new String(Files.readAllBytes(storagePath));
+    public String getValue(String key) throws IOException {
+        //TODO: Check is value in Cache in KVServer
+        String value = "";
+        String input;
+        
+        if(Files.exists(this.storagePath)) {
+            try{
+//              value = new String(Files.readAllBytes(storagePath));
 
-				input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
-				JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
-//				value =	kvStorage.getString(key);
-
-
-			} catch (Exception ex) {
-				logger.error("Unable to open file. ERROR: " + ex);
-			}
-		}			
-		else {
-			logger.info("Server: " + clientSocket.getInetAddress() + " at port: " + 
-		clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");		
-		}		
-		return value;
-	}
+                input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
+                JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
+//              value = kvStorage.getString(key);
 
 
-		
- 
+            } catch (Exception ex) {
+                logger.error("Unable to open file. ERROR: " + ex);
+            }
+        }           
+        else {
+            logger.info("Server: " + clientSocket.getInetAddress() + " at port: " + 
+        clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");     
+        }       
+        return value;
+    }
+
     /**
      * Method sends a TextMessage using this socket.
      * @param msg the message that is to be sent.
@@ -248,47 +242,47 @@ public class ClientConnection implements Runnable {
 
 
 
-//	public boolean deleteKV(String key) throws IOException {
-//		//TODO: Delete it from Cache in KVServer
-//		//delete KV Pair from the persistent memory
-//		boolean delete_successful = false;
-//		String input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
-//		JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
-//		if(kvStorage.has(key)) {
-//			kvStorage.remove(key);	
-//			logger.info("Server: "+ clientSocket.getInetAddress().getHostName() + " at port: " + 
-//						clientSocket.getLocalPort() + "\tDELETE SUCCESS for key: " + key);
-//			delete_successful = true;
-//	
-//		}
-//		else {
-//			logger.error("Server: " + clientSocket.getInetAddress().getHostName() + " at port: " + 
-//						clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");
-//		}
+//  public boolean deleteKV(String key) throws IOException {
+//      //TODO: Delete it from Cache in KVServer
+//      //delete KV Pair from the persistent memory
+//      boolean delete_successful = false;
+//      String input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
+//      JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
+//      if(kvStorage.has(key)) {
+//          kvStorage.remove(key);  
+//          logger.info("Server: "+ clientSocket.getInetAddress().getHostName() + " at port: " + 
+//                      clientSocket.getLocalPort() + "\tDELETE SUCCESS for key: " + key);
+//          delete_successful = true;
+//  
+//      }
+//      else {
+//          logger.error("Server: " + clientSocket.getInetAddress().getHostName() + " at port: " + 
+//                      clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");
+//      }
 //
-//		String output = JSONValue.toJSONString(kvStorage);
-//		Files.write(this.storagePath, output.getBytes(StandardCharsets.UTF_8));
+//      String output = JSONValue.toJSONString(kvStorage);
+//      Files.write(this.storagePath, output.getBytes(StandardCharsets.UTF_8));
 //
 //
-//		if(Files.notExists(this.storagePath.toString())) {
-//			//return message that key doesn't exist
-//			logger.error("Server: " + clientSocket.getInetAddress().getHostName() + " at port: " + 
-//		clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");			
-//		}
-//		else {
-//			//delete file and return message that deletion successful
-//			try {
-//				Files.delete(storagePath);
-//				logger.info("Server: "+ clientSocket.getInetAddress().getHostName() + " at port: " + 
-//		clientSocket.getLocalPort() + "\tDELETE SUCCESS for key: " + key);
-//				delete_successful = true;
+//      if(Files.notExists(this.storagePath.toString())) {
+//          //return message that key doesn't exist
+//          logger.error("Server: " + clientSocket.getInetAddress().getHostName() + " at port: " + 
+//      clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");         
+//      }
+//      else {
+//          //delete file and return message that deletion successful
+//          try {
+//              Files.delete(storagePath);
+//              logger.info("Server: "+ clientSocket.getInetAddress().getHostName() + " at port: " + 
+//      clientSocket.getLocalPort() + "\tDELETE SUCCESS for key: " + key);
+//              delete_successful = true;
 //
-//			} catch (IOException x) {
-//				logger.error("Server: "+ clientSocket.getInetAddress().getHostName() + " at port: " + 
-//		clientSocket.getLocalPort() + "\tDELETE ERROR for key: " + key);			
-//			}
-//		}
+//          } catch (IOException x) {
+//              logger.error("Server: "+ clientSocket.getInetAddress().getHostName() + " at port: " + 
+//      clientSocket.getLocalPort() + "\tDELETE ERROR for key: " + key);            
+//          }
+//      }
 //
-//		return delete_successful;
-//	}
-	
+//      return delete_successful;
+//  }
+    

@@ -47,6 +47,7 @@ public class KVStore extends Thread implements KVCommInterface {
             throws UnknownHostException, IOException {
         this.serverAddr = address;
         this.serverPort = port;
+        setRunning(true);
     }
 
     /**
@@ -99,17 +100,16 @@ public class KVStore extends Thread implements KVCommInterface {
         // TODO Auto-generated method stub
         this.clientSocket = new Socket(this.serverAddr, this.serverPort);
         this.listeners = new HashSet<IKVClient>();
-        setRunning(true);
         logger.info("Connection established with address " + this.serverAddr + 
             " at port " + this.serverPort);
         this.output = clientSocket.getOutputStream();
-        this.input = clientSocket.getInputStream();  
+        this.input = clientSocket.getInputStream();
     }
 
     @Override
     public synchronized void disconnect() {
         // TODO Auto-generated method stub
-        logger.info("trying to close connection ...");
+        logger.info("Trying to close connection ...");
         
         try {
             tearDownConnection();
@@ -125,11 +125,13 @@ public class KVStore extends Thread implements KVCommInterface {
     private void tearDownConnection() 
             throws IOException {
         setRunning(false);
-        logger.info("tearing down the connection ...");
+        logger.info("Tearing down the connection ...");
         if (clientSocket != null) {
+            input.close();
+            output.close();
             clientSocket.close();
             clientSocket = null;
-            logger.info("connection closed!");
+            logger.info("Connection closed!");
         }
     }
 

@@ -63,16 +63,20 @@ public class KVClient implements IKVClient {
                         newConnection(serverAddress, serverPort);
                     }
                     catch(NumberFormatException nfe) {
-                        printError("No valid address. Port must be a number!");
-                        logger.error("Unable to parse argument <port>", nfe);
+                        printError("Invalid port. Port must be a number!");
+                        logger.error("Invalid port. Port must be a number!", nfe);
                     }
                     catch (UnknownHostException e) {
-                        printError("Unknown Host!");
-                        logger.error("Unknown Host!", e);
+                        printError("Unknown Host! Unable to connect to " + serverAddress +
+                            " at port " + serverPort);
+                        logger.error("Unknown Host! Unable to connect to " + serverAddress +
+                            " at port " + serverPort);
                     }
                     catch (IOException e) {
-                        printError("Could not establish connection!");
-                        logger.error("Could not establish connection!", e);
+                        printError("Could not establish connection! Unable to connect to " + serverAddress +
+                            " at port " + serverPort);
+                        logger.error("Could not establish connection! Unable to connect to " + serverAddress +
+                            " at port " + serverPort);
                     }
                 }
                 else {
@@ -86,7 +90,7 @@ public class KVClient implements IKVClient {
                 break;
 
             case "put":
-                if (tokens.length >= 3) {
+                if (tokens.length >= 2) {
                     String key = tokens[1];
                     if (clientStore != null && clientStore.isRunning()) {
                         StringBuilder msg = new StringBuilder();
@@ -204,17 +208,17 @@ public class KVClient implements IKVClient {
         sb.append(PROMPT).append("connect <host> <port>");
         sb.append("\t establishes a connection to a server\n");
         sb.append(PROMPT).append("put <key> <value>");
-        sb.append("\t\t 1) Inserts a key-value pair into a server data strusture. \n");
-        sb.append("\t\t\t\t\t\t 2) Updates current value if server already contains key \n");
-        sb.append("\t\t\t\t\t\t 3) Deletes entry for given key if <value> equals null \n");
+        sb.append("\t 1) Inserts a key-value pair into a server data strusture. \n");
+        sb.append("\t\t\t\t 2) Updates current value if server already contains key \n");
+        sb.append("\t\t\t\t 3) Deletes entry for given key if <value> equals null \n");
         sb.append(PROMPT).append("get <key>");
         sb.append("\t\t Retrieves the value for the given key from the storage server. \n");
         sb.append(PROMPT).append("disconnect");
-        sb.append("\t\t\t disconnects from the server \n");
+        sb.append("\t\t disconnects from the server \n");
         
         sb.append(PROMPT).append("logLevel");
-        sb.append("\t\t\t changes the logLevel \n");
-        sb.append(PROMPT).append("\t\t\t\t ");
+        sb.append("\t\t changes the logLevel \n");
+        sb.append(PROMPT).append("\t\t\t ");
         sb.append("ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF \n");
         
         sb.append(PROMPT).append("quit ");
@@ -258,7 +262,7 @@ public class KVClient implements IKVClient {
     }
 
     private void disconnect() {
-        if(clientStore != null) {
+        if (clientStore != null) {
             clientStore.disconnect();
             clientStore = null;
         }
@@ -278,15 +282,9 @@ public class KVClient implements IKVClient {
         throws UnknownHostException, IOException {
         // TODO Auto-generated method stub
         clientStore = new KVStore(hostname, port);
-        try {
-            clientStore.connect();
-        }
-        catch (Exception ex) {
-            printError("Connection to " + hostname + " at port " + port + 
-                " could not be established.");
-            logger.error("Connection to " + hostname + " at port " + port + 
-                " could not be established. Error: " + ex);           
-        }
+        clientStore.connect();
+        clientStore.addListener(this);
+        clientStore.start();
     }
 
     @Override
