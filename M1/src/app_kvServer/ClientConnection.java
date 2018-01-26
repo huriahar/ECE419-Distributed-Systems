@@ -114,7 +114,6 @@ public class ClientConnection implements Runnable {
     private void handlePutCmd (String key, String value) {
         String result = "PUT_ERROR";
         //Done in KVServer;
-        System.out.println("DEBUG: PUT Key " + key + " Value " + value);
         // If Value is not null or empty, insert in $ and disk
         if (value != null && !value.equals("") && !value.equals("null")) {
             try {

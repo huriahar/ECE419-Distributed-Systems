@@ -18,7 +18,7 @@ import java.io.IOException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-public class KVStore extends Thread implements KVCommInterface {
+public class KVStore /*extends Thread */implements KVCommInterface {
     private static Logger logger = Logger.getRootLogger();
     private Set<IKVClient> listeners;
     
@@ -54,7 +54,7 @@ public class KVStore extends Thread implements KVCommInterface {
     /**
      * Initializes and starts the client connection. 
      * Loops until the connection is closed or aborted by the client.
-     */
+     */ /*
     public void run() {
         try {
             this.output = clientSocket.getOutputStream();
@@ -94,15 +94,18 @@ public class KVStore extends Thread implements KVCommInterface {
             }
         }
     }
-
+*/
     @Override
     public void connect() 
             throws UnknownHostException, IOException {
-        // TODO Auto-generated method stub
         this.clientSocket = new Socket(this.serverAddr, this.serverPort);
         this.listeners = new HashSet<IKVClient>();
         this.output = clientSocket.getOutputStream();
         this.input = clientSocket.getInputStream();
+
+        //Receive the connection ack message
+        TextMessage reply = receiveMessage();
+        logger.info(reply.getMsg());
     }
 
     @Override

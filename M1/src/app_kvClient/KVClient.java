@@ -293,7 +293,7 @@ public class KVClient implements IKVClient {
         clientStore = new KVStore(hostname, port);
         clientStore.connect();
         clientStore.addListener(this);
-        clientStore.start();
+        //clientStore.start();
     }
 
     @Override
