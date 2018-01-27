@@ -129,7 +129,7 @@ public class ClientConnection implements Runnable {
             result = false;
         }
         if (key.contains(DELIM)) {
-            logger.error("Error: Key should not contain delimiter " + DELIM);
+            logger.error("Server Error: Key should not contain delimiter " + DELIM);
             result = false;
         }
         return result;
@@ -189,14 +189,14 @@ public class ClientConnection implements Runnable {
                 result = "GET_ERROR";
                 logger.info("GET_ERROR: Unable to fetch the value for the key " + key + " on server");
             }
+        }
 
-            // Send PUT Ack to the user
-            try {
-                sendMessage(new TextMessage(result));
-            }
-            catch (Exception ex) {
-                logger.error("SEND Error! Server unable to send PUT Ack message back to the client");
-            }
+        // Send PUT Ack to the user
+        try {
+            sendMessage(new TextMessage(result));
+        }
+        catch (Exception ex) {
+            logger.error("SEND Error! Server unable to send PUT Ack message back to the client");
         }
     }
 
