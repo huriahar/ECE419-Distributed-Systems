@@ -24,6 +24,8 @@ public class ClientConnection implements Runnable {
     
     private boolean isOpen;
     private static final int BUFFER_SIZE = 1024;
+    private static final int MAX_KEY_LENGTH = 20; 
+    private static final int MAX_VALUE_LENGTH = 122880; //120KB
     private static final int DROP_SIZE = 128 * BUFFER_SIZE;
     private static final String DELIM = "|";
     
@@ -102,55 +104,89 @@ public class ClientConnection implements Runnable {
         }
     }
 
+    private boolean errorCheck (String key, String value) {
+        boolean result = true;
+        if (key.length() > MAX_KEY_LENGTH) {
+            logger.error("Server Error: maximum key length allowed is " + MAX_KEY_LENGTH + " but key has length " + key.length());
+            result = false;
+        }
+        if (value.length() > MAX_VALUE_LENGTH) {
+            logger.error("Server Error: maximum value length allowed is 120K Bytes but value has length " + value.length());
+            result = false;
+        }
+        if (key.contains(" ")) {
+            logger.error("Server Error: Key should not contain space");
+            result = false;
+        }
+        if (key.contains(DELIM) || value.contains(DELIM)) {
+            logger.error("Error: Key/Value should not contain delimiter " + DELIM);
+            result = false;
+        }
+        return result;
+    }
+
     private void handlePutCmd (String key, String value) {
         String result = "PUT_ERROR";
         //Done in KVServer;
-        // If Value is not null or empty, insert in $ and disk
-        if (value != null && !value.equals("") && !value.equals("null")) {
-            try {
-                server.putKV(key, value);
-                result = "PUT_SUCCESS";
-                logger.info("Successfully added key " + key + " and value " 
-                    + value + " on server");
+        if (errorCheck(key, value)) {
+            // If Value is not null or empty, insert in $ and disk
+            if (value != null && !value.equals("") && !value.equals("null")) {
+                try {
+                    result = (server.inStorage(key)) ? "PUT_UPDATE" : "PUT_SUCCESS";
+                    server.putKV(key, value);
+                    logger.info("Success " + result + " with key " + key + " and value " 
+                        + value + " on server");
+                }
+                catch (Exception ex) {
+                    result = "PUT_ERROR";
+                    logger.error("PUT Error! Unable to add key " + key + " and value "
+                        + value + " to server");
+                }
             }
-            catch (Exception ex) {
-                result = "PUT_ERROR";
-                logger.error("PUT Error! Unable to add key " + key + " and value "
-                    + value + " to server");
+            else {
+                // Delete the value from $ and disk
+                try {
+                    server.deleteKV(key);
+                    result = "DELETE_SUCCESS";
+                    logger.info("Success " + result + " with key " + key + " on server");
+                }
+                catch (Exception ex) {
+                    result = "DELETE_ERROR";
+                    logger.error("DELETE Error! Unable to delete key " + key + " from server");
+                }
             }
         }
-        else {
-            // Delete the value from $ and disk
-        }
-
 
         // Send PUT Ack to the user
         try {
             sendMessage(new TextMessage(result));
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             logger.error("SEND Error! Server unable to send PUT Ack message back to the client");
         }
     }
 
     private void handleGetCmd (String key) {
-        String result;
-        //Done in KVServer;
-        try {
-            String value = server.getKV(key);
-            result = "GET_SUCCESS" + DELIM + value;
-            logger.info("Successfully fetched the value " + value + " for the key " + key + " on server");
-        }
-        catch (Exception ex) {
-            result = "GET_ERROR";
-            logger.info("GET_ERROR: Unable to fetch the value for the key " + key + " on server");
-        }
+        String result = "GET_ERROR";
+        if (errorCheck(key, "")) {
+            //Done in KVServer;
+            try {
+                String value = server.getKV(key);
+                result = "GET_SUCCESS" + DELIM + value;
+                logger.info("Successfully fetched the value " + value + " for the key " + key + " on server");
+            }
+            catch (Exception ex) {
+                result = "GET_ERROR";
+                logger.info("GET_ERROR: Unable to fetch the value for the key " + key + " on server");
+            }
 
-        // Send PUT Ack to the user
-        try {
-            sendMessage(new TextMessage(result));
-        }
-        catch (Exception ex) {
-            logger.error("SEND Error! Server unable to send PUT Ack message back to the client");
+            // Send PUT Ack to the user
+            try {
+                sendMessage(new TextMessage(result));
+            }
+            catch (Exception ex) {
+                logger.error("SEND Error! Server unable to send PUT Ack message back to the client");
+            }
         }
     }
    
