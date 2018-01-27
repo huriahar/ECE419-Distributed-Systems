@@ -140,9 +140,8 @@ public class KVStore implements KVCommInterface {
             logger.error("Error: Key should not contain space");
             return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
         }
-        // Might not need this - Need to test!!
         if (key.contains(DELIM)) {
-            logger.error("Error: Key/Value should not contain delimiter " + DELIM);
+            logger.error("Error: Key should not contain delimiter " + DELIM);
             return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
         }
 
