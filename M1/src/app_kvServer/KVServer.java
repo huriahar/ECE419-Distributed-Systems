@@ -120,6 +120,13 @@ public class KVServer extends Thread implements IKVServer {
     }
 
     @Override
+    public void deleteKV(String key)
+            throws Exception {
+        this.cache.delete(key);
+        this.cache.print();
+    }
+
+    @Override
     public void clearCache() {
         this.cache.clearCache();
     }
