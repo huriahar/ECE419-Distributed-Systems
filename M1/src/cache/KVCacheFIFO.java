@@ -43,11 +43,11 @@ public class KVCacheFIFO extends KVCache {
     }
 
     @Override
-    public void delete(String key){
-        if( kvp_map.containsKey(key)) {
+    public void delete(String key) {
+        if (kvp_map.containsKey(key)) {
             kvp_map.remove(key);
 
-            if( fifo.contains(key))
+            if (fifo.contains(key))
                 fifo.remove(key);
         }
     }

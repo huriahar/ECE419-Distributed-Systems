@@ -5,6 +5,7 @@ import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.net.BindException;
 import java.net.InetAddress;
 
@@ -62,7 +63,14 @@ public class KVServer extends Thread implements IKVServer {
     @Override
     public String getHostname() {
         // TODO Auto-generated method stub
-        return (serverSocket != null) ? serverSocket.getInetAddress().getHostAddress() : "";
+        if (serverSocket == null) return "";
+        try {
+            return serverSocket.getInetAddress().getLocalHost().getHostAddress();
+        }
+        catch (UnknownHostException ex) {
+            logger.error("Unknown Host! Unable to get Hostname");
+            return "";
+        }
     }
 
     @Override

@@ -18,7 +18,7 @@ import java.io.IOException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-public class KVStore /*extends Thread */implements KVCommInterface {
+public class KVStore implements KVCommInterface {
     private static Logger logger = Logger.getRootLogger();
     private Set<IKVClient> listeners;
     
@@ -47,8 +47,6 @@ public class KVStore /*extends Thread */implements KVCommInterface {
         this.serverAddr = address;
         this.serverPort = port;
         setRunning(true);
-        logger.info("Connection established with address " + this.serverAddr + 
-            " at port " + this.serverPort);
     }
 
     @Override
@@ -59,7 +57,7 @@ public class KVStore /*extends Thread */implements KVCommInterface {
         this.output = clientSocket.getOutputStream();
         this.input = clientSocket.getInputStream();
 
-        //Receive the connection ack message
+        // Receive the connection ack message
         TextMessage reply = receiveMessage();
         logger.info(reply.getMsg());
     }
