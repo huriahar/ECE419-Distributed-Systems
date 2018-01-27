@@ -4,15 +4,6 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
-import java.nio.file.Files;
-import java.io.FileWriter;  
-import java.nio.file.Path;
-
-//import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.JSONValue;
 import cache.KVCache;
 import common.messages.TextMessage;
 
@@ -40,18 +31,18 @@ public class ClientConnection implements Runnable {
     private KVServer server;
     private InputStream input;
     private OutputStream output;
-    private Path storagePath;
+    //private Path storagePath;
     private KVCache cache;
 
     /**
      * Constructs a new CientConnection object for a given TCP socket.
      * @param clientSocket the Socket object for the client connection.
      */
-    public ClientConnection (KVServer server, Socket clientSocket, Path storagePath, KVCache cache) {
+    public ClientConnection (KVServer server, Socket clientSocket,  KVCache cache) {
         this.server = server;
         this.clientSocket = clientSocket;
         this.isOpen = true;
-        this.storagePath = storagePath;
+        //this.storagePath = storagePath;
 //      this.cache = cache;
     }
     
@@ -163,53 +154,6 @@ public class ClientConnection implements Runnable {
         
     }
    
-    public boolean onDisk(String key) {
-        boolean foundOnDisk = false;
-
-        if(Files.exists(storagePath)) {
-            //return message that key found in Storage
-            foundOnDisk = true;
-        }
-        return foundOnDisk;
-    }
-
-    public void storeKV(String key, String value) throws IOException {
-        //TODO : Cache it in KVServer
- 
-        FileWriter file = new FileWriter(this.storagePath.toString());      
-        String input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
-        JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
-        kvStorage.put(key, value);
-
-        String output = JSONValue.toJSONString(kvStorage);
-        Files.write(this.storagePath, output.getBytes(StandardCharsets.UTF_8));
-
-    }
-
-    public String getValue(String key) throws IOException {
-        //TODO: Check is value in Cache in KVServer
-        String value = "";
-        String input;
-        
-        if(Files.exists(this.storagePath)) {
-            try{
-//              value = new String(Files.readAllBytes(storagePath));
-
-                input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
-                JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
-//              value = kvStorage.getString(key);
-
-
-            } catch (Exception ex) {
-                logger.error("Unable to open file. ERROR: " + ex);
-            }
-        }           
-        else {
-            logger.info("Server: " + clientSocket.getInetAddress() + " at port: " + 
-        clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");     
-        }       
-        return value;
-    }
 
     /**
      * Method sends a TextMessage using this socket.

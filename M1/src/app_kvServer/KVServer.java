@@ -8,8 +8,13 @@ import java.io.IOException;
 import java.net.BindException;
 import java.net.InetAddress;
 
-import java.io.IOException;
-import java.net.BindException;
+import java.nio.file.Files;
+import java.io.FileWriter;  
+import java.nio.charset.StandardCharsets;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
+import org.json.simple.ItemList;
 
 import logger.LogSetup;
 
@@ -126,7 +131,7 @@ public class KVServer extends Thread implements IKVServer {
                 try {
                     Socket client = serverSocket.accept();                
                     ClientConnection connection = 
-                            new ClientConnection(this, client, this.storagePath, this.cache);
+                            new ClientConnection(this, client,  this.cache);
                     new Thread(connection).start();
 
                     logger.info("Connected to " 
@@ -222,4 +227,52 @@ public class KVServer extends Thread implements IKVServer {
             System.exit(1);
         }
     }
+
+
+    public String onDisk(String keyStr) throws IOException {
+        String input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
+		JSONObject currentContents = (JSONObject) JSONValue.parse(input);
+		Object keyValue = currentContents.get(keyStr);
+		return keyValue.toString();
+    }
+
+    public void storeKV(String key, String value) throws IOException {
+        //TODO : Cache it in KVServer
+ 
+        FileWriter file = new FileWriter(this.storagePath.toString());      
+        String input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
+        JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
+		String curValue = onDisk(key);
+        kvStorage.put(key, value);
+//		if(kvStorage.has("hey"))
+
+        String output = JSONValue.toJSONString(kvStorage);
+        Files.write(this.storagePath, output.getBytes(StandardCharsets.UTF_8));
+
+    }
+
+    public String getValue(String key) throws IOException {
+        //TODO: Check is value in Cache in KVServer
+        String value = "";
+        String input;
+        
+        if(Files.exists(this.storagePath)) {
+            try{
+//              value = new String(Files.readAllBytes(storagePath));
+
+                input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
+                JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
+                value = kvStorage.get(key).toString();
+
+
+            } catch (Exception ex) {
+                logger.error("Unable to open file. ERROR: " + ex);
+            }
+        }           
+        else {
+	    	;    
+		}       
+        return value;
+    }
+
 }
