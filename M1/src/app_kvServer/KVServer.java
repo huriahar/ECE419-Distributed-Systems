@@ -134,6 +134,7 @@ public class KVServer extends Thread implements IKVServer {
     @Override
     public void clearStorage() {
         // TODO Auto-generated method stub
+        clearCache();
     }
 
     @Override

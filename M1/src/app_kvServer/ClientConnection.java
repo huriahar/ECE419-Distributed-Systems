@@ -4,6 +4,9 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.LinkedList;
+import java.util.List;
+
 import cache.KVCache;
 import common.messages.TextMessage;
 
@@ -68,8 +71,15 @@ public class ClientConnection implements Runnable {
                     // Unmarshalling of received message
                     String[] msgContent = msgReceived.getMsg().split("\\" + DELIM);
                     String command = msgContent[0];
+                    // Key cannot contain DELIM, but value can
+                    // So combine all strings from msgContent[2] till end to get value
+                    List<String> valueParts = new LinkedList<>();
+                    for (int i = 2; i < msgContent.length; ++i) {
+                        valueParts.add(msgContent[i]);
+                    }
+                    String value = String.join(DELIM, valueParts);
                     if (command.equals("PUT")) {
-                        handlePutCmd(msgContent[1], msgContent[2]);
+                        handlePutCmd(msgContent[1], value);
                     }
                     else if (command.equals("GET")) {
                         handleGetCmd(msgContent[1]);
@@ -118,8 +128,8 @@ public class ClientConnection implements Runnable {
             logger.error("Server Error: Key should not contain space");
             result = false;
         }
-        if (key.contains(DELIM) || value.contains(DELIM)) {
-            logger.error("Error: Key/Value should not contain delimiter " + DELIM);
+        if (key.contains(DELIM)) {
+            logger.error("Error: Key should not contain delimiter " + DELIM);
             result = false;
         }
         return result;
@@ -189,7 +199,7 @@ public class ClientConnection implements Runnable {
             }
         }
     }
-   
+
 
     /**
      * Method sends a TextMessage using this socket.

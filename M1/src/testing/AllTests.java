@@ -15,8 +15,6 @@ public class AllTests {
 	static {
 		try {
 			new LogSetup("logs/testing/test.log", Level.INFO);
-			// Adding start function here! Server is not really accepting 
-			// requests till this is there... Might want to confirm with some other teams!
 			new KVServer(50000, 10, "FIFO").start();
 		} catch (IOException e) {
 			e.printStackTrace();

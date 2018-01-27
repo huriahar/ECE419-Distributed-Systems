@@ -5,6 +5,8 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.LinkedList;
+import java.util.List;
 
 import common.messages.KVMessage;
 import common.messages.TextMessage;
@@ -107,9 +109,8 @@ public class KVStore implements KVCommInterface {
             logger.error("Error: Key should not contain space");
             return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
         }
-        // Might not need this - Need to test!!
-        if (key.contains(DELIM) || value.contains(DELIM)) {
-            logger.error("Error: Key/Value should not contain delimiter " + DELIM);
+        if (key.contains(DELIM)) {
+            logger.error("Error: Key should not contain delimiter " + DELIM);
             return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
         }
 
@@ -152,12 +153,22 @@ public class KVStore implements KVCommInterface {
         // step 3 - get the server's response and forward it to the client
         TextMessage reply = receiveMessage();
         String[] tokens = (reply.getMsg()).split("\\|");
-        if( tokens.length == 2 ) {
-            return new KVReplyMessage(key, tokens[1], KVMessage.StatusType.GET_SUCCESS);
-        } else if ( tokens.length == 1 ) {
+        String getStatus = tokens[0];
+        if (tokens.length < 2) {
             return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
-        } else {
-            //TODO throw exception
+        }
+        else if (getStatus.equals("GET_SUCCESS")) {
+            // Success! Combine the remaining tokens to get value
+            // Done as value can contain DELIM
+            List<String> valueParts = new LinkedList<>();
+            for (int i = 1; i < tokens.length; ++i) {
+                valueParts.add(tokens[i]);
+            }
+            String value = String.join(DELIM, valueParts);
+            return new KVReplyMessage(key, value, KVMessage.StatusType.GET_SUCCESS);
+        }
+        else {
+            // Invalid Message type received or received GET_ERROR
             return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
         }
     }

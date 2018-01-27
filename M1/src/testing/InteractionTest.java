@@ -37,7 +37,6 @@ public class InteractionTest extends TestCase {
 		} catch (Exception e) {
 			ex = e;
 		}
-
 		assertTrue(ex == null && response.getStatus() == StatusType.PUT_SUCCESS);
 	}
 	
@@ -128,7 +127,4 @@ public class InteractionTest extends TestCase {
 
 		assertTrue(ex == null && response.getStatus() == StatusType.GET_ERROR);
 	}
-	
-
-
 }
