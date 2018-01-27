@@ -43,7 +43,7 @@ public class ClientConnection implements Runnable {
         this.clientSocket = clientSocket;
         this.isOpen = true;
         //this.storagePath = storagePath;
-//      this.cache = cache;
+        //this.cache = cache;
     }
     
     /**
@@ -148,10 +148,10 @@ public class ClientConnection implements Runnable {
         // Send PUT Ack to the user
         try {
             sendMessage(new TextMessage(result));
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             logger.error("SEND Error! Server unable to send PUT Ack message back to the client");
         }
-        
     }
    
 
@@ -160,7 +160,8 @@ public class ClientConnection implements Runnable {
      * @param msg the message that is to be sent.
      * @throws IOException some I/O error regarding the output stream 
      */
-    public void sendMessage(TextMessage msg) throws IOException {
+    public void sendMessage(TextMessage msg)
+            throws IOException {
         byte[] msgBytes = msg.getMsgBytes();
         output.write(msgBytes, 0, msgBytes.length);
         output.flush();
@@ -169,10 +170,9 @@ public class ClientConnection implements Runnable {
                 + clientSocket.getPort() + ">: '" 
                 + msg.getMsg() +"'");
     }
-    
-    
-    private TextMessage receiveMessage() throws IOException {
-        
+
+    private TextMessage receiveMessage()
+            throws IOException {
         int index = 0;
         byte[] msgBytes = null, tmp = null;
         byte[] bufferBytes = new byte[BUFFER_SIZE];
@@ -181,7 +181,7 @@ public class ClientConnection implements Runnable {
         byte read = (byte) input.read();    
         boolean reading = true;
 
-        while(read != 10 && read !=-1 && reading) {/* CR, LF, error */
+        while(read != 10 && read != -1 && reading) {/* CR, LF, error */
             /* if buffer filled, copy to msg array */
             if(index == BUFFER_SIZE) {
                 if(msgBytes == null){
@@ -215,13 +215,16 @@ public class ClientConnection implements Runnable {
         if(msgBytes == null){
             tmp = new byte[index];
             System.arraycopy(bufferBytes, 0, tmp, 0, index);
-        } else {
+        }
+        else {
             tmp = new byte[msgBytes.length + index];
             System.arraycopy(msgBytes, 0, tmp, 0, msgBytes.length);
             System.arraycopy(bufferBytes, 0, tmp, msgBytes.length, index);
         }
         
         msgBytes = tmp;
+
+        if (new String(msgBytes).trim().isEmpty()) throw new IOException();
         
         /* build final String */
         TextMessage msg = new TextMessage(msgBytes);
@@ -230,52 +233,5 @@ public class ClientConnection implements Runnable {
                 + clientSocket.getPort() + ">: '" 
                 + msg.getMsg().trim() + "'");
         return msg;
-    }    
+    }
 }
-
-
-
-//  public boolean deleteKV(String key) throws IOException {
-//      //TODO: Delete it from Cache in KVServer
-//      //delete KV Pair from the persistent memory
-//      boolean delete_successful = false;
-//      String input = new String(Files.readAllBytes(this.storagePath), StandardCharsets.UTF_8);
-//      JSONObject kvStorage = (JSONObject) JSONValue.parse(input);
-//      if(kvStorage.has(key)) {
-//          kvStorage.remove(key);  
-//          logger.info("Server: "+ clientSocket.getInetAddress().getHostName() + " at port: " + 
-//                      clientSocket.getLocalPort() + "\tDELETE SUCCESS for key: " + key);
-//          delete_successful = true;
-//  
-//      }
-//      else {
-//          logger.error("Server: " + clientSocket.getInetAddress().getHostName() + " at port: " + 
-//                      clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");
-//      }
-//
-//      String output = JSONValue.toJSONString(kvStorage);
-//      Files.write(this.storagePath, output.getBytes(StandardCharsets.UTF_8));
-//
-//
-//      if(Files.notExists(this.storagePath.toString())) {
-//          //return message that key doesn't exist
-//          logger.error("Server: " + clientSocket.getInetAddress().getHostName() + " at port: " + 
-//      clientSocket.getLocalPort() + "\tKey: " + key + " does not exist");         
-//      }
-//      else {
-//          //delete file and return message that deletion successful
-//          try {
-//              Files.delete(storagePath);
-//              logger.info("Server: "+ clientSocket.getInetAddress().getHostName() + " at port: " + 
-//      clientSocket.getLocalPort() + "\tDELETE SUCCESS for key: " + key);
-//              delete_successful = true;
-//
-//          } catch (IOException x) {
-//              logger.error("Server: "+ clientSocket.getInetAddress().getHostName() + " at port: " + 
-//      clientSocket.getLocalPort() + "\tDELETE ERROR for key: " + key);            
-//          }
-//      }
-//
-//      return delete_successful;
-//  }
-    

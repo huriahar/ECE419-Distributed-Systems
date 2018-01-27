@@ -51,50 +51,6 @@ public class KVStore /*extends Thread */implements KVCommInterface {
             " at port " + this.serverPort);
     }
 
-    /**
-     * Initializes and starts the client connection. 
-     * Loops until the connection is closed or aborted by the client.
-     */ /*
-    public void run() {
-        try {
-            this.output = clientSocket.getOutputStream();
-            this.input = clientSocket.getInputStream();
-            
-            while (isRunning()) {
-                try {
-                    TextMessage latestMsg = receiveMessage();
-                    for(IKVClient listener : listeners) {
-                        listener.handleNewMessage(latestMsg);
-                    }
-                }
-                catch (IOException ioe) {
-                    if (isRunning()) {
-                        logger.error("Connection lost!");
-                        try {
-                            tearDownConnection();
-                            for(IKVClient listener : listeners) {
-                                listener.handleStatus(
-                                        SocketStatus.CONNECTION_LOST);
-                            }
-                        }
-                        catch (IOException e) {
-                            logger.error("Unable to close connection!");
-                        }
-                    }
-                }
-            }
-        }
-        catch (IOException ioe) {
-            logger.error("Connection could not be established!");
-            
-        }
-        finally {
-            if (isRunning()) {
-                disconnect();
-            }
-        }
-    }
-*/
     @Override
     public void connect() 
             throws UnknownHostException, IOException {

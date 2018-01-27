@@ -277,15 +277,6 @@ public class KVClient implements IKVClient {
         }
     }
 
-    /*private void sendMessage(String msg){
-        try {
-            client.sendMessage(new TextMessage(msg));
-        } catch (IOException e) {
-            printError("Unable to send message!");
-            disconnect();
-        }
-    }*/
-
     @Override
     public void newConnection(String hostname, int port) 
         throws UnknownHostException, IOException {
@@ -293,7 +284,6 @@ public class KVClient implements IKVClient {
         clientStore = new KVStore(hostname, port);
         clientStore.connect();
         clientStore.addListener(this);
-        //clientStore.start();
     }
 
     @Override
@@ -324,7 +314,6 @@ public class KVClient implements IKVClient {
                     + serverAddress + " / " + serverPort);
             System.out.print(PROMPT);
         }
-        
     }
 
     private void printError(String error) {
