@@ -21,7 +21,7 @@ public class KVCacheLRU extends KVCache {
     }
 
     @Override
-    public void insert(String key, String value){
+    public synchronized void insert(String key, String value){
         if(value.equals("")) return;
 
         // check if it already exists
@@ -42,7 +42,7 @@ public class KVCacheLRU extends KVCache {
     }
 
     @Override
-    public void delete(String key) {
+    public synchronized void delete(String key) {
         if( kvp_map.containsKey(key)) {
             kvp_map.remove(key);
 
@@ -52,19 +52,19 @@ public class KVCacheLRU extends KVCache {
     }
 
     @Override
-    public boolean hasKey(String key){
+    public synchronized boolean hasKey(String key){
         return kvp_map.containsKey(key);
     }
 
     @Override
-    public String getValue(String key){
+    public synchronized String getValue(String key){
         if(hasKey(key))
             return kvp_map.get(key);
         return "";
     }
 
     @Override
-    public void clearCache(){
+    public synchronized void clearCache(){
         fifo.clear(); 
         kvp_map.clear();
     }
