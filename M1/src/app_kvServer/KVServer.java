@@ -108,7 +108,6 @@ public class KVServer extends Thread implements IKVServer {
             // 2 - insert in cache
             this.cache.insert(key, value);
         }
-        this.cache.print();
         return value;
     }
 
@@ -117,7 +116,6 @@ public class KVServer extends Thread implements IKVServer {
             throws Exception {
         //TODO write in storage
         this.cache.insert(key, value);
-        this.cache.print();
 		storeKV(key, value);
     }
 
@@ -125,7 +123,6 @@ public class KVServer extends Thread implements IKVServer {
     public void deleteKV(String key)
             throws Exception {
         this.cache.delete(key);
-        this.cache.print();
 		storeKV(key, "");
     }
 
@@ -363,6 +360,10 @@ public class KVServer extends Thread implements IKVServer {
 
     public String getValue(String key) throws IOException {
 	    return onDisk(key);
+    }
+
+    public void printCache() {
+        this.cache.print();
     }
 
     /**
