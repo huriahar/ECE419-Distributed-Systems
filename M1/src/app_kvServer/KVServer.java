@@ -19,6 +19,14 @@ import java.io.BufferedWriter;
 import java.io.PrintWriter;
 import logger.LogSetup;
 
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.io.RandomAccessFile;
+import java.nio.channels.OverlappingFileLockException;
+
+import java.util.LinkedList;
+import java.util.List;
+
 import cache.*;
 import common.messages.TextMessage;
 
@@ -33,7 +41,7 @@ public class KVServer extends Thread implements IKVServer {
     private KVCache cache;
     private boolean running;
     private String KVServerName ;
-
+    private static final String DELIM = "|";
 
     /**
      * Start KV Server at given port
@@ -87,8 +95,18 @@ public class KVServer extends Thread implements IKVServer {
     @Override
     public boolean inStorage(String key) {
         if (inCache(key)) return true;
-        // TODO: We need to check if key is in permanant disk storage as well!
-		return false;	
+        // We need to check if key is in permanant disk storage as well!
+		String value = "";
+		try {
+			value = onDisk(key);
+				
+		} catch (IOException ex) {
+			logger.error("ERROR: " + ex); 
+		}
+		if(value.equals(""))
+			return false;	
+		else
+			return true;
     }
 
     @Override
@@ -102,7 +120,6 @@ public class KVServer extends Thread implements IKVServer {
         String value = this.cache.getValue(key);
         if(value.equals("")){
             // 1- retrieve from disk    
-            // TODO
             value = getValueFromDisk(key);            
             
             // 2 - insert in cache
@@ -135,6 +152,9 @@ public class KVServer extends Thread implements IKVServer {
     public void clearStorage() {
         // TODO Auto-generated method stub
         clearCache();
+
+        File file = new File(this.KVServerName);
+        file.delete();
     }
 
     @Override
@@ -148,7 +168,7 @@ public class KVServer extends Thread implements IKVServer {
                 try {
                     Socket client = serverSocket.accept();
                     ClientConnection connection = 
-                            new ClientConnection(this, client,  this.cache);
+                            new ClientConnection(this, client);
                     new Thread(connection).start();
 
                     logger.info("Connected to " 
@@ -219,6 +239,17 @@ public class KVServer extends Thread implements IKVServer {
 		String KVPair;
 		try {
 			File file = new File(filePath);
+			
+			FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
+			FileLock lock = channel.lock();			
+	
+			try {
+				lock = channel.tryLock();
+
+    		} catch (OverlappingFileLockException e) {
+				 System.out.println("Overlapping File Lock Error: " + e.getMessage());
+            }
+
 		    if(!file.exists()) {
 				System.out.println("File not found");
 			}
@@ -229,8 +260,14 @@ public class KVServer extends Thread implements IKVServer {
 				KVPair = br.readLine();
 	
 				while(KVPair != null) {
-					key_val = KVPair.split(",")[0];
-					get_value 	= KVPair.split(",")[1];
+                    String[] msgContent = KVPair.split("\\" + DELIM);
+                    key_val = msgContent[0];
+                    List<String> valueParts = new LinkedList<>();
+                    for (int i = 1; i < msgContent.length; ++i) {
+                        valueParts.add(msgContent[i]);
+                    }
+                    get_value = String.join(DELIM, valueParts);
+					
 					if(key_val.equals(key)) {
 						value = get_value;
 						break; 	
@@ -238,6 +275,10 @@ public class KVServer extends Thread implements IKVServer {
 					KVPair = br.readLine();
 				}
             }
+
+			lock.release();
+			channel.close();
+
 		} catch (IOException ex) { 
                 System.out.println("Unable to open file. ERROR: " + ex);
 		
@@ -279,6 +320,17 @@ public class KVServer extends Thread implements IKVServer {
 				try {
 				    File file = new File(filePath);
 				
+			
+					FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
+					FileLock lock = channel.lock();			
+	
+					try {
+						lock = channel.tryLock();
+
+    				} catch (OverlappingFileLockException e) {
+						 System.out.println("Overlapping File Lock Error: " + e.getMessage());
+            		}
+
 				    if (!file.exists()) {
 				        file.createNewFile();
 				    }
@@ -286,8 +338,11 @@ public class KVServer extends Thread implements IKVServer {
 				    FileWriter fw = new FileWriter(file, true);
 				    wr = new BufferedWriter(fw);
 					pw = new PrintWriter(wr);
-					String KVPair = key + "," + value ;	
+					String KVPair = key + "|" + value ;	
 					pw.println(KVPair);
+
+					lock.release();
+					channel.close();
 
 				} catch (IOException io) {
 				
@@ -317,10 +372,21 @@ public class KVServer extends Thread implements IKVServer {
 		StringBuffer stringBuffer = new StringBuffer();			
 		BufferedReader br = null;
 		BufferedWriter wr  = null;
-		String newPair = key + "," + value ;
+		String newPair = key + "|" + value ;
 		
 		try {
 			File file = new File(filePath);
+			
+			FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
+			FileLock lock = channel.lock();			
+	
+			try {
+				lock = channel.tryLock();
+
+    		} catch (OverlappingFileLockException e) {
+				 System.out.println("Overlapping File Lock Error: " + e.getMessage());
+            }
+			
 		    if(!file.exists()) {
 				System.out.println("File not found");
 			}
@@ -330,8 +396,15 @@ public class KVServer extends Thread implements IKVServer {
 				br = new BufferedReader(fr);
 				KVPair = br.readLine();
 				while(KVPair != null) {
-					key_val = KVPair.split(",")[0];
-					value 	= KVPair.split(",")[1];
+
+                    String[] msgContent = KVPair.split("\\" + DELIM);
+                    key_val = msgContent[0];
+                    List<String> valueParts = new LinkedList<>();
+                    for (int i = 1; i < msgContent.length; ++i) {
+                        valueParts.add(msgContent[i]);
+                    }
+                    value = String.join(DELIM, valueParts);
+
 					if(key_val.equals(key)) {
 						if(!toDelete) {
 							stringBuffer.append(newPair + "\n");
@@ -352,6 +425,10 @@ public class KVServer extends Thread implements IKVServer {
 				pw.println(inputString);			
 				wr.close();	
             }
+
+			lock.release();
+			channel.close();
+
 		} catch (IOException ex) { 
                 System.out.println("Unable to open file. ERROR: " + ex);
 		}

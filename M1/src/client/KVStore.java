@@ -93,24 +93,36 @@ public class KVStore implements KVCommInterface {
         }
     }
 
+    private boolean errorCheck (String key, String value) {
+        boolean result = true;
+        if (key.length() < 1) {
+            logger.error("Server Error: minimum key length allowed is 1 but key has length " + key.length());
+            result = false;
+        }
+        if (key.length() > MAX_KEY_LENGTH) {
+            logger.error("Server Error: maximum key length allowed is " + MAX_KEY_LENGTH + " but key has length " + key.length());
+            result = false;
+        }
+        if (value.length() > MAX_VALUE_LENGTH) {
+            logger.error("Server Error: maximum value length allowed is 120K Bytes but value has length " + value.length());
+            result = false;
+        }
+        if (key.contains(" ")) {
+            logger.error("Server Error: Key should not contain space");
+            result = false;
+        }
+        if (key.contains(DELIM)) {
+            logger.error("Server Error: Key should not contain delimiter " + DELIM);
+            result = false;
+        }
+        return result;
+    }
+
     @Override
     public KVMessage put(String key, String value)
             throws Exception {
         // step 1 - input validation
-        if (key.length() > MAX_KEY_LENGTH) {
-            logger.error("Error: maximum key length allowed is " + MAX_KEY_LENGTH + " but key has length " + key.length());
-            return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
-        }
-        if (value.length() > MAX_VALUE_LENGTH) {
-            logger.error("Error: maximum value length allowed is 120K Bytes but value has length " + value.length());
-            return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
-        }
-        if (key.contains(" ")) {
-            logger.error("Error: Key should not contain space");
-            return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
-        }
-        if (key.contains(DELIM)) {
-            logger.error("Error: Key should not contain delimiter " + DELIM);
+        if (!errorCheck(key, value)) {
             return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
         }
 
@@ -132,16 +144,7 @@ public class KVStore implements KVCommInterface {
     public KVMessage get(String key)
             throws Exception {
         // step 1 - input validation
-        if (key.length() > MAX_KEY_LENGTH) {
-            logger.error("Error: maximum key length allowed is " + MAX_KEY_LENGTH + " but key has length " + key.length());
-            return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
-        }
-        if (key.contains(" ")) {
-            logger.error("Error: Key should not contain space");
-            return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
-        }
-        if (key.contains(DELIM)) {
-            logger.error("Error: Key should not contain delimiter " + DELIM);
+        if (!errorCheck(key, "")) {
             return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
         }
 
