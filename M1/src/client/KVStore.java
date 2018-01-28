@@ -145,7 +145,7 @@ public class KVStore implements KVCommInterface {
             throws Exception {
         // step 1 - input validation
         if (!errorCheck(key, "")) {
-            return new KVReplyMessage(key, value, KVMessage.StatusType.GET_ERROR);
+            return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
         }
 
         // step 2 - send a PUT request to the server
