@@ -24,6 +24,9 @@ import java.nio.channels.FileLock;
 import java.io.RandomAccessFile;
 import java.nio.channels.OverlappingFileLockException;
 
+import java.util.LinkedList;
+import java.util.List;
+
 import cache.*;
 import common.messages.TextMessage;
 
@@ -38,7 +41,7 @@ public class KVServer extends Thread implements IKVServer {
     private KVCache cache;
     private boolean running;
     private String KVServerName ;
-
+    private static final String DELIM = "|";
 
     /**
      * Start KV Server at given port
@@ -240,17 +243,12 @@ public class KVServer extends Thread implements IKVServer {
 			FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
 			FileLock lock = channel.lock();			
 	
-			System.out.println("Acquiring lock");
-
 			try {
 				lock = channel.tryLock();
-				System.out.println("Still acquiring lock");
 
     		} catch (OverlappingFileLockException e) {
 				 System.out.println("Overlapping File Lock Error: " + e.getMessage());
             }
-			
-			System.out.println("Lock Acquired, so do stuff");
 
 		    if(!file.exists()) {
 				System.out.println("File not found");
@@ -262,8 +260,14 @@ public class KVServer extends Thread implements IKVServer {
 				KVPair = br.readLine();
 	
 				while(KVPair != null) {
-					key_val = KVPair.split(",")[0];
-					get_value 	= KVPair.split(",")[1];
+                    String[] msgContent = KVPair.split("\\" + DELIM);
+                    key_val = msgContent[0];
+                    List<String> valueParts = new LinkedList<>();
+                    for (int i = 1; i < msgContent.length; ++i) {
+                        valueParts.add(msgContent[i]);
+                    }
+                    get_value = String.join(DELIM, valueParts);
+					
 					if(key_val.equals(key)) {
 						value = get_value;
 						break; 	
@@ -320,17 +324,12 @@ public class KVServer extends Thread implements IKVServer {
 					FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
 					FileLock lock = channel.lock();			
 	
-					System.out.println("Acquiring lock");
-
 					try {
 						lock = channel.tryLock();
-						System.out.println("Still acquiring lock");
 
     				} catch (OverlappingFileLockException e) {
 						 System.out.println("Overlapping File Lock Error: " + e.getMessage());
             		}
-					
-					System.out.println("Lock Acquired, so do stuff");
 
 				    if (!file.exists()) {
 				        file.createNewFile();
@@ -339,7 +338,7 @@ public class KVServer extends Thread implements IKVServer {
 				    FileWriter fw = new FileWriter(file, true);
 				    wr = new BufferedWriter(fw);
 					pw = new PrintWriter(wr);
-					String KVPair = key + "," + value ;	
+					String KVPair = key + "|" + value ;	
 					pw.println(KVPair);
 
 					lock.release();
@@ -373,7 +372,7 @@ public class KVServer extends Thread implements IKVServer {
 		StringBuffer stringBuffer = new StringBuffer();			
 		BufferedReader br = null;
 		BufferedWriter wr  = null;
-		String newPair = key + "," + value ;
+		String newPair = key + "|" + value ;
 		
 		try {
 			File file = new File(filePath);
@@ -381,19 +380,13 @@ public class KVServer extends Thread implements IKVServer {
 			FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
 			FileLock lock = channel.lock();			
 	
-			System.out.println("Acquiring lock");
-
 			try {
 				lock = channel.tryLock();
-				System.out.println("Still acquiring lock");
 
     		} catch (OverlappingFileLockException e) {
 				 System.out.println("Overlapping File Lock Error: " + e.getMessage());
             }
 			
-			System.out.println("Lock Acquired, so do stuff");
-
-
 		    if(!file.exists()) {
 				System.out.println("File not found");
 			}
@@ -403,8 +396,15 @@ public class KVServer extends Thread implements IKVServer {
 				br = new BufferedReader(fr);
 				KVPair = br.readLine();
 				while(KVPair != null) {
-					key_val = KVPair.split(",")[0];
-					value 	= KVPair.split(",")[1];
+
+                    String[] msgContent = KVPair.split("\\" + DELIM);
+                    key_val = msgContent[0];
+                    List<String> valueParts = new LinkedList<>();
+                    for (int i = 1; i < msgContent.length; ++i) {
+                        valueParts.add(msgContent[i]);
+                    }
+                    value = String.join(DELIM, valueParts);
+
 					if(key_val.equals(key)) {
 						if(!toDelete) {
 							stringBuffer.append(newPair + "\n");
