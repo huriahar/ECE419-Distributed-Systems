@@ -92,8 +92,18 @@ public class KVServer extends Thread implements IKVServer {
     @Override
     public boolean inStorage(String key) {
         if (inCache(key)) return true;
-        // TODO: We need to check if key is in permanant disk storage as well!
-		return false;	
+        // We need to check if key is in permanant disk storage as well!
+		String value = "";
+		try {
+			value = onDisk(key);
+				
+		} catch (IOException ex) {
+			logger.error("ERROR: " + ex); 
+		}
+		if(value.equals(""))
+			return false;	
+		else
+			return true;
     }
 
     @Override
@@ -107,7 +117,6 @@ public class KVServer extends Thread implements IKVServer {
         String value = this.cache.getValue(key);
         if(value.equals("")){
             // 1- retrieve from disk    
-            // TODO
             value = getValueFromDisk(key);            
             
             // 2 - insert in cache
