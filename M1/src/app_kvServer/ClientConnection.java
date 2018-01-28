@@ -36,19 +36,15 @@ public class ClientConnection implements Runnable {
     private KVServer server;
     private InputStream input;
     private OutputStream output;
-    //private Path storagePath;
-    private KVCache cache;
 
     /**
      * Constructs a new CientConnection object for a given TCP socket.
      * @param clientSocket the Socket object for the client connection.
      */
-    public ClientConnection (KVServer server, Socket clientSocket,  KVCache cache) {
+    public ClientConnection (KVServer server, Socket clientSocket) {
         this.server = server;
         this.clientSocket = clientSocket;
         this.isOpen = true;
-        //this.storagePath = storagePath;
-        //this.cache = cache;
     }
     
     /**
@@ -116,6 +112,10 @@ public class ClientConnection implements Runnable {
 
     private boolean errorCheck (String key, String value) {
         boolean result = true;
+        if (key.length() < 1) {
+            logger.error("Server Error: minimum key length allowed is 1 but key has length " + key.length());
+            result = false;
+        }
         if (key.length() > MAX_KEY_LENGTH) {
             logger.error("Server Error: maximum key length allowed is " + MAX_KEY_LENGTH + " but key has length " + key.length());
             result = false;

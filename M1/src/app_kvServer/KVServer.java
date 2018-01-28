@@ -155,6 +155,9 @@ public class KVServer extends Thread implements IKVServer {
     public void clearStorage() {
         // TODO Auto-generated method stub
         clearCache();
+
+        File file = new File("C:\\Users\\Mayank\\Desktop\\1.txt");
+        file.delete();
     }
 
     @Override
@@ -168,7 +171,7 @@ public class KVServer extends Thread implements IKVServer {
                 try {
                     Socket client = serverSocket.accept();
                     ClientConnection connection = 
-                            new ClientConnection(this, client,  this.cache);
+                            new ClientConnection(this, client);
                     new Thread(connection).start();
 
                     logger.info("Connected to " 
