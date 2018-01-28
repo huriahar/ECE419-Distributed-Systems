@@ -156,7 +156,7 @@ public class KVServer extends Thread implements IKVServer {
         // TODO Auto-generated method stub
         clearCache();
 
-        File file = new File("C:\\Users\\Mayank\\Desktop\\1.txt");
+        File file = new File(this.KVServerName);
         file.delete();
     }
 
