@@ -88,7 +88,7 @@ public class KVServer extends Thread implements IKVServer {
     public boolean inStorage(String key) {
         if (inCache(key)) return true;
         // TODO: We need to check if key is in permanant disk storage as well!
-        return false;
+		return false;	
     }
 
     @Override
@@ -126,6 +126,7 @@ public class KVServer extends Thread implements IKVServer {
             throws Exception {
         this.cache.delete(key);
         this.cache.print();
+		storeKV(key, "");
     }
 
     @Override
@@ -228,13 +229,11 @@ public class KVServer extends Thread implements IKVServer {
 				
 				FileReader fr = new FileReader(file);
 				br = new BufferedReader(fr);
-				System.out.println("File found. Beginning to read");
 				KVPair = br.readLine();
 	
 				while(KVPair != null) {
-					key_val = KVPair.split("|")[0];
-					get_value 	= KVPair.split("|")[2];
-					System.out.println("Value: " + get_value + " and key: " + key_val);	
+					key_val = KVPair.split(",")[0];
+					get_value 	= KVPair.split(",")[1];
 					if(key_val.equals(key)) {
 						value = get_value;
 						break; 	
@@ -263,54 +262,51 @@ public class KVServer extends Thread implements IKVServer {
         //TODO : Cache it in KVServer
 
 		String filePath  = this.KVServerName;
-		
-		System.out.println(filePath);
 		BufferedWriter wr  = null;
 		PrintWriter pw = null;
+		boolean toBeDeleted = false; 
+
 		String curVal = onDisk(key);
-		if(curVal != "") {
+		if(value == "") {
+			toBeDeleted = true;
+		}
+
+		if(!curVal.equals("")) {
 				//rewrite entire file back with new values
-			if(value == "") {
-				writeNewFile(key, value, true);				
-				System.out.println("Existing Pair: " + key);
-			}
-			else {
-				writeNewFile(key, value, false);
-				System.out.println("Deleting Pair: " + key );
-			}
+			writeNewFile(key, value, toBeDeleted);		
 		}
 		else{
-			//simply append it to the end
-			System.out.println("New KKV Pair");
-			try {
-			    File file = new File(filePath);
-			
-			    if (!file.exists()) {
-			        file.createNewFile();
-			    }
-			
-			    FileWriter fw = new FileWriter(file, true);
-			    wr = new BufferedWriter(fw);
-				pw = new PrintWriter(wr);
-				String KVPair = key + "|" + value ;	
-				pw.println(KVPair);
-
-			} catch (IOException io) {
-			
-			    io.printStackTrace();
-			}
+			if(!toBeDeleted) {
 				
-			finally
-			{
-			    try{
-			        if(wr!=null)
-			            wr.close();
-//					if(pw != null)
-//						pw.close();
-			
-			    }   catch(Exception ex){
-			            System.out.println("Error in closing the BufferedWriter"+ex);
-			     }
+				//simply append it to the end
+				try {
+				    File file = new File(filePath);
+				
+				    if (!file.exists()) {
+				        file.createNewFile();
+				    }
+				
+				    FileWriter fw = new FileWriter(file, true);
+				    wr = new BufferedWriter(fw);
+					pw = new PrintWriter(wr);
+					String KVPair = key + "," + value ;	
+					pw.println(KVPair);
+
+				} catch (IOException io) {
+				
+				    io.printStackTrace();
+				}
+					
+				finally
+				{
+				    try{
+				        if(wr!=null)
+				            wr.close();
+				
+				    }   catch(Exception ex){
+				            System.out.println("Error in closing the BufferedWriter"+ex);
+				     }
+				}
 			}
 		}
 	}
@@ -318,66 +314,46 @@ public class KVServer extends Thread implements IKVServer {
 
 	public void writeNewFile(String key, String value, boolean toDelete) {
 
-		String key_val = "";
-		String KVPair = "Empty";
+		String key_val;
+		String KVPair;
 		String filePath  = this.KVServerName; 
-		System.out.println("Write to File. Delete:" + toDelete);
 		StringBuffer stringBuffer = new StringBuffer();			
 		BufferedReader br = null;
 		BufferedWriter wr  = null;
-		String newPair = key + "|" + value ;
-		String newline = System.getProperty("line.separator");
+		String newPair = key + "," + value ;
 		
 		try {
 			File file = new File(filePath);
 		    if(!file.exists()) {
-				System.out.println("file not found");
+				System.out.println("File not found");
 			}
 			else{
 			
 				FileReader fr = new FileReader(file);
 				br = new BufferedReader(fr);
-				System.out.println("Reading File");	
 				KVPair = br.readLine();
-				System.out.println("Initial KVpair Read in : " + KVPair);
 				while(KVPair != null) {
-					key_val = KVPair.split("|")[0];
-					value 	= KVPair.split("|")[2];
-					System.out.println("Value: " + value + " and key: " + key_val);
+					key_val = KVPair.split(",")[0];
+					value 	= KVPair.split(",")[1];
 					if(key_val.equals(key)) {
-						if(toDelete) {
-							System.out.println("Assume it's deleled");
-						}							
-						else {
-							System.out.println("Adding in updatedPair");
-							stringBuffer.append(newPair);
-							System.out.println(stringBuffer);
+						if(!toDelete) {
+							stringBuffer.append(newPair + "\n");
 						}
 					}
 					else{
-						System.out.println("Add in  old Pair with no changes");
-						stringBuffer.append(KVPair);
-						System.out.println(stringBuffer);
-
+						stringBuffer.append(KVPair + "\n");
 					}
 					KVPair = br.readLine();
-					if(KVPair != null )
-						stringBuffer.append("\n");
-//						System.out.println("Newline char: " + KVPair.contains(newline));
-					System.out.println("KVpair Read in : " + KVPair);
 				}
 
-				System.out.println("Exited loop ");
 				br.close();
+				String inputString = (stringBuffer.toString()).trim();
 
-
-				System.out.println("Writing the sb to file");
 				FileWriter fw = new FileWriter(file);
 			    wr = new BufferedWriter(fw);
 				PrintWriter pw = new PrintWriter(wr);
-				pw.println(stringBuffer.toString());			
+				pw.println(inputString);			
 				wr.close();	
-//				pw.close();
             }
 		} catch (IOException ex) { 
                 System.out.println("Unable to open file. ERROR: " + ex);
