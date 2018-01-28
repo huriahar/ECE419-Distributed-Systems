@@ -112,11 +112,9 @@ public class CacheTests extends TestCase {
     public void  testEvictRetrieve() {
         // Server needed to test disk consistency with cache
         // Initialize server
-        kvServer = new KVServer(1234, 3, "FIFO");
-        kvServer.start();
 
         // Initialize client
-		kvClient = new KVStore("localhost",1234);
+		kvClient = new KVStore("localhost",50000);
 		try {
 			kvClient.connect();
 		} catch (Exception e) {
@@ -129,11 +127,16 @@ public class CacheTests extends TestCase {
             kvClient.put("b", "2");
             kvClient.put("c", "3");
             kvClient.put("d", "4");
+            kvClient.put("e", "5");
+            kvClient.put("f", "6");
+            kvClient.put("g", "7");
+            kvClient.put("h", "8");
+            kvClient.put("i", "9");
+            kvClient.put("j", "10");
+            kvClient.put("k", "11");
         } catch (Exception e) {
             ex = e;
         }
-        assertTrue(kvServer.inCache("d"));
-        assertFalse(kvServer.inCache("a"));
 
 		KVMessage response = null;
 		ex = null;
@@ -147,7 +150,6 @@ public class CacheTests extends TestCase {
         assertTrue(ex == null && response.getStatus() == StatusType.GET_SUCCESS && response.getValue().equals("1"));
 
 		kvClient.disconnect();
-        kvServer.close();
     } 
 }
 
