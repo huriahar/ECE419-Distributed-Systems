@@ -103,7 +103,7 @@ public class KVServer extends Thread implements IKVServer {
         if(value.equals("")){
             // 1- retrieve from disk    
             // TODO
-            value = getValue(key);            
+            value = getValueFromDisk(key);            
             
             // 2 - insert in cache
             this.cache.insert(key, value);
@@ -361,7 +361,7 @@ public class KVServer extends Thread implements IKVServer {
 
 	}
 
-    public String getValue(String key) throws IOException {
+    public String getValueFromDisk(String key) throws IOException {
 	    return onDisk(key);
     }
 
