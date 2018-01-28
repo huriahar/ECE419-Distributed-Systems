@@ -109,7 +109,7 @@ public class CacheTests extends TestCase {
     // The following tests ensure that after retrieving a value from disk
     // the cache is updates as expected
     @Test
-    public void  testFIFO() {
+    public void  testEvictRetrieve() {
         // Server needed to test disk consistency with cache
         // Initialize server
         kvServer = new KVServer(1234, 3, "FIFO");
@@ -144,7 +144,7 @@ public class CacheTests extends TestCase {
 			ex = e;
 		}
 
-        assertTrue(ex == null && response.getStatus() == StatusType.GET_SUCCESS && response.getKey().equals("1"));
+        assertTrue(ex == null && response.getStatus() == StatusType.GET_SUCCESS && response.getValue().equals("1"));
 
 		kvClient.disconnect();
         kvServer.close();
