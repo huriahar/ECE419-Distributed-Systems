@@ -19,6 +19,11 @@ import java.io.BufferedWriter;
 import java.io.PrintWriter;
 import logger.LogSetup;
 
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.io.RandomAccessFile;
+import java.nio.channels.OverlappingFileLockException;
+
 import cache.*;
 import common.messages.TextMessage;
 
@@ -222,6 +227,22 @@ public class KVServer extends Thread implements IKVServer {
 		String KVPair;
 		try {
 			File file = new File(filePath);
+			
+			FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
+			FileLock lock = channel.lock();			
+	
+			System.out.println("Acquiring lock");
+
+			try {
+				lock = channel.tryLock();
+				System.out.println("Still acquiring lock");
+
+    		} catch (OverlappingFileLockException e) {
+				 System.out.println("Overlapping File Lock Error: " + e.getMessage());
+            }
+			
+			System.out.println("Lock Acquired, so do stuff");
+
 		    if(!file.exists()) {
 				System.out.println("File not found");
 			}
@@ -241,6 +262,10 @@ public class KVServer extends Thread implements IKVServer {
 					KVPair = br.readLine();
 				}
             }
+
+			lock.release();
+			channel.close();
+
 		} catch (IOException ex) { 
                 System.out.println("Unable to open file. ERROR: " + ex);
 		
@@ -282,6 +307,22 @@ public class KVServer extends Thread implements IKVServer {
 				try {
 				    File file = new File(filePath);
 				
+			
+					FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
+					FileLock lock = channel.lock();			
+	
+					System.out.println("Acquiring lock");
+
+					try {
+						lock = channel.tryLock();
+						System.out.println("Still acquiring lock");
+
+    				} catch (OverlappingFileLockException e) {
+						 System.out.println("Overlapping File Lock Error: " + e.getMessage());
+            		}
+					
+					System.out.println("Lock Acquired, so do stuff");
+
 				    if (!file.exists()) {
 				        file.createNewFile();
 				    }
@@ -291,6 +332,9 @@ public class KVServer extends Thread implements IKVServer {
 					pw = new PrintWriter(wr);
 					String KVPair = key + "," + value ;	
 					pw.println(KVPair);
+
+					lock.release();
+					channel.close();
 
 				} catch (IOException io) {
 				
@@ -324,6 +368,23 @@ public class KVServer extends Thread implements IKVServer {
 		
 		try {
 			File file = new File(filePath);
+			
+			FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
+			FileLock lock = channel.lock();			
+	
+			System.out.println("Acquiring lock");
+
+			try {
+				lock = channel.tryLock();
+				System.out.println("Still acquiring lock");
+
+    		} catch (OverlappingFileLockException e) {
+				 System.out.println("Overlapping File Lock Error: " + e.getMessage());
+            }
+			
+			System.out.println("Lock Acquired, so do stuff");
+
+
 		    if(!file.exists()) {
 				System.out.println("File not found");
 			}
@@ -355,6 +416,10 @@ public class KVServer extends Thread implements IKVServer {
 				pw.println(inputString);			
 				wr.close();	
             }
+
+			lock.release();
+			channel.close();
+
 		} catch (IOException ex) { 
                 System.out.println("Unable to open file. ERROR: " + ex);
 		}
