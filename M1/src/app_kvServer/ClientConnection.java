@@ -156,8 +156,9 @@ public class ClientConnection implements Runnable {
             else {
                 // Delete the value from $ and disk
                 try {
-                    server.deleteKV(key);
-                    result = "DELETE_SUCCESS";
+                    result = (server.inStorage(key)) ? "DELETE_SUCCESS" : "DELETE_ERROR";
+					if(result.equals("DELETE_SUCCESS")) 
+	                    server.deleteKV(key);
                     logger.info("Success " + result + " with key " + key + " on server");
                 }
                 catch (Exception ex) {

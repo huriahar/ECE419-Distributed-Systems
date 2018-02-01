@@ -242,12 +242,12 @@ public class KVServer extends Thread implements IKVServer {
 			
 			FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
 			FileLock lock = channel.lock();			
-	
+
 			try {
 				lock = channel.tryLock();
 
     		} catch (OverlappingFileLockException e) {
-				 System.out.println("Overlapping File Lock Error: " + e.getMessage());
+				 //System.out.println("Overlapping File Lock Error: " + e.getMessage());
             }
 
 		    if(!file.exists()) {
@@ -328,7 +328,7 @@ public class KVServer extends Thread implements IKVServer {
 						lock = channel.tryLock();
 
     				} catch (OverlappingFileLockException e) {
-						 System.out.println("Overlapping File Lock Error: " + e.getMessage());
+						 //System.out.println("Overlapping File Lock Error: " + e.getMessage());
             		}
 
 				    if (!file.exists()) {
@@ -384,7 +384,7 @@ public class KVServer extends Thread implements IKVServer {
 				lock = channel.tryLock();
 
     		} catch (OverlappingFileLockException e) {
-				 System.out.println("Overlapping File Lock Error: " + e.getMessage());
+				 //System.out.println("Overlapping File Lock Error: " + e.getMessage());
             }
 			
 		    if(!file.exists()) {

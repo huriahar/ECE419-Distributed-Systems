@@ -49,25 +49,25 @@ public class KVCache implements IKVCache {
     }
 
     @Override
-    public void insert(String key, String value){
+    public synchronized void insert(String key, String value){
     }
 
     @Override
-    public void delete(String key){
+    public  synchronized void delete(String key){
     }
 
     @Override
-    public boolean hasKey(String key){
+    public synchronized boolean hasKey(String key){
         return false;
     }
 
     @Override
-    public String getValue(String key){
+    public synchronized String getValue(String key){
         return "";
     }
 
     @Override
-    public void clearCache(){
+    public synchronized void clearCache(){
     }
 
     @Override
