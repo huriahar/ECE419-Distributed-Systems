@@ -17,15 +17,15 @@ import java.io.InputStreamReader;
 
 public class ECSClient implements IECSClient {
 
-	private ECS ecsInstance;
+    private ECS ecsInstance;
     private BufferedReader stdin;
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "ECSClient> ";
-	Collection<IECSNodes> nodesLaunched;
+    Collection<IECSNodes> nodesLaunched;
 
 
-	public ECSClient (String configFile) {
-    	this.ecsInstance = new ECS(configFile); 
+    public ECSClient (String configFile) {
+        this.ecsInstance = new ECS(configFile); 
 
     }
 
@@ -61,10 +61,10 @@ public class ECSClient implements IECSClient {
             case "init":
                 if(tokens.length == 4) {
                     try {
-                        int numNodes 	= Integer.parseInt(tokens[1]);
+                        int numNodes     = Integer.parseInt(tokens[1]);
                         int cacheSize   = Integer.parseInt(tokens[2]);
-						String cacheStrategy = tokens[3];
-                        nodesLaunched = addNodes(numNodes, cacheSize, cacheStrategy);	
+                        String cacheStrategy = tokens[3];
+                        nodesLaunched = addNodes(numNodes, cacheSize, cacheStrategy);    
                     }
                     catch(NumberFormatException nfe) {
                         printError("Invalid numNodes/cacheSize. numNodes/cacheSize  must be a number!");
@@ -79,49 +79,49 @@ public class ECSClient implements IECSClient {
 
             case "stop":
                 if(!stop()) {
-					printError("Unable to stop the service");	
-				}
+                    printError("Unable to stop the service");    
+                }
                 break;
 
             case "shutDown": 
-				if(!shutDown()) {
-					printError("Unable to stop and exit");
-				}	
-				break;
+                if(!shutDown()) {
+                    printError("Unable to stop and exit");
+                }    
+                break;
 
-			case "addNode":
-				if(tokens.length == 3) {
-					try {
-						int cacheSize = Integer.parseInt(tokens[1]);
-						String cacheStrategy = tokens[2];
-						IECS newNode = addNode(cacheSize, cacheStrategy);	
-						nodesLaunched.add(newNode);
-					}
+            case "addNode":
+                if(tokens.length == 3) {
+                    try {
+                        int cacheSize = Integer.parseInt(tokens[1]);
+                        String cacheStrategy = tokens[2];
+                        IECS newNode = addNode(cacheSize, cacheStrategy);    
+                        nodesLaunched.add(newNode);
+                    }
                     catch(NumberFormatException nfe) {
                         printError("Invalid cacheSize. cacheSize must be a number!");
                         logger.error("Invalid cacheSize. cacheSize must be a number!", nfe);
                     }
 
-				}
+                }
                 else {
                     printError("Invalid number of parameters for command \"connect\"");
                     printHelp();
                 }
-				break;
+                break;
 
-			case "removeNode":
-				if(tokens.length() >= 2) {
-					Collections<String> nodeNames;
-					for(int i = 1; i < tokens.length(); i++) {
-						nodeNames.add(tokens[i]);
-					}	
-					if(!removeNodes(nodeNames)) {
-						printError("Unable to remove node");	
-					}
-				}
-				break;			
-	
-			case "logLevel":
+            case "removeNode":
+                if(tokens.length() >= 2) {
+                    Collections<String> nodeNames;
+                    for(int i = 1; i < tokens.length(); i++) {
+                        nodeNames.add(tokens[i]);
+                    }    
+                    if(!removeNodes(nodeNames)) {
+                        printError("Unable to remove node");    
+                    }
+                }
+                break;            
+    
+            case "logLevel":
                 if (tokens.length == 2) {
                     String level = setLevel(tokens[1]);
                     if (level.equals(LogSetup.UNKNOWN_LEVEL)) {
@@ -144,7 +144,7 @@ public class ECSClient implements IECSClient {
             default:
                 printError("Unknown command");
                 printHelp();            
-                break
+                break;
         }
     }
 
@@ -184,15 +184,30 @@ public class ECSClient implements IECSClient {
     @Override
     public boolean start() {
         // TODO
-		//Loop through the list of nodes in Collections and change their status away from STOPPED	
-        return false;
+        boolean failed = false;
+        //Loop through the list of nodes in Collections and change their status away from STOPPED   
+        for (iterable_type iterable_element : nodesLaunched) {
+            if(!start(iterable_element)) {
+                failed = true;
+            }               
+        }
+        return failed;
     }
 
     @Override
     public boolean stop() {
         // TODO
-		//Loop through the list of ECS
-        return false;
+        //Loop through the list of ECS
+        for (iterable_type iterable_element : nodesLaunched) {
+            if(!stop(iterable_element)) {
+                failed = true;
+            }               
+        }
+        return failed;
+
+    }
+
+
     @Override
     public boolean shutdown() {
         // TODO
@@ -226,12 +241,12 @@ public class ECSClient implements IECSClient {
     @Override
     public boolean removeNodes(Collection<String> nodeNames) {
         // TODO
-		//Iterator<Integer> iter = l.iterator();
-		//while (iter.hasNext()) {
-		//    if (iter.next().intValue() == 5) {
-		//        iter.remove();
-		//    }
-		//}
+        //Iterator<Integer> iter = l.iterator();
+        //while (iter.hasNext()) {
+        //    if (iter.next().intValue() == 5) {
+        //        iter.remove();
+        //    }
+        //}
 I
         return false;
     }
@@ -269,4 +284,7 @@ I
             System.exit(1);
         }
     }
+
+
+
 }
