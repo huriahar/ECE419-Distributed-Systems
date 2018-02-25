@@ -282,7 +282,15 @@ public class KVClient implements IKVClient {
         throws UnknownHostException, IOException {
         // TODO Auto-generated method stub
         clientStore = new KVStore(hostname, port);
-        clientStore.connect();
+        try {
+            clientStore.connect();    
+        }
+        catch (Exception ex) {
+            printError("Unable to establish connection with " + hostname + 
+                "at port " + port);
+            logger.error("Unable to establish connection with " + hostname + 
+                "at port " + port);
+        }
         clientStore.addListener(this);
     }
 

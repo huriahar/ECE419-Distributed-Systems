@@ -3,9 +3,19 @@ package app_kvECS;
 import java.util.Map;
 import java.util.Collection;
 
+import java.io.IOException;
+
+import logger.LogSetup;
+import org.apache.log4j.Logger;
+import org.apache.log4j.Level;
+
 import ecs.IECSNode;
 
 public class ECSClient implements IECSClient {
+
+    public ECSClient (String configFile) {
+        
+    }
 
     @Override
     public boolean start() {
@@ -69,5 +79,23 @@ public class ECSClient implements IECSClient {
 
     public static void main(String[] args) {
         // TODO
+        try {
+            new LogSetup("logs/ECSClient.log", Level.ALL);
+            if (args.length != 1) {
+                System.out.println("Error! Invalid number of arguments!");
+                System.out.println("Usage: ecs <ecs.config>");
+            }
+            else {
+                System.out.println("Config file " + args[0]);
+                String configFile = args[0];
+                ECSClient ECSClientApp = new ECSClient(configFile);
+                ECSClientApp.run();
+            }
+        }
+        catch (IOException e) {
+            System.out.println("Error! Unable to initialize logger!");
+            e.printStackTrace();
+            System.exit(1);
+        }
     }
 }
