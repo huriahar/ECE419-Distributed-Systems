@@ -439,6 +439,10 @@ public class KVServer extends Thread implements IKVServer {
 	    return onDisk(key);
     }
 
+    public void printCache() {
+        this.cache.print();
+    }
+
     /**
      * Main entry point for the KV server application. 
      * @param args contains the port number at args[0]
