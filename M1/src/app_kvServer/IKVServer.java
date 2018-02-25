@@ -62,7 +62,7 @@ public interface IKVServer {
     public void putKV(String key, String value) throws Exception;
 
     /**
-     * Put the key-value pair into storage
+     * Delete the key-value pair from storage
      * @throws Exception
      *      when key not in the key range of the server
      */
