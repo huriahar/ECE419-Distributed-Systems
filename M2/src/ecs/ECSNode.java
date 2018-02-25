@@ -1,4 +1,3 @@
-
 package ecs;
 
 public class ECSNode {
