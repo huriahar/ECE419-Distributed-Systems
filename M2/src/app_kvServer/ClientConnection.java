@@ -6,9 +6,11 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.util.LinkedList;
 import java.util.List;
-
+import java.util.HashMap;
+import java.math.BigInteger;
 import cache.KVCache;
 import common.messages.TextMessage;
+import common.Parser.*;
 
 import org.apache.log4j.*;
 
@@ -30,7 +32,7 @@ public class ClientConnection implements Runnable {
     private static final int MAX_KEY_LENGTH = 20; 
     private static final int MAX_VALUE_LENGTH = 122880; //120KB
     private static final int DROP_SIZE = 128 * BUFFER_SIZE;
-    private static final String DELIM = "|";
+    private HashMap<BigInteger, ServerMetaData> ringNetwork;
     
     private Socket clientSocket;
     private KVServer server;
@@ -75,6 +77,11 @@ public class ClientConnection implements Runnable {
                     }
                     String value = String.join(DELIM, valueParts);
                     if (command.equals("PUT")) {
+                        if(server.isWriteLocked()){
+                            sendMessage(new TextMessage("SERVER_WRITE_LOCK"));
+                            logger.info("SERVER_WRITE_LOCK: server locked, write operation failed");
+                            continue;
+                        }
                         handlePutCmd(msgContent[1], value);
                     }
                     else if (command.equals("GET")) {

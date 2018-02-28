@@ -7,10 +7,15 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.LinkedList;
 import java.util.List;
+import java.math.BigInteger;
 
+import common.MD5;
 import common.messages.KVMessage;
 import common.messages.TextMessage;
 import common.messages.KVReplyMessage;
+import common.Parser.*;
+import common.ServerMetaData;
+import common.ServerMetaData.configContent;
 import app_kvClient.IKVClient;
 import app_kvClient.IKVClient.SocketStatus;
 
@@ -31,14 +36,12 @@ public class KVStore implements KVCommInterface {
     private Socket clientSocket;
     private OutputStream output;
     private InputStream input;
+    private HashMap<BigInteger, ServerMetaData> ringNetwork;
 
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
     private static final int MAX_KEY_LENGTH = 20; 
     private static final int MAX_VALUE_LENGTH = 122880; //120KB
-    private static final String DELIM = "|";
-    private static final String PUT_CMD = "PUT";
-    private static final String GET_CMD = "GET";
 
     /**
      * Initialize KVStore with address and port of KVServer
@@ -137,7 +140,16 @@ public class KVStore implements KVCommInterface {
 
         // step 3 - get the server's response and forward it to the client
         TextMessage reply = receiveMessage();
-        return new KVReplyMessage(key, value, reply.getMsg());
+        KVReplyMessage kvreply = new KVReplyMessage(key, value, reply.getMsg());
+        
+        // step 4 - retry put if possible
+        switch(kvreply.getStatus()){
+            case SERVER_NOT_RESPONSIBLE:
+                kvreply = retryRequest(key, value, PUT_CMD);
+            default:
+                break;
+        }
+        return kvreply;
     }
 
     @Override
@@ -156,6 +168,7 @@ public class KVStore implements KVCommInterface {
         TextMessage reply = receiveMessage();
         String[] tokens = (reply.getMsg()).split("\\|");
         String getStatus = tokens[0];
+        
         if (tokens.length < 2) {
             return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
         }
@@ -169,10 +182,70 @@ public class KVStore implements KVCommInterface {
             String value = String.join(DELIM, valueParts);
             return new KVReplyMessage(key, value, KVMessage.StatusType.GET_SUCCESS);
         }
+        else if(getStatus.equals("SERVER_NOT_RESPONSIBLE") {
+            return retryRequest(key, null, GET_CMD);
+        }
         else {
             // Invalid Message type received or received GET_ERROR
             return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
         }
+    }
+
+    private KVMessage retryRequest(String key, String value, String request) {
+        // step 1 - Update ServerMetaData
+        string status = (value == null) ? "DELETE_ERROR" : "PUT_ERROR";
+        status = (request.equals(GET_CMD)) ? "GET_ERROR" : status;
+
+        sendMessage(new TextMessage("GET_METADATA");
+        TextMessage reply = receiveMessage();
+        if(reply.getMsg().equals("METADATA_FETCH_ERROR")) {
+            return new KVReplyMessage(key, value, status);
+        }
+        else {
+            // Update ServerMetaData
+            updateMetaData(reply.getMsg());
+            
+            // Find responsible server
+            BigInteger serverHash = getResponsibleServer(key);
+            if(serverHash == -1) {
+                return new KVReplyMessage(key, value, status);
+            }
+            
+            // Disconnect from current server and reconnect
+            // to the correct server
+            disconnect();
+            this.serverAddr = this.ringNetwork[serverHash].addr;
+            this.serverPort = this.ringNetwork[serverHash].port;
+            connect();
+            
+            return (request.equals(PUT_CMD)) ? put(key, value) : get(key);
+        }
+    }
+
+    private void updateMetaData(String marshalledData) {
+        this.ringNetwork = new HashMap<BigInteger, ServerMetaData>();
+        String[] dataEntries = marshalledData.split(NEWLINE_DELIM);
+
+        for(int i = 0; i < dataEntries.length ; i++) {
+            BigInteger serverHash = MD5.encode(line[SERVER_NAME] + DELIM + line[SERVER_IP] + DELIM + line[SERVER_PORT]);
+            ServerMetaData meta = new ServerMetaData(line[SERVER_NAME], line[SERVER_IP], Integer.parseInt(line[SERVER_PORT]), line[BEGIN_HASH], line[END_HASH]);
+            this.ringNetwork.put(serverHash, meta);
+        }
+    }
+
+    private BigInteger getResponsibleServer(String key) {
+        if(ringNetwork.isEmpty()) return -1;
+        BigInteger encodedKey = MD5.encode(key);
+        /*
+            TODO this comment is copied verbatum
+            Return the server that has the next highest hash to the encodedKey.
+            If encodedKey has a hash higher than all KVServers, then return
+            the Metadata of KVServer with the lowest hash (due to wrap-around).
+        */
+        if(ringNetwork.higherEntry(encodedKey) == null) {
+            return ringNetwork.firstEntry().getValue();
+        }
+        return ringNetwork.higherEntry(encodedKey).getValue();
     }
 
     public boolean isRunning() {
