@@ -76,6 +76,12 @@ public class ECSClient implements IECSClient {
                     printHelp();
                 }
                 break;
+            
+            case "start":
+                if(!start()) {
+                    printtError("Unable to start all servers");
+                }
+                break;
 
             case "stop":
                 if(!stop()) {
@@ -181,13 +187,41 @@ public class ECSClient implements IECSClient {
     }
 
 
+    private String setLevel(String levelString) {
+        
+        if(levelString.equals(Level.ALL.toString())) {
+            logger.setLevel(Level.ALL);
+            return Level.ALL.toString();
+        } else if(levelString.equals(Level.DEBUG.toString())) {
+            logger.setLevel(Level.DEBUG);
+            return Level.DEBUG.toString();
+        } else if(levelString.equals(Level.INFO.toString())) {
+            logger.setLevel(Level.INFO);
+            return Level.INFO.toString();
+        } else if(levelString.equals(Level.WARN.toString())) {
+            logger.setLevel(Level.WARN);
+            return Level.WARN.toString();
+        } else if(levelString.equals(Level.ERROR.toString())) {
+            logger.setLevel(Level.ERROR);
+            return Level.ERROR.toString();
+        } else if(levelString.equals(Level.FATAL.toString())) {
+            logger.setLevel(Level.FATAL);
+            return Level.FATAL.toString();
+        } else if(levelString.equals(Level.OFF.toString())) {
+            logger.setLevel(Level.OFF);
+            return Level.OFF.toString();
+        } else {
+            return LogSetup.UNKNOWN_LEVEL;
+        }
+    }
+
     @Override
     public boolean start() {
         // TODO
         boolean failed = false;
         //Loop through the list of nodes in Collections and change their status away from STOPPED   
-        for (iterable_type iterable_element : nodesLaunched) {
-            if(!start(iterable_element)) {
+        for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext()) {
+            if(!start(iter) {
                 failed = true;
             }               
         }
@@ -198,8 +232,8 @@ public class ECSClient implements IECSClient {
     public boolean stop() {
         // TODO
         //Loop through the list of ECS
-        for (iterable_type iterable_element : nodesLaunched) {
-            if(!stop(iterable_element)) {
+        for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext()) {
+            if(!stop(iter)) {
                 failed = true;
             }               
         }
@@ -211,6 +245,7 @@ public class ECSClient implements IECSClient {
     @Override
     public boolean shutdown() {
         // TODO
+            
         return false;
     }
 
@@ -223,7 +258,8 @@ public class ECSClient implements IECSClient {
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
         // TODO
-        return 
+        
+        return  
     }
 
     @Override
