@@ -220,8 +220,8 @@ public class ECSClient implements IECSClient {
         // TODO
         boolean failed = false;
         //Loop through the list of nodes in Collections and change their status away from STOPPED   
-        for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext()) {
-            if(!start(iter) {
+        for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
+            if(!start(iter)) {
                 failed = true;
             }               
         }
@@ -232,7 +232,7 @@ public class ECSClient implements IECSClient {
     public boolean stop() {
         // TODO
         //Loop through the list of ECS
-        for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext()) {
+        for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
             if(!stop(iter)) {
                 failed = true;
             }               
@@ -259,7 +259,7 @@ public class ECSClient implements IECSClient {
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
         // TODO
         
-        return  
+        return null; 
     }
 
     @Override
@@ -283,7 +283,7 @@ public class ECSClient implements IECSClient {
         //        iter.remove();
         //    }
         //}
-I
+
         return false;
     }
 
