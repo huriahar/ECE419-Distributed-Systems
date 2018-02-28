@@ -14,7 +14,7 @@ public class ECS {
 	private confPath; 
 	private Socket socket;
     private String DELIM = "|";
-    private HashMap ringNetwork;
+    private HashMap<BigInteger, ServerMetaData> ringNetwork;
 	private enum ConfigContent {
         SERVER_NAME = 0,
         SERVER_IP = 1,
@@ -23,7 +23,7 @@ public class ECS {
 	public ECS(String confFile)
     {
         this.configFile = Paths.get(configFile);
-        this.ringNetwork = new HashMap();
+        this.ringNetwork = new HashMap<BigInteger, ServerMetaData>();
         populateRingNetwork();
     }
 
@@ -44,8 +44,8 @@ public class ECS {
             String[] line = lines.get(i).split(" ");
             BigInteger serverHash = strToMD5(line[SERVER_NAME] + DELIM + line[SERVER_IP] + DELIM + line[SERVER_PORT]);
             //TODO figure out begin and end hash, does zookeeper assign it?
-            ECSNode ecsNode = new ECSNode(line[SERVER_NAME], line[SERVER_IP], Integer.parseInt(line[SERVER_PORT]), null, null)
-            this.ringNetwork.put(serverHash, ecsNode);
+            ServerMetaData meta = new ServerMetaData(line[SERVER_NAME], line[SERVER_IP], Integer.parseInt(line[SERVER_PORT]), null, null)
+            this.ringNetwork.put(serverHash, meta);
         }
 
     }
