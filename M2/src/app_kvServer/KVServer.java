@@ -29,6 +29,7 @@ import java.util.List;
 
 import cache.*;
 import common.messages.TextMessage;
+import common.Parser.*;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.Level;
@@ -41,8 +42,7 @@ public class KVServer extends Thread implements IKVServer {
     private KVCache cache;
     private boolean running;
     private String KVServerName ;
-    private static final String DELIM = "|";
-
+    private boolean locked;
     /**
 	 * Start KV Server with selected name
 	 * @param name			unique name of server
@@ -51,6 +51,7 @@ public class KVServer extends Thread implements IKVServer {
 	 */
 	public KVServer(String name, String zkHostname, int zkPort) {
 		// TODO Auto-generated method stub
+        this.KVServerName = name;
 	}
 
 	@Override
@@ -60,15 +61,7 @@ public class KVServer extends Thread implements IKVServer {
 
 	@Override
     public String getHostname(){
-        if (serverSocket == null) return "";
-        if (this.KVServerName) return this.KVServerName;
-        try {
-            return this.KVServerName = serverSocket.getInetAddress().getLocalHost().getHostAddress();
-        }
-        catch (UnknownHostException ex) {
-            logger.error("Unknown Host! Unable to get Hostname");
-            return "";
-        }
+        return this.KVServerName;
 	}
 
 	@Override
@@ -445,13 +438,18 @@ public class KVServer extends Thread implements IKVServer {
     @Override
     public void lockWrite() {
 		// TODO Lock the KVServer for write operations.
-
+        this.locked = true;
 	}
 
     @Override
     public void unlockWrite() {
 		// TODO Unlock the KVServer for write operations.
+        this.locked = false;
 	}
+
+    public boolean isWriteLocked() {
+        return this.locked;
+    }
 
     @Override
     public boolean moveData(String[] hashRange, String targetName) throws Exception {

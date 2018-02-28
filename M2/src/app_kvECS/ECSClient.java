@@ -16,6 +16,7 @@ import java.io.InputStreamReader;
 
 
 public class ECSClient implements IECSClient {
+    private ECS ecs = null;
 
     private ECS ecsInstance;
     private BufferedReader stdin;
@@ -26,7 +27,6 @@ public class ECSClient implements IECSClient {
 
     public ECSClient (String configFile) {
         this.ecsInstance = new ECS(configFile); 
-
     }
 
 

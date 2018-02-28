@@ -77,6 +77,15 @@ public class KVReplyMessage implements KVMessage
             case "DELETE_ERROR":
                 statusType = StatusType.DELETE_ERROR;
                 break;
+            case "SERVER_STOPPED":
+                statusType = StatusType.SERVER_STOPPED;
+                break;
+            case "SERVER_WRITE_LOCK":
+                statusType = StatusType.SERVER_WRITE_LOCK;
+                break;
+            case "SERVER_NOT_RESPONSIBLE":
+                statusType = StatusType.SERVER_NOT_RESPONSIBLE;
+                break;
             default:
                 statusType = StatusType.PUT_ERROR;
                 break;
@@ -112,6 +121,15 @@ public class KVReplyMessage implements KVMessage
 
             case DELETE_ERROR:
             return "DELETE_ERROR";
+
+            case SERVER_STOPPED:
+            return "SERVER_STOPPED";
+
+            case SERVER_WRITE_LOCK:
+            return "SERVER_WRITE_LOCK";
+
+            case SERVER_NOT_RESPONSIBLE:
+            return "SERVER_NOT_RESPONSIBLE"; 
 
             default:
             return null;
