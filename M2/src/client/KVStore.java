@@ -32,7 +32,7 @@ public class KVStore implements KVCommInterface {
     
     private String serverAddr;
     private int serverPort;
-    private boolean running;
+    private boolean connected;
 
     private Socket clientSocket;
     private OutputStream output;
@@ -249,16 +249,17 @@ public class KVStore implements KVCommInterface {
         return ringNetwork.higherEntry(encodedKey).getValue();
     }
 
-    public boolean isRunning() {
-        return running;
-    }
 
-    public void setRunning(boolean run) {
-        running = run;
+    public void setConnected(boolean connect) {
+        connected = connect;
     }
 
     public void addListener(IKVClient listener){
         listeners.add(listener);
+    }
+
+    public boolean isConnected() {
+        return connected;
     }
 
     /**

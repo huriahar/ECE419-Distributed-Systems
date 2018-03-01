@@ -5,7 +5,7 @@ import java.util.Collection;
 
 import java.io.IOException;
 
-//import logger.LogSetup;
+import logger.LogSetup;
 import org.apache.log4j.Logger;
 import org.apache.log4j.Level;
 
@@ -25,7 +25,7 @@ public class ECSClient implements IECSClient {
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "ECSClient> ";
     Collection<IECSNode> nodesLaunched;
-
+    private boolean stop = false;
 
     public ECSClient (String configFile) {
         this.ecsInstance = new ECS(configFile); 
@@ -242,6 +242,14 @@ public class ECSClient implements IECSClient {
         } else {
             return LogSetup.UNKNOWN_LEVEL;
         }
+    }
+
+    private void disconnect() {
+        
+    }
+
+    private void printError(String error) {
+        System.out.println(PROMPT + "Error! " + error);
     }
 
     public boolean start() {
