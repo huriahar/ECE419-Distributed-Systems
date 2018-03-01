@@ -18,7 +18,7 @@ import org.apache.log4j.Logger;
 
 import common.*;
 
-public class ECS {
+public class ECS implements IECS {
 	private Path configFile; 
     private HashMap<BigInteger, ServerMetaData> ringNetwork;
     private static Logger logger = Logger.getRootLogger();
