@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.math.BigInteger;
 import cache.KVCache;
 import common.messages.TextMessage;
+import common.KVConstants;
 import common.ServerMetaData;
 import common.KVConstants.*;
 
@@ -68,7 +69,7 @@ public class ClientConnection implements Runnable {
                 try {
                     TextMessage msgReceived = receiveMessage();
                     // Unmarshalling of received message
-                    String[] msgContent = msgReceived.getMsg().split("\\" + DELIM);
+                    String[] msgContent = msgReceived.getMsg().split("\\" + KVConstants.DELIM);
                     String command = msgContent[0];
                     // Key cannot contain DELIM, but value can
                     // So combine all strings from msgContent[2] till end to get value
@@ -76,7 +77,7 @@ public class ClientConnection implements Runnable {
                     for (int i = 2; i < msgContent.length; ++i) {
                         valueParts.add(msgContent[i]);
                     }
-                    String value = String.join(DELIM, valueParts);
+                    String value = String.join(KVConstants.DELIM, valueParts);
                     if (command.equals("PUT")) {
                         if(server.isWriteLocked()){
                             sendMessage(new TextMessage("SERVER_WRITE_LOCK"));
@@ -136,8 +137,8 @@ public class ClientConnection implements Runnable {
             logger.error("Server Error: Key should not contain space");
             result = false;
         }
-        if (key.contains(DELIM)) {
-            logger.error("Server Error: Key should not contain delimiter " + DELIM);
+        if (key.contains(KVConstants.DELIM)) {
+            logger.error("Server Error: Key should not contain delimiter " + KVConstants.DELIM);
             result = false;
         }
         return result;
@@ -191,7 +192,7 @@ public class ClientConnection implements Runnable {
             //Done in KVServer;
             try {
                 String value = server.getKV(key);
-                result = "GET_SUCCESS" + DELIM + value;
+                result = "GET_SUCCESS" + KVConstants.DELIM + value;
                 logger.info("Successfully fetched the value " + value + " for the key " + key + " on server");
             }
             catch (Exception ex) {

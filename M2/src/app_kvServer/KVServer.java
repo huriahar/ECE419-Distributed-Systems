@@ -1,35 +1,31 @@
 package app_kvServer;
 
-import java.net.Socket;
-import java.net.ServerSocket;
-import java.net.InetAddress;
-
-import java.io.IOException;
-import java.net.UnknownHostException;
-import java.net.BindException;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.channels.OverlappingFileLockException;
-
-import java.io.FileWriter;
-import java.io.File;
-import java.io.FileReader;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
-
-import org.apache.log4j.Logger;
-import org.apache.log4j.Level;
-import logger.LogSetup;
-
+import java.net.BindException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.util.LinkedList;
 import java.util.List;
 
-import cache.*;
-import common.*;
+import logger.LogSetup;
+
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
+import common.KVConstants;
+
+import cache.IKVCache.CacheStrategy;
+import cache.KVCache;
 
 public class KVServer extends Thread implements IKVServer {
 
@@ -222,13 +218,13 @@ public class KVServer extends Thread implements IKVServer {
 				KVPair = br.readLine();
 	
 				while(KVPair != null) {
-                    String[] msgContent = KVPair.split("\\" + DELIM);
+                    String[] msgContent = KVPair.split("\\" + KVConstants.DELIM);
                     key_val = msgContent[0];
                     List<String> valueParts = new LinkedList<>();
                     for (int i = 1; i < msgContent.length; ++i) {
                         valueParts.add(msgContent[i]);
                     }
-                    get_value = String.join(DELIM, valueParts);
+                    get_value = String.join(KVConstants.DELIM, valueParts);
 					
 					if(key_val.equals(key)) {
 						value = get_value;
@@ -359,13 +355,13 @@ public class KVServer extends Thread implements IKVServer {
 				KVPair = br.readLine();
 				while(KVPair != null) {
 
-                    String[] msgContent = KVPair.split("\\" + DELIM);
+                    String[] msgContent = KVPair.split("\\" + KVConstants.DELIM);
                     key_val = msgContent[0];
                     List<String> valueParts = new LinkedList<>();
                     for (int i = 1; i < msgContent.length; ++i) {
                         valueParts.add(msgContent[i]);
                     }
-                    value = String.join(DELIM, valueParts);
+                    value = String.join(KVConstants.DELIM, valueParts);
 
 					if(key_val.equals(key)) {
 						if(!toDelete) {
@@ -480,4 +476,10 @@ public class KVServer extends Thread implements IKVServer {
             System.exit(1);
         }
     }
+
+	@Override
+	public void deleteKV(String key) throws Exception {
+		// TODO Auto-generated method stub
+		
+	}
 }

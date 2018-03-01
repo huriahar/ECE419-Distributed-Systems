@@ -235,7 +235,7 @@ public class KVStore implements KVCommInterface {
     }
 
     private BigInteger getResponsibleServer(String key) {
-        if(ringNetwork.isEmpty()) return -1;
+        if(ringNetwork.isEmpty()) return INVALID_SERVER;
         BigInteger encodedKey = md5.encode(key);
         /*
             TODO this comment is copied verbatum

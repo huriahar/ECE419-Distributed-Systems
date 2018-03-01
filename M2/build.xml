@@ -31,11 +31,6 @@
     <fileset dir="${lib.dir}" includes="**/*.jar"/>
   </path>
 
-  <!-- path to zookeeper-->
-  <path id="zookeeper.jars">
-    <fileset dir="${zk.dir}" includes="**/*.jar"/> 
-  </path>
-
   <!-- Build path -->
   <path id="project.buildpath">
     <pathelement location="${src.dir}"/>

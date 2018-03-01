@@ -1,5 +1,7 @@
 package app_kvServer;
 
+import cache.IKVCache.CacheStrategy;
+
 public interface IKVServer {
 
     /**
