@@ -6,7 +6,7 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.HashMap;
+import java.util.TreeMap;
 import java.math.BigInteger;
 import cache.KVCache;
 import common.messages.TextMessage;
@@ -34,7 +34,7 @@ public class ClientConnection implements Runnable {
     private static final int MAX_KEY_LENGTH = 20; 
     private static final int MAX_VALUE_LENGTH = 122880; //120KB
     private static final int DROP_SIZE = 128 * BUFFER_SIZE;
-    private HashMap<BigInteger, ServerMetaData> ringNetwork;
+    private TreeMap<BigInteger, ServerMetaData> ringNetwork;
     
     private Socket clientSocket;
     private KVServer server;
@@ -78,16 +78,30 @@ public class ClientConnection implements Runnable {
                         valueParts.add(msgContent[i]);
                     }
                     String value = String.join(KVConstants.DELIM, valueParts);
+                    String key = msgContent[1];
+
+                    // Check if server is responsible for this key
+                    if (!server.isResponsible(key)){
+                        sendMessage(new TextMessage("SERVER_NOT_RESPONSIBLE"));
+                        TextMessage getMetaData = receiveMessage();
+                        if(getMetaData.getMsg().equals("GET_METADATA")) {
+                            sendMessage(new TextMessage(server.getMetaDataStr()));
+                        } else {
+                            logger.info("ERROR!!! EXPECTED TO RECEIVE GET_METADATA MSG!!");
+                        }
+                        continue;
+                    }
+
                     if (command.equals("PUT")) {
                         if(server.isWriteLocked()){
                             sendMessage(new TextMessage("SERVER_WRITE_LOCK"));
                             logger.info("SERVER_WRITE_LOCK: server locked, write operation failed");
                             continue;
                         }
-                        handlePutCmd(msgContent[1], value);
+                        handlePutCmd(key, value);
                     }
                     else if (command.equals("GET")) {
-                        handleGetCmd(msgContent[1]);
+                        handleGetCmd(key);
                     }
                     else {
                         logger.error("Received invalid message type from client.");
@@ -146,6 +160,7 @@ public class ClientConnection implements Runnable {
 
     private void handlePutCmd (String key, String value) {
         String result = "PUT_ERROR";
+
         //Done in KVServer;
         if (errorCheck(key, value)) {
             // If Value is not null or empty, insert in $ and disk
