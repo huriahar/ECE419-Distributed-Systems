@@ -33,14 +33,16 @@ import common.md5;
 import cache.IKVCache.CacheStrategy;
 import cache.KVCache;
 
-public class KVServer extends Thread implements IKVServer {
+public class KVServer implements Runnable {
 
 	private static Logger logger = Logger.getRootLogger();
     private int serverPort;
+    private int zkPort;
     private ServerSocket serverSocket;
     private KVCache cache;
     private boolean running;
     private String KVServerName;
+    private String zkHostname;
     private boolean locked;
     private ServerMetaData metadata;
     private Path metaDataFile;
@@ -53,8 +55,10 @@ public class KVServer extends Thread implements IKVServer {
 	public KVServer(String name, String zkHostname, int zkPort) {
 		// TODO Auto-generated method stub
         this.KVServerName = name;
-
+        this.zkHostname = zkHostname;
+        this.zkPort = zkPort;
         // TODO: Figure out how to get cache parameters
+        // TODO: Figure out how to get own server port and name
 	}
 
 	public int getPort(){
@@ -94,7 +98,7 @@ public class KVServer extends Thread implements IKVServer {
 	}
 
     public String getKV(String key) throws Exception{
-        //TODO check if server is responsible for key
+        if(!isResponsible(key)) return "";
         //TODO what if asked for a KVpair that is not on disk
         String value = this.cache.getValue(key);
         if(value.equals("")){
@@ -110,6 +114,7 @@ public class KVServer extends Thread implements IKVServer {
 
     public void putKV(String key, String value) throws Exception{
         //TODO check that server is responsible for key
+        if(!isResponsible(key)) return;
         this.cache.insert(key, value);
 		storeKV(key, value);
         this.cache.print();
@@ -178,7 +183,6 @@ public class KVServer extends Thread implements IKVServer {
         }
     }
 
-	@Override
     public void kill(){
         running = false;
         try {
@@ -189,7 +193,6 @@ public class KVServer extends Thread implements IKVServer {
         }
 	}
 
-	@Override
     public void close(){
         // TODO: Wait for all threads, save any remainder stuff in cache to memory
         running = false;
@@ -435,31 +438,24 @@ public class KVServer extends Thread implements IKVServer {
         return marshalledData.toString();
     }
 
-	@Override
 	public void start() {
 		// TODO Starts the KVServer, all client requests and all ECS requests are processed.
 	}
 
     //TODO build error: cannot override stop in thread??
-    /*@Override
     public void stop() {
 		// TODO Stops the KVServer, all client requests are rejected and only ECS requests are processed
 	}
-*/
-//    @Override
+
     public void shutdown() {
 		// TODO Exits the KVServer application.
 	}
     
-
-
-    @Override
     public void lockWrite() {
 		// TODO Lock the KVServer for write operations.
         this.locked = true;
 	}
 
-    @Override
     public void unlockWrite() {
 		// TODO Unlock the KVServer for write operations.
         this.locked = false;
@@ -469,7 +465,6 @@ public class KVServer extends Thread implements IKVServer {
         return this.locked;
     }
 
-    @Override
     public boolean moveData(String[] hashRange, String targetName) throws Exception {
 		// TODO Transfer a subset (range) of the KVServer's data to another KVServer (reallocation before
         // removing this server or adding a new KVServer to the ring); send a notification to the ECS,
@@ -513,7 +508,6 @@ public class KVServer extends Thread implements IKVServer {
         }
     }
 
-	@Override
 	public void deleteKV(String key) throws Exception {
 		// TODO Auto-generated method stub
 		
