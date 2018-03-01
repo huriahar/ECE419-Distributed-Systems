@@ -9,7 +9,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.HashMap;
+import java.util.TreeMap;
 
 import java.math.BigInteger;
 
@@ -20,6 +20,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import common.*;
+import common.ServerMetaData.*;
 import common.messages.*;
 import app_kvClient.*;
 
@@ -35,7 +36,7 @@ public class KVStore implements KVCommInterface {
     private Socket clientSocket;
     private OutputStream output;
     private InputStream input;
-    private HashMap<BigInteger, ServerMetaData> ringNetwork;
+    private TreeMap<BigInteger, ServerMetaData> ringNetwork;
 
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
@@ -224,12 +225,21 @@ public class KVStore implements KVCommInterface {
     }
 
     private void updateMetaData(String marshalledData) {
-        this.ringNetwork = new HashMap<BigInteger, ServerMetaData>();
+        this.ringNetwork = new TreeMap<BigInteger, ServerMetaData>();
         String[] dataEntries = marshalledData.split(KVConstants.NEWLINE_DELIM);
 
         for(int i = 0; i < dataEntries.length ; i++) {
-            BigInteger serverHash = md5.encode(line[0] + KVConstants.DELIM + line[1] + KVConstants.DELIM + line[2]);
-            ServerMetaData meta = new ServerMetaData(line[0], line[1], Integer.parseInt(line[2]), line[BEGIN_HASH], line[END_HASH]);
+            String[] line = dataEntries[i].split(KVConstants.DELIM);
+
+            BigInteger serverHash = md5.encode(line[ServerMetaData.SERVER_NAME] + 
+                                                KVConstants.DELIM + line[ServerMetaData.SERVER_IP] + 
+                                                KVConstants.DELIM + line[ServerMetaData.SERVER_PORT]);
+
+            ServerMetaData meta = new ServerMetaData(line[ServerMetaData.SERVER_NAME],
+                                                     line[ServerMetaData.SERVER_IP],
+                                                     Integer.parseInt(line[ServerMetaData.SERVER_PORT]),
+                                                     line[ServerMetaData.BEGIN_HASH],
+                                                     line[ServerMetaData.BEGIN_HASH]);
             this.ringNetwork.put(serverHash, meta);
         }
     }
@@ -244,9 +254,9 @@ public class KVStore implements KVCommInterface {
             the Metadata of KVServer with the lowest hash (due to wrap-around).
         */
         if(ringNetwork.higherEntry(encodedKey) == null) {
-            return ringNetwork.firstEntry().getValue();
+            return ringNetwork.firstEntry().getKey();
         }
-        return ringNetwork.higherEntry(encodedKey).getValue();
+        return ringNetwork.higherEntry(encodedKey).getKey();
     }
 
 
