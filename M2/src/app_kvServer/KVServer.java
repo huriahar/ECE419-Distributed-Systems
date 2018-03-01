@@ -15,7 +15,12 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.util.LinkedList;
+import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.math.BigInteger;
 
 import logger.LogSetup;
 
@@ -23,7 +28,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import common.KVConstants;
-
+import common.ServerMetaData;
+import common.md5;
 import cache.IKVCache.CacheStrategy;
 import cache.KVCache;
 
@@ -34,8 +40,10 @@ public class KVServer extends Thread implements IKVServer {
     private ServerSocket serverSocket;
     private KVCache cache;
     private boolean running;
-    private String KVServerName ;
+    private String KVServerName;
     private boolean locked;
+    private ServerMetaData metadata;
+    private Path metaDataFile;
     /**
 	 * Start KV Server with selected name
 	 * @param name			unique name of server
@@ -118,6 +126,11 @@ public class KVServer extends Thread implements IKVServer {
         file.delete();
 	}
 
+    public ServerMetaData getMetaData() {
+        return this.metadata;
+    }
+
+	@Override
     public void run(){
         running = initializeServer();
         this.serverPort = serverSocket.getLocalPort();
@@ -401,22 +414,44 @@ public class KVServer extends Thread implements IKVServer {
         this.cache.print();
     }
 
+    public boolean isResponsible(String key) {
+        String encodedKey = md5.encode(key).toString(16);
+        return ((encodedKey.compareTo(metadata.bHash) >= 0  && encodedKey.compareTo(metadata.eHash) < 0) ||
+               (encodedKey.compareTo(metadata.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0) ||
+               (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(metadata.eHash) < 0));
+    }
+
+    public String getMetaDataStr() {
+        StringBuilder marshalledData = new StringBuilder();
+        try {
+            ArrayList<String> metaData = new ArrayList<>(Files.readAllLines(this.metaDataFile,
+                                                         StandardCharsets.UTF_8));
+            for(String line : metaData) {
+                marshalledData.append(line + KVConstants.NEWLINE_DELIM);
+            }
+        } catch (IOException e) {
+            marshalledData.append("METADATA_FETCH_ERROR");
+        }
+        return marshalledData.toString();
+    }
 
 	@Override
 	public void start() {
 		// TODO Starts the KVServer, all client requests and all ECS requests are processed.
 	}
 
-    @Override
+    //TODO build error: cannot override stop in thread??
+    /*@Override
     public void stop() {
 		// TODO Stops the KVServer, all client requests are rejected and only ECS requests are processed
 	}
-
-    @Override
+*/
+//    @Override
     public void shutdown() {
 		// TODO Exits the KVServer application.
 	}
     
+
 
     @Override
     public void lockWrite() {
@@ -462,7 +497,8 @@ public class KVServer extends Thread implements IKVServer {
                 if (args.length == 3) {
                     replacementPolicy = args[2];
                 }
-                new KVServer(port, cacheSize, replacementPolicy).start();
+                //TODO create new KVServer object here!
+                //new KVServer(port, cacheSize, replacementPolicy).start();
             }
         }
         catch (IOException e) {
