@@ -5,21 +5,16 @@ import java.util.Collection;
 
 import java.io.IOException;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+
 import logger.LogSetup;
 import org.apache.log4j.Logger;
 import org.apache.log4j.Level;
 
-import ecs.IECSNode;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-
-import ecs.ECS;
-import ecs.IECSNode;
+import ecs.*;
 
 public class ECSClient implements IECSClient {
-    private ECS ecs = null;
-
     private ECS ecsInstance;
     private BufferedReader stdin;
     private static Logger logger = Logger.getRootLogger();

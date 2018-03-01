@@ -2,37 +2,34 @@ package app_kvServer;
 
 import java.net.Socket;
 import java.net.ServerSocket;
+import java.net.InetAddress;
+
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.net.BindException;
-import java.net.InetAddress;
 
 import java.nio.file.Files;
-import java.io.FileWriter;  
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.channels.OverlappingFileLockException;
+
+import java.io.FileWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.BufferedReader;
-import java.io.FileWriter;
 import java.io.BufferedWriter;
 import java.io.PrintWriter;
-//import logger.LogSetup;
-
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.io.RandomAccessFile;
-import java.nio.channels.OverlappingFileLockException;
+
+import org.apache.log4j.Logger;
+import org.apache.log4j.Level;
+import logger.LogSetup;
 
 import java.util.LinkedList;
 import java.util.List;
 
 import cache.*;
-import common.messages.TextMessage;
-import common.KVConstants.*;
-
-import org.apache.log4j.Logger;
-import org.apache.log4j.Level;
+import common.*;
 
 public class KVServer extends Thread implements IKVServer {
 
@@ -52,38 +49,35 @@ public class KVServer extends Thread implements IKVServer {
 	public KVServer(String name, String zkHostname, int zkPort) {
 		// TODO Auto-generated method stub
         this.KVServerName = name;
+
+        // TODO: Figure out how to get cache parameters
 	}
 
-	@Override
 	public int getPort(){
         return this.serverPort;
 	}
 
-	@Override
-    public String getHostname(){
+	public String getHostname(){
         return this.KVServerName;
 	}
 
-	@Override
-    public CacheStrategy getCacheStrategy(){
+	public CacheStrategy getCacheStrategy(){
         return this.cache.getStrategy();
 	}
 
-	@Override
-    public int getCacheSize(){
+	public int getCacheSize(){
         return this.cache.getCacheSize();
 	}
 
-	@Override
-    public boolean inStorage(String key){
+	public boolean inStorage(String key){
         //TODO check if server is responsible for key
         if (inCache(key)) return true;
-        // We need to check if key is in permanant disk storage as well!
+        // We need to check if key is in permanent disk storage as well!
 		String value = "";
 		try {
 			value = onDisk(key);
-				
-		} catch (IOException ex) {
+		}
+		catch (IOException ex) {
 			logger.error("ERROR: " + ex); 
 		}
 		if(value.equals(""))
@@ -91,13 +85,10 @@ public class KVServer extends Thread implements IKVServer {
         return true;
 	}
 
-	@Override
-    public boolean inCache(String key){
-        //TODO ensure that this query does not insert objects in cache
+	public boolean inCache(String key){
         return this.cache.hasKey(key);
 	}
 
-	@Override
     public String getKV(String key) throws Exception{
         //TODO check if server is responsible for key
         //TODO what if asked for a KVpair that is not on disk
@@ -113,7 +104,6 @@ public class KVServer extends Thread implements IKVServer {
         return value;
 	}
 
-	@Override
     public void putKV(String key, String value) throws Exception{
         //TODO check that server is responsible for key
         this.cache.insert(key, value);
@@ -121,12 +111,10 @@ public class KVServer extends Thread implements IKVServer {
         this.cache.print();
 	}
 
-	@Override
     public void clearCache(){
         this.cache.clearCache();
 	}
 
-	@Override
     public void clearStorage(){
         clearCache();
 
@@ -134,7 +122,6 @@ public class KVServer extends Thread implements IKVServer {
         file.delete();
 	}
 
-	@Override
     public void run(){
         running = initializeServer();
         this.serverPort = serverSocket.getLocalPort();

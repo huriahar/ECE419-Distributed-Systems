@@ -7,7 +7,7 @@ public class ServerMetaData {
     public String bHash;
     public String eHash;
 
-	public static enum ConfigContent{
+	public static enum ConfigContent {
         SERVER_NAME(0),
         SERVER_IP(1),
         SERVER_PORT(2),
