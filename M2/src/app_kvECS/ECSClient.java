@@ -221,9 +221,9 @@ public class ECSClient implements IECSClient {
         boolean failed = false;
         //Loop through the list of nodes in Collections and change their status away from STOPPED   
         for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
-            if(!start(iter)) {
+            if(!ecsInstance.start(iter)) {
                 failed = true;
-            }               
+            } 
         }
         return failed;
     }
@@ -233,7 +233,7 @@ public class ECSClient implements IECSClient {
         // TODO
         //Loop through the list of ECS
         for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
-            if(!stop(iter)) {
+            if(!ecsInstance.stop(iter)) {
                 failed = true;
             }               
         }
@@ -252,25 +252,29 @@ public class ECSClient implements IECSClient {
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
         // TODO
-        return null;
+        return ecsInstance.addNode(cacheStrategy, cacheSize); 
     }
 
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
         // TODO
-        
-        return null; 
+
+        setupNodes(count, cacheStrategy, cacheSize);
+         
     }
 
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
         // TODO
-        return null;
+        //setup zookeeper
+        //call await nodes
+        return awaitNodes(count, cacheStrategy, cacheSize);
     }
 
     @Override
     public boolean awaitNodes(int count, int timeout) throws Exception {
         // TODO
+        
         return false;
     }
 

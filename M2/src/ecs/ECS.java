@@ -4,7 +4,7 @@ import common.ServerMetaData;
 import common.ServerMetaData.configContent;
 import app_kvServer.KVServer;
 import common.Parser.*;
-import IECSNode;
+import ecs.IECSNode;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,9 +13,10 @@ import java.nio.file.Files;
 import java.math.BigInteger;
 
 public class ECS {
-	private confPath; 
+	private String confPath; 
 	private Socket socket;
     private HashMap<BigInteger, ServerMetaData> ringNetwork;
+    
 
 	public ECS(String confFile)
     {
@@ -32,22 +33,100 @@ public class ECS {
         for(int i = 0; i < numServers ; i++) {
             String[] line = lines.get(i).split(" ");
             BigInteger serverHash = MD5.encode(line[SERVER_NAME] + DELIM + line[SERVER_IP] + DELIM + line[SERVER_PORT]);
-            //TODO figure out begin and end hash, does zookeeper assign it?
+            //TODO figure out begin and end hash, does zookeeper assign it? No it doesn't. Have to do it ourselves
             ServerMetaData meta = new ServerMetaData(line[SERVER_NAME], line[SERVER_IP], Integer.parseInt(line[SERVER_PORT]), null, null);
             this.ringNetwork.put(serverHash, meta);
+            
         }
 
     }
 
-	public void addNode() {
+    
+
+    @Override
+    public boolean start() {
+        // TODO
+        boolean failed = false;
+        //Loop through the list of nodes in Collections and change their status away from STOPPED   
+        for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
+           // if(!ecsInstance.start(iter)) {
+           //     failed = true;
+           // } 
+            
+                      
+        }
+        return failed;
+    }
+
+    @Override
+    public boolean stop() {
+        // TODO
+        //Loop through the list of ECS
+        for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
+            if(!ecsInstance.stop(iter)) {
+                failed = true;
+            }               
+        }
+        return failed;
+
+    }
 
 
-	}
+    @Override
+    public boolean shutdown() {
+        // TODO
+            
+        return false;
+    }
 
-	public void removeNode() {
+    @Override
+    public IECSNode addNode(String cacheStrategy, int cacheSize) {
+        // TODO
+        return null;
+    }
 
+    @Override
+    public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
+        // TODO
+         
+        return null; 
+    }
 
-	}
+    @Override
+    public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
+        // TODO
+        return null;
+    }
 
+    @Override
+    public boolean awaitNodes(int count, int timeout) throws Exception {
+        // TODO
+        return false;
+    }
+
+    @Override
+    public boolean removeNodes(Collection<String> nodeNames) {
+        // TODO
+        //Iterator<Integer> iter = l.iterator();
+        //while (iter.hasNext()) {
+        //    if (iter.next().intValue() == 5) {
+        //        iter.remove();
+        //    }
+        //}
+
+        return false;
+    }
+
+    @Override
+    public Map<String, IECSNode> getNodes() {
+        // TODO
+        return null;
+    }
+
+    @Override
+    public IECSNode getNodeByKey(String Key) {
+        // TODO
+        return null;
+    }
 
 }
