@@ -64,7 +64,18 @@ public class ECSClient implements IECSClient {
                         int numNodes     = Integer.parseInt(tokens[1]);
                         int cacheSize   = Integer.parseInt(tokens[2]);
                         String cacheStrategy = tokens[3];
-                        nodesLaunched = addNodes(numNodes, cacheSize, cacheStrategy);    
+                        if(count <= ringNetworks.size()) { 
+                            nodesLaunched = ecsInstance.addNodes(numNodes, cacheSize, cacheStrategy);    
+                            if(nodesLaunched == null) {
+                            printError("Unable to start any KVServers");
+                            }
+                            else if(nodesLaunched.size() != count) {
+                                printError("Unable to start all KVServers");
+                            }           
+                        }
+                        else {
+                           printError("Enough KVServers not available");
+                        }
                     }
                     catch(NumberFormatException nfe) {
                         printError("Invalid numNodes/cacheSize. numNodes/cacheSize  must be a number!");
@@ -78,21 +89,30 @@ public class ECSClient implements IECSClient {
                 break;
             
             case "start":
-                if(!start()) {
-                    printtError("Unable to start all servers");
-                }
+                for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
+                    if(!ecsInstance.start(iter)) {
+                        printError("Unable to start KVServer: "+ iter.getNodeName() + " Host: " + iter.getNodeHost()+ " Port: " + iter.getNodePort()) ;
+                    } 
+                }       
                 break;
 
             case "stop":
-                if(!stop()) {
-                    printError("Unable to stop the service");    
-                }
+                for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
+                    if(!ecsInstance.stop(iter)) {
+                        printError("Unable to stop KVServer: "+ iter.getNodeName() + " Host: " + iter.getNodeHost()+ " Port: " + iter.getNodePort()) ;
+                    } 
+                }       
                 break;
 
             case "shutDown": 
-                if(!shutDown()) {
-                    printError("Unable to stop and exit");
-                }    
+                for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
+                    if(!ecsInstance.stop(iter)) {
+                        printError("Unable to stop KVServer: "+ iter.getNodeName() + " Host: " + iter.getNodeHost()+ " Port: " + iter.getNodePort()) ;
+                    } 
+                }      
+                if(!ecsInstance.shutDown()) {
+                    printError("Unable to exit process");
+                }
                 break;
 
             case "addNode":
@@ -100,8 +120,12 @@ public class ECSClient implements IECSClient {
                     try {
                         int cacheSize = Integer.parseInt(tokens[1]);
                         String cacheStrategy = tokens[2];
-                        IECS newNode = addNode(cacheSize, cacheStrategy);    
-                        nodesLaunched.add(newNode);
+                        IECS newNode = addNode(cacheSize, cacheStrategy);       
+                        if(newNode == null) {
+                            printError("Unable to find Node containing Key: " + Key);    
+                        }
+                        else 
+                            nodesLaunched.add(newNode);
                     }
                     catch(NumberFormatException nfe) {
                         printError("Invalid cacheSize. cacheSize must be a number!");
@@ -121,8 +145,11 @@ public class ECSClient implements IECSClient {
                     for(int i = 1; i < tokens.length(); i++) {
                         nodeNames.add(tokens[i]);
                     }    
-                    if(!removeNodes(nodeNames)) {
-                        printError("Unable to remove node");    
+                    if(!ecsInstance.removeNodes(nodeNames)) {
+                        printError("Unable to remove node(s): ");   
+                        for(int i = 0; i < nodeNames.size(); i++) {
+                            printError(nodeNames[i]+ " ");
+                        }    
                     }
                 }
                 break;            
@@ -215,29 +242,15 @@ public class ECSClient implements IECSClient {
         }
     }
 
-    @Override
     public boolean start() {
         // TODO
-        boolean failed = false;
-        //Loop through the list of nodes in Collections and change their status away from STOPPED   
-        for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
-            if(!ecsInstance.start(iter)) {
-                failed = true;
-            } 
-        }
-        return failed;
+        return false; 
     }
 
     @Override
     public boolean stop() {
         // TODO
-        //Loop through the list of ECS
-        for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
-            if(!ecsInstance.stop(iter)) {
-                failed = true;
-            }               
-        }
-        return failed;
+        return false;
 
     }
 
@@ -252,41 +265,31 @@ public class ECSClient implements IECSClient {
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
         // TODO
-        return ecsInstance.addNode(cacheStrategy, cacheSize); 
+        return null;
     }
 
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
         // TODO
-
-        setupNodes(count, cacheStrategy, cacheSize);
          
+        return null; 
     }
 
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
         // TODO
-        //setup zookeeper
-        //call await nodes
-        return awaitNodes(count, cacheStrategy, cacheSize);
+        return null;
     }
 
     @Override
     public boolean awaitNodes(int count, int timeout) throws Exception {
         // TODO
-        
         return false;
     }
 
     @Override
     public boolean removeNodes(Collection<String> nodeNames) {
         // TODO
-        //Iterator<Integer> iter = l.iterator();
-        //while (iter.hasNext()) {
-        //    if (iter.next().intValue() == 5) {
-        //        iter.remove();
-        //    }
-        //}
 
         return false;
     }
