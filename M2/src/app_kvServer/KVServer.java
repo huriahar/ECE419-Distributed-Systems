@@ -33,7 +33,7 @@ import common.md5;
 import cache.IKVCache.CacheStrategy;
 import cache.KVCache;
 
-public class KVServer implements Runnable {
+public class KVServer implements IKVServer, Runnable {
 
 	private static Logger logger = Logger.getRootLogger();
     private int serverPort;
@@ -183,6 +183,7 @@ public class KVServer implements Runnable {
         }
     }
 
+	@Override
     public void kill(){
         running = false;
         try {
@@ -193,6 +194,7 @@ public class KVServer implements Runnable {
         }
 	}
 
+	@Override
     public void close(){
         // TODO: Wait for all threads, save any remainder stuff in cache to memory
         running = false;
@@ -438,11 +440,12 @@ public class KVServer implements Runnable {
         return marshalledData.toString();
     }
 
+	@Override
 	public void start() {
 		// TODO Starts the KVServer, all client requests and all ECS requests are processed.
 	}
 
-    //TODO build error: cannot override stop in thread??
+    @Override
     public void stop() {
 		// TODO Stops the KVServer, all client requests are rejected and only ECS requests are processed
 	}
@@ -450,12 +453,14 @@ public class KVServer implements Runnable {
     public void shutdown() {
 		// TODO Exits the KVServer application.
 	}
-    
+
+    @Override
     public void lockWrite() {
 		// TODO Lock the KVServer for write operations.
         this.locked = true;
 	}
 
+    @Override
     public void unlockWrite() {
 		// TODO Unlock the KVServer for write operations.
         this.locked = false;
@@ -465,6 +470,7 @@ public class KVServer implements Runnable {
         return this.locked;
     }
 
+    @Override
     public boolean moveData(String[] hashRange, String targetName) throws Exception {
 		// TODO Transfer a subset (range) of the KVServer's data to another KVServer (reallocation before
         // removing this server or adding a new KVServer to the ring); send a notification to the ECS,
@@ -508,6 +514,7 @@ public class KVServer implements Runnable {
         }
     }
 
+	@Override
 	public void deleteKV(String key) throws Exception {
 		// TODO Auto-generated method stub
 		
