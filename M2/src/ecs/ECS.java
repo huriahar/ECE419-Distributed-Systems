@@ -18,7 +18,7 @@ import org.apache.log4j.Logger;
 
 import common.*;
 
-public class ECS implements IECS {
+public class ECS {
 	private Path configFile; 
     private HashMap<BigInteger, ServerMetaData> ringNetwork;
     private static Logger logger = Logger.getRootLogger();
@@ -51,7 +51,6 @@ public class ECS implements IECS {
     	return ringNetwork.size();
     }
 
-    @Override
     public boolean start(IECSNode server) {
         // TODO
         boolean failed = false;
@@ -59,7 +58,6 @@ public class ECS implements IECS {
         return failed;
     }
 
-    @Override
     public boolean stop(IECSNode server) {
         // TODO
         //Loop through the list of ECS
@@ -68,39 +66,33 @@ public class ECS implements IECS {
     }
 
 
-    @Override
     public boolean shutdown() {
         // TODO
             
         return false;
     }
 
-    @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
         // TODO
         return null;
     }
 
-    @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
         // TODO
          
         return null; 
     }
 
-    @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
         // TODO
         return null;
     }
 
-    @Override
     public boolean awaitNodes(int count, int timeout) throws Exception {
         // TODO
         return false;
     }
 
-    @Override
     public boolean removeNodes(Collection<String> nodeNames) {
         // TODO
         //Iterator<Integer> iter = l.iterator();
@@ -113,13 +105,11 @@ public class ECS implements IECS {
         return false;
     }
 
-    @Override
     public Map<String, IECSNode> getNodes() {
         // TODO
         return null;
     }
 
-    @Override
     public IECSNode getNodeByKey(String Key) {
         // TODO
         return null;
