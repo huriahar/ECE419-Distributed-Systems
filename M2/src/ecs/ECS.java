@@ -16,7 +16,7 @@ import java.math.BigInteger;
 import java.util.Collection;
 
 public class ECS {
-	private String confPath; 
+	private String configFile; 
     private HashMap<BigInteger, ServerMetaData> ringNetwork;
     
 
@@ -44,30 +44,18 @@ public class ECS {
     }
 
     @Override
-    public boolean start() {
+    public boolean start(IECSNode server) {
         // TODO
         boolean failed = false;
         //Loop through the list of nodes in Collections and change their status away from STOPPED   
-        for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
-           // if(!ecsInstance.start(iter)) {
-           //     failed = true;
-           // } 
-            
-                      
-        }
         return failed;
     }
 
     @Override
-    public boolean stop() {
+    public boolean stop(IECSNode server) {
         // TODO
         //Loop through the list of ECS
-        for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
-            if(!ecsInstance.stop(iter)) {
-                failed = true;
-            }               
-        }
-        return failed;
+        return false;
 
     }
 

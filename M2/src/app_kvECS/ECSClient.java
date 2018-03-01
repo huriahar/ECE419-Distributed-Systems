@@ -2,6 +2,7 @@ package app_kvECS;
  
 import java.util.Map;
 import java.util.Collection;
+import java.util.Iterator;
 
 import java.io.IOException;
 
@@ -15,17 +16,15 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 
 import ecs.ECS;
-import ecs.IECSNode;
 
 public class ECSClient implements IECSClient {
-    private ECS ecs = null;
 
-    private ECS ecsInstance;
     private BufferedReader stdin;
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "ECSClient> ";
-    Collection<IECSNode> nodesLaunched;
+    private Collection<IECSNode> nodesLaunched;
     private boolean stop = false;
+    private ECS ecsInstance = null;
 
     public ECSClient (String configFile) {
         this.ecsInstance = new ECS(configFile); 
@@ -66,12 +65,12 @@ public class ECSClient implements IECSClient {
                         int numNodes     = Integer.parseInt(tokens[1]);
                         int cacheSize   = Integer.parseInt(tokens[2]);
                         String cacheStrategy = tokens[3];
-                        if(count <= ringNetworks.size()) { 
-                            nodesLaunched = ecsInstance.addNodes(numNodes, cacheSize, cacheStrategy);    
+                        if(numNodes <= ecsInstance.ringNetworks.size()) { 
+                            nodesLaunched = ecsInstance.addNodes(numNodes, cacheStrategy, cacheSize);
                             if(nodesLaunched == null) {
-                            printError("Unable to start any KVServers");
+                                printError("Unable to start any KVServers");
                             }
-                            else if(nodesLaunched.size() != count) {
+                            else if(nodesLaunched.size() != numNodes) {
                                 printError("Unable to start all KVServers");
                             }           
                         }
@@ -91,24 +90,24 @@ public class ECSClient implements IECSClient {
                 break;
             
             case "start":
-                for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
-                    if(!ecsInstance.start(iter)) {
+                for (int i = 0; i < nodesLaunched.size(); i++) {
+                    if(!ecsInstance.start(nodesLaunched.get(i))) {
                         printError("Unable to start KVServer: "+ iter.getNodeName() + " Host: " + iter.getNodeHost()+ " Port: " + iter.getNodePort()) ;
                     } 
                 }       
                 break;
 
             case "stop":
-                for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
-                    if(!ecsInstance.stop(iter)) {
+                for(int i = 0; i < nodesLaunched.size(); i++) {
+                    if(!ecsInstance.stop(nodesLaunched.get(i))) {
                         printError("Unable to stop KVServer: "+ iter.getNodeName() + " Host: " + iter.getNodeHost()+ " Port: " + iter.getNodePort()) ;
                     } 
                 }       
                 break;
 
             case "shutDown": 
-                for (iterator<IECSNodes> iter = nodesLaunched.iterator(); iter.hasNext();) {
-                    if(!ecsInstance.stop(iter)) {
+                for(int i = 0; i < nodesLaunched.size(); i++) {     
+                    if(!ecsInstance.stop(nodesLaunched.get(i))) {
                         printError("Unable to stop KVServer: "+ iter.getNodeName() + " Host: " + iter.getNodeHost()+ " Port: " + iter.getNodePort()) ;
                     } 
                 }      
@@ -122,7 +121,7 @@ public class ECSClient implements IECSClient {
                     try {
                         int cacheSize = Integer.parseInt(tokens[1]);
                         String cacheStrategy = tokens[2];
-                        IECS newNode = addNode(cacheSize, cacheStrategy);       
+                        IECSNode newNode = addNode(cacheStrategy, cacheSize);
                         if(newNode == null) {
                             printError("Unable to find Node containing Key: " + Key);    
                         }
