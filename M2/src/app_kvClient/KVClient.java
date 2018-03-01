@@ -12,7 +12,7 @@ import java.io.InputStreamReader;
 import java.net.UnknownHostException;
 import java.io.IOException;
 
-import logger.LogSetup;
+//import logger.LogSetup;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;

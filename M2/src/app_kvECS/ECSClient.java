@@ -1,9 +1,11 @@
+package app_kvECS;
+ 
 import java.util.Map;
 import java.util.Collection;
 
 import java.io.IOException;
 
-import logger.LogSetup;
+//import logger.LogSetup;
 import org.apache.log4j.Logger;
 import org.apache.log4j.Level;
 
@@ -12,8 +14,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-
-
+import ecs.ECS;
+import ecs.IECSNode;
 
 public class ECSClient implements IECSClient {
     private ECS ecs = null;
@@ -22,7 +24,7 @@ public class ECSClient implements IECSClient {
     private BufferedReader stdin;
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "ECSClient> ";
-    Collection<IECSNodes> nodesLaunched;
+    Collection<IECSNode> nodesLaunched;
 
 
     public ECSClient (String configFile) {

@@ -7,15 +7,16 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.HashMap;
 import java.math.BigInteger;
 
-import common.MD5;
+//import common.md5;
 import common.messages.KVMessage;
 import common.messages.TextMessage;
 import common.messages.KVReplyMessage;
-import common.Parser.*;
+import common.KVConstants.*;
 import common.ServerMetaData;
-import common.ServerMetaData.configContent;
+import common.ServerMetaData.ConfigContent;
 import app_kvClient.IKVClient;
 import app_kvClient.IKVClient.SocketStatus;
 
@@ -182,7 +183,7 @@ public class KVStore implements KVCommInterface {
             String value = String.join(DELIM, valueParts);
             return new KVReplyMessage(key, value, KVMessage.StatusType.GET_SUCCESS);
         }
-        else if(getStatus.equals("SERVER_NOT_RESPONSIBLE") {
+        else if(getStatus.equals("SERVER_NOT_RESPONSIBLE")) {
             return retryRequest(key, null, GET_CMD);
         }
         else {
@@ -196,7 +197,7 @@ public class KVStore implements KVCommInterface {
         string status = (value == null) ? "DELETE_ERROR" : "PUT_ERROR";
         status = (request.equals(GET_CMD)) ? "GET_ERROR" : status;
 
-        sendMessage(new TextMessage("GET_METADATA");
+        sendMessage(new TextMessage("GET_METADATA"));
         TextMessage reply = receiveMessage();
         if(reply.getMsg().equals("METADATA_FETCH_ERROR")) {
             return new KVReplyMessage(key, value, status);
@@ -227,7 +228,7 @@ public class KVStore implements KVCommInterface {
         String[] dataEntries = marshalledData.split(NEWLINE_DELIM);
 
         for(int i = 0; i < dataEntries.length ; i++) {
-            BigInteger serverHash = MD5.encode(line[SERVER_NAME] + DELIM + line[SERVER_IP] + DELIM + line[SERVER_PORT]);
+            BigInteger serverHash = md5.encode(line[SERVER_NAME] + DELIM + line[SERVER_IP] + DELIM + line[SERVER_PORT]);
             ServerMetaData meta = new ServerMetaData(line[SERVER_NAME], line[SERVER_IP], Integer.parseInt(line[SERVER_PORT]), line[BEGIN_HASH], line[END_HASH]);
             this.ringNetwork.put(serverHash, meta);
         }
@@ -235,7 +236,7 @@ public class KVStore implements KVCommInterface {
 
     private BigInteger getResponsibleServer(String key) {
         if(ringNetwork.isEmpty()) return -1;
-        BigInteger encodedKey = MD5.encode(key);
+        BigInteger encodedKey = md5.encode(key);
         /*
             TODO this comment is copied verbatum
             Return the server that has the next highest hash to the encodedKey.

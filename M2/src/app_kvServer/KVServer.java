@@ -17,7 +17,7 @@ import java.io.BufferedReader;
 import java.io.FileWriter;
 import java.io.BufferedWriter;
 import java.io.PrintWriter;
-import logger.LogSetup;
+//import logger.LogSetup;
 
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -29,7 +29,7 @@ import java.util.List;
 
 import cache.*;
 import common.messages.TextMessage;
-import common.Parser.*;
+import common.KVConstants.*;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.Level;

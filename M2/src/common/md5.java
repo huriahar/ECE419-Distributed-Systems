@@ -1,7 +1,8 @@
 import java.security.MessageDigest;
 import java.math.BigInteger;
 
-public class MD5 {
+public class md5 {
+
     public static BigInteger encode(String m){
         MessageDigest hash = MessageDigest.getInstance("MD5");
 
