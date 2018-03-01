@@ -1,11 +1,5 @@
 package app_kvClient;
 
-import client.KVCommInterface;
-import client.KVStore;
-import common.messages.TextMessage;
-import common.messages.KVMessage;
-import common.messages.KVMessage.StatusType;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
@@ -16,6 +10,10 @@ import logger.LogSetup;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+
+import client.*;
+import common.messages.*;
+import common.messages.KVMessage.*;
 
 public class KVClient implements IKVClient {
 

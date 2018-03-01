@@ -2,7 +2,6 @@ package app_kvECS;
  
 import java.util.Map;
 import java.util.Collection;
-import java.util.Iterator;
 
 import java.io.IOException;
 
@@ -14,20 +13,21 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.Level;
 
 import ecs.*;
+import cache.*;
 
 public class ECSClient implements IECSClient {
-    private ECS ecsInstance;
+    private ECS ecsInstance = null;
     private BufferedReader stdin;
+
     private static Logger logger = Logger.getRootLogger();
     private static final String PROMPT = "ECSClient> ";
+
     private Collection<IECSNode> nodesLaunched;
     private boolean stop = false;
-    private ECS ecsInstance = null;
 
     public ECSClient (String configFile) {
         this.ecsInstance = new ECS(configFile); 
     }
-
 
     public void run() {
         while (!stop) {
@@ -46,8 +46,7 @@ public class ECSClient implements IECSClient {
         }
     }
 
-
-    private void handleCommand (String cmdLine) {
+	private void handleCommand (String cmdLine) {
         String[] tokens = cmdLine.split("\\s+");
 
         switch (tokens[0]) {
@@ -57,23 +56,34 @@ public class ECSClient implements IECSClient {
                 System.out.println(PROMPT + "Application exit!");
                 break;
 
+            // init numNodes cacheSize cacheStrategy
             case "init":
                 if(tokens.length == 4) {
                     try {
-                        int numNodes     = Integer.parseInt(tokens[1]);
-                        int cacheSize   = Integer.parseInt(tokens[2]);
+                        int numNodes = Integer.parseInt(tokens[1]);
+                        int cacheSize = Integer.parseInt(tokens[2]);
                         String cacheStrategy = tokens[3];
-                        if(numNodes <= ecsInstance.ringNetworks.size()) { 
-                            nodesLaunched = ecsInstance.addNodes(numNodes, cacheStrategy, cacheSize);
-                            if(nodesLaunched == null) {
-                                printError("Unable to start any KVServers");
+
+                        if(numNodes <= ecsInstance.maxServers()) {
+                            if (KVCache.isValidStrategy(cacheStrategy)) {
+                                nodesLaunched = ecsInstance.addNodes(numNodes, cacheStrategy, cacheSize);
+                                if(nodesLaunched == null) {
+                                    printError("Unable to start any KVServers");
+                                    logger.error("Unable to launch any KVServers");
+                                }
+                                else if(nodesLaunched.size() != numNodes) {
+                                    printError("Launched only " + nodesLaunched.size() + " servers instead of " + numNodes);
+                                    logger.error("Launched only " + nodesLaunched.size() + " servers instead of " + numNodes);
+                                }
                             }
-                            else if(nodesLaunched.size() != numNodes) {
-                                printError("Unable to start all KVServers");
-                            }           
+                            else {
+                                printError("Enter a valid cache strategy. Entered value: " + cacheStrategy);
+                                logger.error("Enter a valid cache strategy. Entered value: " + cacheStrategy);
+                            }
                         }
                         else {
-                           printError("Enough KVServers not available");
+                           printError("Not enough KVServers available");
+                           logger.error("Not enough KVServers available");
                         }
                     }
                     catch(NumberFormatException nfe) {
@@ -82,72 +92,85 @@ public class ECSClient implements IECSClient {
                     }
                 }
                 else {
-                    printError("Invalid number of parameters for command \"connect\"");
+                    printError("Invalid number of parameters for command \"init\".");
                     printHelp();
                 }
                 break;
             
             case "start":
-                for (int i = 0; i < nodesLaunched.size(); i++) {
-                    if(!ecsInstance.start(nodesLaunched.get(i))) {
-                        printError("Unable to start KVServer: "+ iter.getNodeName() + " Host: " + iter.getNodeHost()+ " Port: " + iter.getNodePort()) ;
-                    } 
-                }       
-                break;
-
-            case "stop":
-                for(int i = 0; i < nodesLaunched.size(); i++) {
-                    if(!ecsInstance.stop(nodesLaunched.get(i))) {
-                        printError("Unable to stop KVServer: "+ iter.getNodeName() + " Host: " + iter.getNodeHost()+ " Port: " + iter.getNodePort()) ;
-                    } 
-                }       
-                break;
-
-            case "shutDown": 
-                for(int i = 0; i < nodesLaunched.size(); i++) {     
-                    if(!ecsInstance.stop(nodesLaunched.get(i))) {
-                        printError("Unable to stop KVServer: "+ iter.getNodeName() + " Host: " + iter.getNodeHost()+ " Port: " + iter.getNodePort()) ;
-                    } 
-                }      
-                if(!ecsInstance.shutDown()) {
-                    printError("Unable to exit process");
+                for (IECSNode node : nodesLaunched) {
+                    if (!ecsInstance.start(node)) {
+                        printError("Unable to start KVServer: "+ node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
+                        logger.error("Unable to start KVServer: "+ node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
+                    }
                 }
                 break;
 
+            case "stop":
+                for (IECSNode node : nodesLaunched) {
+                    if (!ecsInstance.stop(node)) {
+                        printError("Unable to stop KVServer: "+ node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
+                        logger.error("Unable to stop KVServer: "+ node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
+                    }
+                }
+                break;
+
+            case "shutdown":
+                for (IECSNode node : nodesLaunched) {
+                    if (!ecsInstance.stop(node)) {
+                        printError("Unable to shutdown KVServer: "+ node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
+                        logger.error("Unable to shutdown KVServer: "+ node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
+                    }
+                }      
+                if(!ecsInstance.shutdown()) {
+                    printError("Unable to exit ECS process");
+                }
+                break;
+
+            // addNode cacheSize cacheStrategy
             case "addNode":
                 if(tokens.length == 3) {
                     try {
                         int cacheSize = Integer.parseInt(tokens[1]);
                         String cacheStrategy = tokens[2];
-                        IECSNode newNode = addNode(cacheStrategy, cacheSize);
-                        if(newNode == null) {
-                            printError("Unable to find Node containing Key: " + Key);    
+                        if (KVCache.isValidStrategy(cacheStrategy)) {
+                            IECSNode newNode = addNode(cacheStrategy, cacheSize);
+                            if (newNode != null) {
+                                nodesLaunched.add(newNode);
+                            }
+                            else {
+                                printError("Unable to find any remaining unlaunched nodes supplied in config file");
+                                logger.error("Unable to find any remaining unlaunched nodes supplied in config file");
+                            }
                         }
-                        else 
-                            nodesLaunched.add(newNode);
+                        else {
+                            printError("Enter a valid cache strategy. Entered value: " + cacheStrategy);
+                            logger.error("Enter a valid cache strategy. Entered value: " + cacheStrategy);
+                        }
                     }
                     catch(NumberFormatException nfe) {
                         printError("Invalid cacheSize. cacheSize must be a number!");
                         logger.error("Invalid cacheSize. cacheSize must be a number!", nfe);
                     }
-
                 }
                 else {
-                    printError("Invalid number of parameters for command \"connect\"");
+                    printError("Invalid number of parameters for command \"addNode\"");
                     printHelp();
                 }
                 break;
 
             case "removeNode":
-                if(tokens.length() >= 2) {
-                    Collections<String> nodeNames;
-                    for(int i = 1; i < tokens.length(); i++) {
+                if(tokens.length >= 2) {
+                    Collection<String> nodeNames = null;
+                    for (int i = 1; i < tokens.length; ++i) {
                         nodeNames.add(tokens[i]);
-                    }    
+                    }
                     if(!ecsInstance.removeNodes(nodeNames)) {
-                        printError("Unable to remove node(s): ");   
-                        for(int i = 0; i < nodeNames.size(); i++) {
-                            printError(nodeNames[i]+ " ");
+                        printError("Unable to remove node(s): ");
+                        logger.error("Unable to remove node(s): ");
+                        for (String node : nodeNames) {
+                            printError(node + " ");
+                            logger.error(node + " ");
                         }    
                     }
                 }
@@ -180,21 +203,19 @@ public class ECSClient implements IECSClient {
         }
     }
 
-
-
     private void printHelp() {
         StringBuilder sb = new StringBuilder();
         sb.append(PROMPT).append("ECS CLIENT HELP (Usage):\n");
         sb.append(PROMPT);
         sb.append("::::::::::::::::::::::::::::::::");
         sb.append("::::::::::::::::::::::::::::::::\n");
-        sb.append(PROMPT).append("addNodes <numNodes> <cacheSize> <cacheStrategy>");
+        sb.append(PROMPT).append("init <numNodes> <cacheSize> <cacheStrategy>");
         sb.append("\t Launches numNodes servers with cacheSize and cacheStrategy\n");
         sb.append(PROMPT).append("start");
         sb.append("\t 1) Starts storage service on all launched server instances \n");
         sb.append(PROMPT).append("stop");
-        sb.append("\t\t Stops the storage servive but process is running. \n");
-        sb.append(PROMPT).append("shutDown");
+        sb.append("\t\t Stops the storage service (get/put requests) but process is running. \n");
+        sb.append(PROMPT).append("shutdown");
         sb.append("\t\t Stop all the servers and shuts down process  \n");
         sb.append(PROMPT).append("addNode <cacheSize> <cacheStrategy>");
         sb.append("\t\t Adds a new server of cacheSize with cacheStrategy \n");
@@ -211,7 +232,13 @@ public class ECSClient implements IECSClient {
         sb.append("\t\t\t exits the program");
         System.out.println(sb.toString());
     }
-
+    
+    private void printPossibleLogLevels() {
+        System.out.println(PROMPT 
+                + "Possible log levels are:");
+        System.out.println(PROMPT 
+                + "ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF");
+    }
 
     private String setLevel(String levelString) {
         
@@ -258,7 +285,6 @@ public class ECSClient implements IECSClient {
     public boolean stop() {
         // TODO
         return false;
-
     }
 
 
@@ -314,7 +340,6 @@ public class ECSClient implements IECSClient {
     }
 
     public static void main(String[] args) {
-        // TODO
         try {
             new LogSetup("logs/ECSClient.log", Level.ALL);
             if (args.length != 1) {
@@ -334,7 +359,4 @@ public class ECSClient implements IECSClient {
             System.exit(1);
         }
     }
-
-
-
 }

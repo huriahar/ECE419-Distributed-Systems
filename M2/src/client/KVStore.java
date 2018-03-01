@@ -1,18 +1,17 @@
 package client;
 
 import java.io.InputStream;
-
 import java.io.OutputStream;
+
 import java.net.Socket;
+
 import java.util.HashSet;
 import java.util.Set;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.HashMap;
-import java.math.BigInteger;
 
-import common.*;
-import app_kvClient.*;
+import java.math.BigInteger;
 
 import java.net.UnknownHostException;
 import java.io.IOException;
@@ -20,12 +19,17 @@ import java.io.IOException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import common.*;
+import common.messages.*;
+import app_kvClient.*;
+
 public class KVStore implements KVCommInterface {
     private static Logger logger = Logger.getRootLogger();
     private Set<IKVClient> listeners;
     
     private String serverAddr;
     private int serverPort;
+    private boolean running;
     private boolean connected;
 
     private Socket clientSocket;
@@ -37,6 +41,7 @@ public class KVStore implements KVCommInterface {
     private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
     private static final int MAX_KEY_LENGTH = 20; 
     private static final int MAX_VALUE_LENGTH = 122880; //120KB
+    private static final BigInteger INVALID_SERVER = BigInteger.valueOf(-1);
 
     /**
      * Initialize KVStore with address and port of KVServer
@@ -109,15 +114,15 @@ public class KVStore implements KVCommInterface {
             logger.error("Server Error: Key should not contain space");
             result = false;
         }
-        if (key.contains(DELIM)) {
-            logger.error("Server Error: Key should not contain delimiter " + DELIM);
+        if (key.contains(KVConstants.DELIM)) {
+            logger.error("Server Error: Key should not contain delimiter " + KVConstants.DELIM);
             result = false;
         }
         return result;
     }
 
     @Override
-    public KVMessage put(String key, String value)
+    public KVReplyMessage put(String key, String value)
             throws Exception {
         // step 1 - input validation
         if (!errorCheck(key, value)) {
@@ -126,9 +131,9 @@ public class KVStore implements KVCommInterface {
 
         // step 2 - send a PUT request to the server
         // Marshall the sending message
-        String msg = PUT_CMD + DELIM + key;
+        String msg = KVConstants.PUT_CMD + KVConstants.DELIM + key;
         if (value != null && !value.equals("")) {
-            msg = msg + DELIM + value;
+            msg = msg + KVConstants.DELIM + value;
         }
         TextMessage message = new TextMessage(msg);
         sendMessage(message);
@@ -140,7 +145,7 @@ public class KVStore implements KVCommInterface {
         // step 4 - retry put if possible
         switch(kvreply.getStatus()){
             case SERVER_NOT_RESPONSIBLE:
-                kvreply = retryRequest(key, value, PUT_CMD);
+                kvreply = retryRequest(key, value, KVConstants.PUT_CMD);
             default:
                 break;
         }
@@ -148,7 +153,7 @@ public class KVStore implements KVCommInterface {
     }
 
     @Override
-    public KVMessage get(String key)
+    public KVReplyMessage get(String key)
             throws Exception {
         // step 1 - input validation
         if (!errorCheck(key, "")) {
@@ -156,7 +161,7 @@ public class KVStore implements KVCommInterface {
         }
 
         // step 2 - send a PUT request to the server
-        TextMessage message = new TextMessage(GET_CMD + DELIM + key);
+        TextMessage message = new TextMessage(KVConstants.GET_CMD + KVConstants.DELIM + key);
         sendMessage(message);
 
         // step 3 - get the server's response and forward it to the client
@@ -174,11 +179,11 @@ public class KVStore implements KVCommInterface {
             for (int i = 1; i < tokens.length; ++i) {
                 valueParts.add(tokens[i]);
             }
-            String value = String.join(DELIM, valueParts);
+            String value = String.join(KVConstants.DELIM, valueParts);
             return new KVReplyMessage(key, value, KVMessage.StatusType.GET_SUCCESS);
         }
         else if(getStatus.equals("SERVER_NOT_RESPONSIBLE")) {
-            return retryRequest(key, null, GET_CMD);
+            return retryRequest(key, null, KVConstants.GET_CMD);
         }
         else {
             // Invalid Message type received or received GET_ERROR
@@ -186,10 +191,11 @@ public class KVStore implements KVCommInterface {
         }
     }
 
-    private KVMessage retryRequest(String key, String value, String request) {
+    private KVReplyMessage retryRequest(String key, String value, String request)
+    		throws Exception {
         // step 1 - Update ServerMetaData
-        string status = (value == null) ? "DELETE_ERROR" : "PUT_ERROR";
-        status = (request.equals(GET_CMD)) ? "GET_ERROR" : status;
+        String status = (value == null) ? "DELETE_ERROR" : "PUT_ERROR";
+        status = (request.equals(KVConstants.GET_CMD)) ? "GET_ERROR" : status;
 
         sendMessage(new TextMessage("GET_METADATA"));
         TextMessage reply = receiveMessage();
@@ -202,28 +208,28 @@ public class KVStore implements KVCommInterface {
             
             // Find responsible server
             BigInteger serverHash = getResponsibleServer(key);
-            if(serverHash == -1) {
+            if (serverHash == INVALID_SERVER) {
                 return new KVReplyMessage(key, value, status);
             }
             
             // Disconnect from current server and reconnect
             // to the correct server
             disconnect();
-            this.serverAddr = this.ringNetwork[serverHash].addr;
-            this.serverPort = this.ringNetwork[serverHash].port;
+            this.serverAddr = this.ringNetwork.get(serverHash).addr;
+            this.serverPort = this.ringNetwork.get(serverHash).port;
             connect();
             
-            return (request.equals(PUT_CMD)) ? put(key, value) : get(key);
+            return (request.equals(KVConstants.PUT_CMD)) ? put(key, value) : get(key);
         }
     }
 
     private void updateMetaData(String marshalledData) {
         this.ringNetwork = new HashMap<BigInteger, ServerMetaData>();
-        String[] dataEntries = marshalledData.split(NEWLINE_DELIM);
+        String[] dataEntries = marshalledData.split(KVConstants.NEWLINE_DELIM);
 
         for(int i = 0; i < dataEntries.length ; i++) {
-            BigInteger serverHash = md5.encode(line[SERVER_NAME] + DELIM + line[SERVER_IP] + DELIM + line[SERVER_PORT]);
-            ServerMetaData meta = new ServerMetaData(line[SERVER_NAME], line[SERVER_IP], Integer.parseInt(line[SERVER_PORT]), line[BEGIN_HASH], line[END_HASH]);
+            BigInteger serverHash = md5.encode(line[0] + KVConstants.DELIM + line[1] + KVConstants.DELIM + line[2]);
+            ServerMetaData meta = new ServerMetaData(line[0], line[1], Integer.parseInt(line[2]), line[BEGIN_HASH], line[END_HASH]);
             this.ringNetwork.put(serverHash, meta);
         }
     }
@@ -244,16 +250,24 @@ public class KVStore implements KVCommInterface {
     }
 
 
+    public boolean isConnected() {
+        return connected;
+    }
+    
     public void setConnected(boolean connect) {
         connected = connect;
+    }
+    
+    public boolean isRunning() {
+        return running;
+    }
+    
+    public void setRunning(boolean run) {
+        running = run;
     }
 
     public void addListener(IKVClient listener){
         listeners.add(listener);
-    }
-
-    public boolean isConnected() {
-        return connected;
     }
 
     /**

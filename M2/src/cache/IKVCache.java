@@ -1,11 +1,17 @@
 package cache;
 
-import app_kvServer.IKVServer;
-
 public interface IKVCache {
+	
+	public enum CacheStrategy {
+        None,
+        LRU,
+        LFU,
+        FIFO
+    };
+    
     public int getCacheSize();
 
-    public IKVServer.CacheStrategy getStrategy();
+    public CacheStrategy getStrategy();
 
     public void insert(String key, String value);
 

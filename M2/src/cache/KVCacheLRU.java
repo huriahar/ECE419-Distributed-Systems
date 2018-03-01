@@ -7,8 +7,6 @@ import java.util.Map.Entry;
 import java.util.Iterator;
 import java.util.Set;
 
-import app_kvServer.IKVServer;
-
 public class KVCacheLRU extends KVCache {
     // Using a linked list implementation of a queue
     // Maintians FIFO order but allows random deletion

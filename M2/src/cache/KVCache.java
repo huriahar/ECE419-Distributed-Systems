@@ -1,14 +1,21 @@
 package cache;
 
-import app_kvServer.IKVServer;
-
 public class KVCache implements IKVCache {
     private static int cacheSize;
-    private static IKVServer.CacheStrategy strategy;
+    private static CacheStrategy strategy;
 
     public KVCache(int cacheSize, String strategy){
-        this.cacheSize = cacheSize;
-        this.strategy = cacheStrategyStrToEnum(strategy);
+        KVCache.cacheSize = cacheSize;
+        KVCache.strategy = CacheStrategy.valueOf(strategy);
+    }
+    
+    public static boolean isValidStrategy(String strategy) {
+    	for (CacheStrategy c : CacheStrategy.values()) {
+    		if (c.name().equals(strategy)) {
+    			return true;
+    		}
+    	}
+    	return false;
     }
 
     public static KVCache createKVCache(int cacheSize, String strategy) {
@@ -26,25 +33,25 @@ public class KVCache implements IKVCache {
     }
 
     @Override
-    public IKVServer.CacheStrategy getStrategy(){
-        return this.strategy;
+    public CacheStrategy getStrategy(){
+        return KVCache.strategy;
     }
 
     @Override
     public int getCacheSize(){
-        return this.cacheSize;
+        return KVCache.cacheSize;
     }
 
-    private IKVServer.CacheStrategy cacheStrategyStrToEnum(String strategy) {
+    private CacheStrategy cacheStrategyStrToEnum(String strategy) {
         switch(strategy) {
             case "FIFO":
-                return IKVServer.CacheStrategy.FIFO;
+                return CacheStrategy.FIFO;
             case "LRU":
-                return IKVServer.CacheStrategy.LRU;
+                return CacheStrategy.LRU;
             case "LFU":
-                return IKVServer.CacheStrategy.LFU;
+                return CacheStrategy.LFU;
             default:
-                return IKVServer.CacheStrategy.None;
+                return CacheStrategy.None;
         } 
     }
 

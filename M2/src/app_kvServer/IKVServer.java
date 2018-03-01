@@ -1,12 +1,6 @@
 package app_kvServer;
 
 public interface IKVServer {
-    public enum CacheStrategy {
-        None,
-        LRU,
-        LFU,
-        FIFO
-    };
 
     /**
      * Get the port number of the server

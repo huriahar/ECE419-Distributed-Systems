@@ -6,8 +6,6 @@ import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import app_kvServer.IKVServer;
-
 public class KVCacheLFU extends KVCache {
 
     private Map<String, String>  kvp_map = new HashMap();
