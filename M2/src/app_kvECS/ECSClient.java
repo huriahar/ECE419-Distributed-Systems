@@ -279,7 +279,7 @@ public class ECSClient implements IECSClient {
         for (IECSNode node : nodesLaunched) {
             if (!ecsInstance.start(node)) {
                 success = false;
-                printError("Unable to start KVServer: "+ node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
+                printError(PROMPT + "Unable to start KVServer: "+ node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
                 logger.error("Unable to start KVServer: "+ node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
             }
         }
@@ -294,7 +294,7 @@ public class ECSClient implements IECSClient {
         for (IECSNode node : nodesLaunched) {
             if (!ecsInstance.stop(node)) {
                 success = false;
-                printError("Unable to stop KVServer: "+ node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
+                printError(PROMPT + "Unable to stop KVServer: "+ node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
                 logger.error("Unable to stop KVServer: "+ node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
             }
         }
