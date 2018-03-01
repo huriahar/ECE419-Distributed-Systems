@@ -23,13 +23,13 @@ import common.*;
 
 public class ECS {
     private Path configFile; 
-    private TreeMap<BigInteger, ServerMetaData> ringNetwork;
+    private TreeMap<String, IECSNode> ringNetwork;
     private static Logger logger = Logger.getRootLogger();
 //    private ZooKeeper zk;
     
 	public ECS(String configFile) {
         this.configFile = Paths.get(configFile);
-        this.ringNetwork = new TreeMap<BigInteger, ServerMetaData>();
+        this.ringNetwork = new TreeMap<String, IECSNode>();
         try {
 			populateRingNetwork();
 		} catch (IOException e) {
@@ -44,10 +44,10 @@ public class ECS {
         
         for (int i = 0; i < numServers ; ++i) {
             String[] line = lines.get(i).split(" ");
-            BigInteger serverHash = md5.encode(line[0] + KVConstants.DELIM + line[1] + KVConstants.DELIM + line[2]);
+            String serverHash = md5.encode(line[0] + KVConstants.DELIM + line[1] + KVConstants.DELIM + line[2]);
             //TODO figure out begin and end hash, does zookeeper assign it? No it doesn't. Have to do it ourselves
-            ServerMetaData meta = new ServerMetaData(line[0], line[1], Integer.parseInt(line[2]), null, null);
-            this.ringNetwork.put(serverHash, meta);
+            IECSNode node = new ECSNode(line[0], line[1], Integer.parseInt(line[2]), null, null);
+            this.ringNetwork.put(serverHash, node);
         }
     }
 
@@ -128,14 +128,18 @@ public class ECS {
 
     public Map<String, IECSNode> getNodes() {
         // TODO
-        return null;
+        return this.ringNetwork;
     }
 
     public IECSNode getNodeByKey(String Key) {
         // TODO
-        BigInteger serverHash = md5.encode(Key);
-        ServerMetaData metaData = ringNetwork.get(serverHash);
-        IECSNode serverNode = new ECSNode(metaData.name, metaData.addr, metaData.port, metaData.bHash, metaData.eHash);   
+        IECSNode serverNode;
+        if(ringNetwork.isEmpty()) return null;
+        String encodedKey = md5.encode(Key);
+        if(ringNetwork.higherEntry(encodedKey) == null) {
+            serverNode = ringNetwork.firstEntry().getValue();
+        }
+        serverNode = ringNetwork.higherEntry(encodedKey).getValue();
         return serverNode;
     }
 
