@@ -317,16 +317,30 @@ public class ECSClient implements IECSClient {
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
         // TODO
+        //Setup the zookeeper
+        Collection<IECSNode> nodes = setupNodes(count, cacheStrategy, cacheSize); 
          
-        return setupNodes(count, cacheStrategy, cacheSize); 
+        //SSH call to each server in collection
+        if(ecsInstance.initService(nodesLaunched, cacheStrategy, cacheSize)) {
+//            try(awaitNodes(count, 5000)) { 
+//                return nodes;       
+//            }
+//            catch (Exception io) {
+//                printError("Nodes timed out");
+//            }
+            return nodes;
+        }
+        else
+            return null;
+        
     }
 
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
         // TODO
         //Setup ecsInstance.zk;
-        //Call await nodes
-        return null ;
+        return ecsInstance.connectToZk(count, cacheStrategy, cacheSize); 
+        
     }
 
     @Override
