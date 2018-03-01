@@ -24,5 +24,13 @@ public class ServerMetaData {
     public ServerMetaData(String name, String addr, int port) {
         this(name, addr, port, null, null);
     }
+
+    public void setBeginHash(String s) {
+        this.bHash = s;
+    }
+
+    public void setEndHash(String s) {
+        this.eHash = s;
+    }
 }
 

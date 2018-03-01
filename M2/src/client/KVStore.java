@@ -11,7 +11,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.TreeMap;
 
-import java.math.BigInteger;
 
 import java.net.UnknownHostException;
 import java.io.IOException;
@@ -36,13 +35,13 @@ public class KVStore implements KVCommInterface {
     private Socket clientSocket;
     private OutputStream output;
     private InputStream input;
-    private TreeMap<BigInteger, ServerMetaData> ringNetwork;
+    private TreeMap<String, ServerMetaData> ringNetwork;
 
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
     private static final int MAX_KEY_LENGTH = 20; 
     private static final int MAX_VALUE_LENGTH = 122880; //120KB
-    private static final BigInteger INVALID_SERVER = BigInteger.valueOf(-1);
+    private static final String INVALID_SERVER = "";
 
     /**
      * Initialize KVStore with address and port of KVServer
@@ -208,7 +207,7 @@ public class KVStore implements KVCommInterface {
             updateMetaData(reply.getMsg());
             
             // Find responsible server
-            BigInteger serverHash = getResponsibleServer(key);
+            String serverHash = getResponsibleServer(key);
             if (serverHash == INVALID_SERVER) {
                 return new KVReplyMessage(key, value, status);
             }
@@ -225,13 +224,13 @@ public class KVStore implements KVCommInterface {
     }
 
     private void updateMetaData(String marshalledData) {
-        this.ringNetwork = new TreeMap<BigInteger, ServerMetaData>();
+        this.ringNetwork = new TreeMap<String, ServerMetaData>();
         String[] dataEntries = marshalledData.split(KVConstants.NEWLINE_DELIM);
 
         for(int i = 0; i < dataEntries.length ; i++) {
             String[] line = dataEntries[i].split(KVConstants.DELIM);
 
-            BigInteger serverHash = md5.encode(line[ServerMetaData.SERVER_NAME] + 
+            String serverHash = md5.encode(line[ServerMetaData.SERVER_NAME] + 
                                                 KVConstants.DELIM + line[ServerMetaData.SERVER_IP] + 
                                                 KVConstants.DELIM + line[ServerMetaData.SERVER_PORT]);
 
@@ -244,9 +243,9 @@ public class KVStore implements KVCommInterface {
         }
     }
 
-    private BigInteger getResponsibleServer(String key) {
+    private String getResponsibleServer(String key) {
         if(ringNetwork.isEmpty()) return INVALID_SERVER;
-        BigInteger encodedKey = md5.encode(key);
+        String encodedKey = md5.encode(key);
         /*
             TODO this comment is copied verbatum
             Return the server that has the next highest hash to the encodedKey.

@@ -7,7 +7,6 @@ import java.net.Socket;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.TreeMap;
-import java.math.BigInteger;
 import cache.KVCache;
 import common.messages.TextMessage;
 import common.KVConstants;
@@ -34,7 +33,7 @@ public class ClientConnection implements Runnable {
     private static final int MAX_KEY_LENGTH = 20; 
     private static final int MAX_VALUE_LENGTH = 122880; //120KB
     private static final int DROP_SIZE = 128 * BUFFER_SIZE;
-    private TreeMap<BigInteger, ServerMetaData> ringNetwork;
+    private TreeMap<String, ServerMetaData> ringNetwork;
     
     private Socket clientSocket;
     private KVServer server;

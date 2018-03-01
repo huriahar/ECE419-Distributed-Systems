@@ -20,7 +20,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.math.BigInteger;
 
 import logger.LogSetup;
 
@@ -37,6 +36,7 @@ public class KVServer implements IKVServer, Runnable {
 
 	private static Logger logger = Logger.getRootLogger();
     private int serverPort;
+    private int serverIP;
     private int zkPort;
     private ServerSocket serverSocket;
     private KVCache cache;
@@ -58,7 +58,7 @@ public class KVServer implements IKVServer, Runnable {
         this.zkHostname = zkHostname;
         this.zkPort = zkPort;
         // TODO: Figure out how to get cache parameters
-        // TODO: Figure out how to get own server port and name
+        // TODO: Figure out how to get own server port and name and addr/ip
 	}
 
 	public int getPort(){
@@ -420,7 +420,7 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public boolean isResponsible(String key) {
-        String encodedKey = md5.encode(key).toString(16);
+        String encodedKey = md5.encode(key);
         return ((encodedKey.compareTo(metadata.bHash) >= 0  && encodedKey.compareTo(metadata.eHash) < 0) ||
                (encodedKey.compareTo(metadata.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0) ||
                (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(metadata.eHash) < 0));
@@ -440,6 +440,25 @@ public class KVServer implements IKVServer, Runnable {
         return marshalledData.toString();
     }
 
+    //TODO serverIP and port and name??
+    public void setRange(String metaDataStr) {
+        String[] metaDataLines = metaDataStr.split(KVConstants.NEWLINE_DELIM);
+        for(String line: metaDataLines) {
+            String[] data = line.split(KVConstants.DELIM);
+            if (data[ServerMetaData.SERVER_NAME].equals(KVServerName) &&
+                data[ServerMetaData.SERVER_IP].equals(serverIP) &&
+                data[ServerMetaData.SERVER_PORT].equals(serverPort)) {
+                
+                metadata.setBeginHash(data[ServerMetaData.BEGIN_HASH]); 
+                metadata.setEndHash(data[ServerMetaData.END_HASH]); 
+                logger.info("Set KVServer (" + KVServerName + ", " + serverIP + ", " + serverPort + ") " +
+                            "\nStart hash to: " + metadata.bHash + "\nEnd hash to: " + metadata.eHash);
+                break;
+            }
+        }
+
+    }
+
 	@Override
 	public void start() {
 		// TODO Starts the KVServer, all client requests and all ECS requests are processed.
@@ -450,6 +469,7 @@ public class KVServer implements IKVServer, Runnable {
 		// TODO Stops the KVServer, all client requests are rejected and only ECS requests are processed
 	}
 
+    @Override
     public void shutdown() {
 		// TODO Exits the KVServer application.
 	}
