@@ -20,14 +20,13 @@ import java.lang.Process;
 
 import common.*;
 
+
 public class ECS {
     private Path configFile; 
     private TreeMap<BigInteger, ServerMetaData> ringNetwork;
     private static Logger logger = Logger.getRootLogger();
 //    private ZooKeeper zk;
     
-
-
 	public ECS(String configFile) {
         this.configFile = Paths.get(configFile);
         this.ringNetwork = new TreeMap<BigInteger, ServerMetaData>();
