@@ -537,6 +537,7 @@ public class KVServer implements IKVServer, Runnable {
 		// TODO Transfer a subset (range) of the KVServer's data to another KVServer (reallocation before
         // removing this server or adding a new KVServer to the ring); send a notification to the ECS,
         // if data transfer is completed.
+        lockWrite();
         StringBuilder toSend = new StringBuilder();
         try {
             Path serverPath = Paths.get(this.serverFilePath);
@@ -558,6 +559,7 @@ public class KVServer implements IKVServer, Runnable {
         sender.connect();
         sender.sendMessage(new TextMessage(toSend.toString()));
         sender.disconnect();
+        unlockWrite();
 		return false;
 	}
 
