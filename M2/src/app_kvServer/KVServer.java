@@ -53,7 +53,8 @@ public class KVServer implements IKVServer, Runnable {
     private boolean readLocked = true;      //start in a stopped state
     //Default values
     private static final String UNSET_ADDR = null;
-    private static final String DEFAULT_CACHE = "FIFO";
+    private static final int DEFAULT_CACHE_SIZE = 5;
+    private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
     /**
 	 * Start KV Server with selected name
 	 * @param name			unique name of server
@@ -63,7 +64,7 @@ public class KVServer implements IKVServer, Runnable {
 	public KVServer(String name, String zkHostname, int zkPort) {
         this.metadata = new ServerMetaData(name, UNSET_ADDR, zkPort, KVConstants.MIN_HASH, KVConstants.MIN_HASH);
         this.serverFilePath = "SERVER_" + Integer.toString(metadata.port);
-        this.cache = new KVCache(0, DEFAULT_CACHE);
+        this.cache = KVCache.createKVCache(DEFAULT_CACHE_SIZE, DEFAULT_CACHE_STRATEGY);
 	}
 
 	public int getPort(){
@@ -144,7 +145,8 @@ public class KVServer implements IKVServer, Runnable {
 	@Override
     public void run(){
         running = initializeServer();
-
+        //TODO remove this!
+        start();
         if (serverSocket != null) {
             while(isRunning()){
                 try {
@@ -229,13 +231,10 @@ public class KVServer implements IKVServer, Runnable {
 		BufferedReader br = null;
 		String KVPair;
 		try {
-            logger.info("before creating file");
 			File file = new File(filePath);
-            logger.info("after creating file");
 			
 			FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
 			FileLock lock = channel.lock();			
-            logger.info("after lock");
 
 			try {
 				lock = channel.tryLock();
@@ -243,7 +242,6 @@ public class KVServer implements IKVServer, Runnable {
     		} catch (OverlappingFileLockException e) {
 				 //System.out.println("Overlapping File Lock Error: " + e.getMessage());
             }
-            logger.info("after lock2");
 
 		    if(!file.exists()) {
 				System.out.println("File not found");
@@ -292,7 +290,8 @@ public class KVServer implements IKVServer, Runnable {
 
 	@Override
 	public void deleteKV(String key) throws Exception {
-        putKV(key, null);		
+        this.cache.delete(key);
+		storeKV(key, "");
 	}
 
 
@@ -538,6 +537,7 @@ public class KVServer implements IKVServer, Runnable {
 		// TODO Transfer a subset (range) of the KVServer's data to another KVServer (reallocation before
         // removing this server or adding a new KVServer to the ring); send a notification to the ECS,
         // if data transfer is completed.
+        lockWrite();
         StringBuilder toSend = new StringBuilder();
         try {
             Path serverPath = Paths.get(this.serverFilePath);
@@ -559,6 +559,7 @@ public class KVServer implements IKVServer, Runnable {
         sender.connect();
         sender.sendMessage(new TextMessage(toSend.toString()));
         sender.disconnect();
+        unlockWrite();
 		return false;
 	}
 

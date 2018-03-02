@@ -219,11 +219,8 @@ public class ClientConnection implements Runnable {
             // If Value is not null or empty, insert in $ and disk
             if (value != null && !value.equals("") && !value.equals("null")) {
                 try {
-                    logger.info("before storage check");
                     result = (server.inStorage(key)) ? "PUT_UPDATE" : "PUT_SUCCESS";
-                    logger.info("after storage check");
                     server.putKV(key, value);
-                    logger.info("after putkv");
                     logger.info("Success " + result + " with key " + key + " and value " 
                         + value + " on server");
                 }
