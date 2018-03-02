@@ -139,12 +139,48 @@ public class ECS {
     }
 
 
-    public boolean shutdown() {
-        // TODO
-            
-        return false;
+    public boolean shutDownNode(IECSNode node) throws IOException {
+        //Send Shutdown to node passed in  
+        boolean success = true;  
+        TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "SHUTDOWN_NODE");
+        TextMessage response;
+        response = sendNodeMessage(message, node);
+        if(response.getMsg().equals("SHUTDOWN_SUCCESS")) 
+            logger.info("SUCCESS: Shutdown KVServer: " + node.getNodeName());
+        return success;
     }
 
+    public boolean ECSShutDown() {
+        //Shutdown ECS
+        boolean success = true;
+        if(ringNetwork.isEmpty()) return success;
+        for(Map.Entry<String, IECSNode> entry: ringNetwork.entrySet()) {
+            try {
+                shutDownNode(entry.getValue());
+            } catch(IOException io) {
+                logger.error("ERROR: Unable to shutdown KVServer: " + entry.getValue().getNodeName());
+                success = false;
+            } 
+        }
+
+        //clear the Hash Ring and the set of available nodes
+        ringNetwork.clear();
+        allAvailableNodes.clear();
+
+        try {
+            deleteMetaDataFile();
+        } catch (IOException ex) {
+            logger.error("ERROR: Unable to delete ECS MetaData File");
+            success = false;            
+        }
+            
+        return success;
+    }
+
+    public void deleteMetaDataFile() throws IOException {
+       Files.deleteIfExists(metaDataFile); 
+
+    }
 
     public void updateMetaData(ArrayList<String> data) throws IOException {
         Files.write(metaDataFile,data, StandardCharsets.UTF_8);
@@ -195,8 +231,7 @@ public class ECS {
 
                     //Prepare writable content to write to metaDatafile    
                     //TODO double check that data per server is written separate lines 
-                    metaDataContent.add(node.getNodeName() + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM
-                                        + node.getNodeHashRange()[0] + KVConstants.DELIM + node.getNodeHashRange()[1]);     
+                    metaDataContent.add(node.getNodeName() + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + node.getNodeHashRange()[0] + KVConstants.DELIM + node.getNodeHashRange()[1]);     
 
                 }
             } 
@@ -323,11 +358,60 @@ public class ECS {
         return false;
     }
 
-    public boolean removeNodes(Collection<String> nodeNames) {
+    public boolean removeNodes(Collection<IECSNode> nodes) {
         // TODO
-        return false;
+        String currNodeHash;    
+        IECSNode nextNode = null, currNode = null, node;
+        boolean success = true;
+        ArrayList<String> metaDataContent = new ArrayList<String>();
+
+        for(IECSNode server: nodes) {
+            for(Map.Entry<String, IECSNode> entry : ringNetwork.entrySet()) {
+                if(server.getNodeName().equals(entry.getValue().getNodeName())) {
+                    //Found the node we want to remove
+                    currNodeHash = entry.getKey();
+                    currNode = entry.getValue();
+                    nextNode = findNextNode(currNodeHash);
+                    if(nextNode == null) {
+                        logger.error("ERROR: Removing node error");
+                        success = false;
+                    }
+                    nextNode.setNodeBeginHash(currNode.getNodeHashRange()[0]);
+                    ringNetwork.remove(currNodeHash);
+                    allAvailableNodes.put(currNode, "AVAILABLE");
+                }
+            }
+        }
+       
+        try { 
+            for(Map.Entry<String, IECSNode> entry : ringNetwork.entrySet()) {
+                node = entry.getValue();
+                metaDataContent.add(node.getNodeName() + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + node.getNodeHashRange()[0] + KVConstants.DELIM + node.getNodeHashRange()[1]);     
+            }
+            updateMetaData(metaDataContent);
+        } catch (IOException io) {
+            logger.error("ERROR: Unable to update metaData with nodes removed");
+            success = false;
+        }
+
+        return success;
     }
 
+    public IECSNode findNextNode(String currHash) {
+        IECSNode nextNode = new ECSNode();
+        if(ringNetwork.size() <= 1 || !ringNetwork.containsKey(currHash))
+            nextNode = null;
+        else {
+            if(ringNetwork.higherKey(currHash) == null) {
+                nextNode = ringNetwork.firstEntry().getValue();
+            }
+            else {
+                nextNode = ringNetwork.higherEntry(currHash).getValue();
+            }
+        }
+        return nextNode; 
+    }
+    
     public Map<String, IECSNode> getNodes() {
         return this.ringNetwork;
     }

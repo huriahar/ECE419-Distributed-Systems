@@ -2,6 +2,7 @@ package app_kvECS;
  
 import java.util.Map;
 import java.util.Collection;
+import java.util.ArrayList;
 
 import java.io.IOException;
 
@@ -305,7 +306,12 @@ public class ECSClient implements IECSClient {
     @Override
     public boolean shutdown() {
         // TODO
-        return ecsInstance.shutdown();
+        boolean success = true;
+        if(!ecsInstance.ECSShutDown())
+            success = false;
+
+        return success;
+
     }
 
     @Override
@@ -340,7 +346,7 @@ public class ECSClient implements IECSClient {
         // TODO
         //setup each node with the cache size and strategy
         Collection<IECSNode> nodes = ecsInstance.setupNodesCacheConfig(count, cacheStrategy, cacheSize);
-        return null;    
+        return nodes;    
     }
 
     @Override
@@ -352,8 +358,21 @@ public class ECSClient implements IECSClient {
     @Override
     public boolean removeNodes(Collection<String> nodeNames) {
         // TODO
-
-        return ecsInstance.removeNodes(nodeNames);
+        Collection<IECSNode> nodesToRemove = new ArrayList<IECSNode>();
+        boolean success = true;
+        for(String name : nodeNames) {
+            for(IECSNode entry: nodesLaunched) {
+                if(entry.getNodeName().equals(name))
+                    nodesToRemove.add(entry);
+            }
+        }
+        if(ecsInstance.removeNodes(nodesToRemove)) {
+            nodesLaunched.removeAll(nodesToRemove);
+        }
+        else 
+            success = false;
+            
+        return success;
     }
 
     @Override
