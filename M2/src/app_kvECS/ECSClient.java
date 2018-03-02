@@ -325,15 +325,12 @@ public class ECSClient implements IECSClient {
             //for each node, launch server and set status as stopped
             if(ecsInstance.launchKVServer(entry, cacheStrategy, cacheSize)) {
                 logger.info("SUCCESS. Launched KVServer :" + entry.getNodeName());
-                if(!ecsInstance.stop(entry))
-                    printError(PROMPT + "Unable to stop KVServer: "+ entry.getNodeName() + " Host: " + entry.getNodeHost()+ " Port: " + entry.getNodePort());
-                else 
-                   logger.info("SUCCESS. KVServer in stopped state:" + entry.getNodeName());
             } 
             else {
                 logger.error("ERROR. Unable to launch KVServer :" + entry.getNodeName() + " Host: " + entry.getNodeHost()+ " Port: " + entry.getNodePort());           
             }
         }
+        setupNodes(count, cacheStrategy, cacheSize);
         return nodes;
         
     }
@@ -341,6 +338,8 @@ public class ECSClient implements IECSClient {
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
         // TODO
+        //setup each node with the cache size and strategy
+        Collection<IECSNode> nodes = ecsInstance.setupNodesCacheConfig(count, cacheStrategy, cacheSize);
         return null;    
     }
 
