@@ -317,9 +317,24 @@ public class ECSClient implements IECSClient {
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
         // TODO
-        //Setup the zookeeper and somehow add the nodes to Collection??
-        Collection<IECSNode> nodes  = ecsInstance.addNodesToHashRing(count);
-        return null;
+        //Setup the zookeeper 
+        //Add nodes to hashRing and set up the hashing 
+        Collection<IECSNode> nodes  = ecsInstance.initAddNodesToHashRing(count);
+        boolean success = true; 
+        for(IECSNode entry: nodes) {
+            //for each node, launch server and set status as stopped
+            if(ecsInstance.launchKVServer(entry, cacheStrategy, cacheSize)) {
+                logger.info("SUCCESS. Launched KVServer :" + entry.getNodeName());
+                if(!ecsInstance.stop(entry))
+                    printError(PROMPT + "Unable to stop KVServer: "+ entry.getNodeName() + " Host: " + entry.getNodeHost()+ " Port: " + entry.getNodePort());
+                else 
+                   logger.info("SUCCESS. KVServer in stopped state:" + entry.getNodeName());
+            } 
+            else {
+                logger.error("ERROR. Unable to launch KVServer :" + entry.getNodeName() + " Host: " + entry.getNodeHost()+ " Port: " + entry.getNodePort());           
+            }
+        }
+        return nodes;
         
     }
 

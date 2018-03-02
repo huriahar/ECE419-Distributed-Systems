@@ -8,6 +8,7 @@ import java.net.Socket;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
+import java.lang.InterruptedException;
 
 import java.io.OutputStream;
 import java.io.InputStream;
@@ -32,14 +33,15 @@ import common.messages.TextMessage;
 import ecs.CreateGroup;
 
 public class ECS {
+    private static final int BUFFER_SIZE = 1024;
+    private static final int DROP_SIZE = 128 * BUFFER_SIZE;
+    private static final int LAUNCH_TIMEOUT = 2000;
+    public static final String metaFile = "metaDataECS.config";            
+    
     private Path configFile;
     private Path metaDataFile;
     private Socket ECSSocket;
 
-    private static final int BUFFER_SIZE = 1024;
-    private static final int DROP_SIZE = 128 * BUFFER_SIZE;
-    public static final String metaFile = "metaDataECS.config";            
-    
     private TreeMap<String, IECSNode> ringNetwork;
     private HashMap<IECSNode, String> availableNodes;
     private static Logger logger = Logger.getRootLogger();
@@ -136,12 +138,15 @@ public class ECS {
             if(response.getMsg().equals("STOP_SUCCESS")) 
                 logger.info("Stop KVServer: " + server.getNodeName() + " <" + server.getNodeHost() + "> <" + 
                 server.getNodePort() + ">"); 
+            else if(response.getMsg().equals("STOP_FAILURE")) { 
+		        logger.error("STOP ERROR for KVServer: " + server.getNodeName());
+                success = false;
+            }
+
         } catch (IOException ex) {
 		    logger.error("STOP ERROR for KVServer: " + server.getNodeName() + ". Error: " +  ex);
             success = false;
         } 
-           
-            
         return success;
     }
 
@@ -152,16 +157,48 @@ public class ECS {
         return false;
     }
 
+    public void updateMetaData(ArrayList<String> data) throws IOException {
+        Files.write(metaDataFile,data, StandardCharsets.UTF_8);
+    }
+        
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
         // TODO
         //Add a node in own metadata, reassign hashing and send a TextMessage to all Servers 
         // to update their metaData (UPDATE_METADATA)
-        return null;
+        IECSNode node = new ECSNode();     
+        try { 
+            //Initialize own hashRing
+            ArrayList<String> metaDataContent = new ArrayList<String>();
+            for(Map.Entry<IECSNode, String> entry : availableNodes.entrySet()) {
+                if(entry.getValue().equals("AVAILABLE")) {
+                    //Add the server to the ringNetwork and update HashMap 
+                    entry.setValue("TAKEN");
+                    node = entry.getKey();
+                    String serverHash = md5.encode(node.getNodeName() + "\\" +KVConstants.DELIM +
+                                               node.getNodeHost() + "\\" +KVConstants.DELIM +
+                                               node.getNodePort());
+                    ringNetwork.put(serverHash, node);
+                    //Prepare writable content to write to metaDatafile    
+                    //TODO double check that data per server is written separate lines 
+                    metaDataContent.add(node.getNodeName() + "\\" +KVConstants.DELIM + node.getNodeHost() + "\\" + KVConstants.DELIM + node.getNodePort() + "\\" + KVConstants.DELIM
+                                        + node.getNodeHashRange()[0] + "\\" + KVConstants.DELIM + node.getNodeHashRange()[1]);     
+
+                }
+            } 
+            //Once all nodes are added, write to metaDataFile
+            updateMetaData(metaDataContent);
+
+        } catch (IOException io) {
+            logger.error("Unable to write to metaDataFile"); 
+        }
+        //Other errors ??
+        return node; 
     }
 
-    public Collection<IECSNode> addNodesToHashRing(int numNodes) {
+    public Collection<IECSNode> initAddNodesToHashRing(int numNodes) {
         Collection<IECSNode> chosenNodes = new ArrayList<IECSNode>();     
         int counter = 0;
+    
         try { 
             //Initialize own hashRing
             ArrayList<String> metaDataContent = new ArrayList<String>();
@@ -169,13 +206,16 @@ public class ECS {
                 if(counter < numNodes) {
                     if(entry.getValue().equals("AVAILABLE")) {
                         counter++;
-                        //Add the server to the ringNetwork and update HashMap 
                         entry.setValue("TAKEN");
                         IECSNode node = entry.getKey();
                         String serverHash = md5.encode(node.getNodeName() + "\\" +KVConstants.DELIM +
                                                    node.getNodeHost() + "\\" +KVConstants.DELIM +
                                                    node.getNodePort());
+                        //Setup begin and end hashing for server 
+                        node = updateHash(serverHash, node);   
+                        //Add node to ringNetwork
                         ringNetwork.put(serverHash, node);
+                
                         //Prepare writable content to write to metaDatafile    
                         //TODO double check that data per server is written separate lines 
                         metaDataContent.add(node.getNodeName() + "\\" +KVConstants.DELIM + node.getNodeHost() + "\\" + KVConstants.DELIM + node.getNodePort() + "\\" + KVConstants.DELIM
@@ -187,13 +227,58 @@ public class ECS {
                 }
             } 
             //Once all nodes are added, write to metaDataFile
-            Files.write(metaDataFile, metaDataContent, StandardCharsets.UTF_8);
+            updateMetaData(metaDataContent);
         } catch (IOException io) {
             logger.error("Unable to write to metaDataFile"); 
         }
         //Other errors ??
         
         return chosenNodes; 
+    }
+
+
+    public IECSNode updateHash(String nodeHash, IECSNode node) {
+        
+        IECSNode prevNode = new ECSNode(), currNode = new ECSNode(), nextNode = new ECSNode();
+        String eHash  = nodeHash;
+
+        if(ringNetwork.isEmpty()) // Only one in network, so start and end are yours
+            node.setNodeBeginHash(eHash);
+        else if(ringNetwork.containsKey(nodeHash)) {
+            logger.error("ERROR KVServer already in ringNetwork");
+            return null;
+        }
+        else if(ringNetwork.higherKey(nodeHash) == null) {// the current hash is the highest value
+            prevNode = ringNetwork.firstEntry().getValue();
+            currNode.setNodeBeginHash(prevNode.getNodeHashRange()[0]);   //prevNode authority only goes as far currently added node                     
+            prevNode.setNodeBeginHash(nodeHash);
+        }
+        else { //currNode is at beginning or in between
+            nextNode = ringNetwork.higherEntry(nodeHash).getValue();
+            currNode.setNodeBeginHash(nextNode.getNodeHashRange()[0]);
+            nextNode.setNodeBeginHash(nodeHash);
+        }
+        return currNode; 
+    }
+
+    public boolean launchKVServer(IECSNode node, String cacheStrategy, int cacheSize) {
+        //TODO SSH stuff initializing with server's own name and port
+        boolean success = true;
+        Process proc; 
+        Runtime run = Runtime.getRuntime();
+        try {
+            proc = run.exec("script.sh"/*Script*/);
+            Thread.sleep(LAUNCH_TIMEOUT);
+
+        } catch (InterruptedException ex) {
+            logger.error("ERROR: KVServer Thread unable to sleep");
+            success = false;
+        } catch (IOException io) {
+            logger.error("ERROR: KVServer IOException: " + io);
+        }
+
+        logger.info("KVServer process initiated successfully");
+        return success;
     }
 
     public Collection<IECSNode> connectToZk(int count, String cacheStrategy, int cacheSize) {
