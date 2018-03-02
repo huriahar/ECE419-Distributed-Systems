@@ -8,6 +8,10 @@ public class ECSNode implements IECSNode{
     public ECSNode(String name, String addr, int port, String bHash, String eHash) {
         this.meta = new ServerMetaData(name, addr, port, bHash, eHash);
     }
+
+    public ECSNode(String dataStr) {
+        this.meta = new ServerMetaData(dataStr);
+    }
    
     public ECSNode() {
     } 

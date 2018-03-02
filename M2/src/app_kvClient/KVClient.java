@@ -128,6 +128,9 @@ public class KVClient implements IKVClient {
                                 logger.error(reply.getStatusString() + " with <key, value>: <" +
                                     reply.getKey() + ", " + reply.getValue() + ">");
                             }
+                            else if (status == KVMessage.StatusType.SERVER_STOPPED) {
+                                System.out.println(PROMPT + "SERVER_STOPPED! Server not accepting any requests at the moment.");
+                            }
                             else {
                                 System.out.println(PROMPT + "Invalid Message Type from server!");
                                 logger.error("Invalid Message Type from server!");
@@ -285,9 +288,9 @@ public class KVClient implements IKVClient {
         }
         catch (Exception ex) {
             printError("Unable to establish connection with " + hostname + 
-                "at port " + port);
+                " at port " + port);
             logger.error("Unable to establish connection with " + hostname + 
-                "at port " + port);
+                " at port " + port);
         }
         clientStore.addListener(this);
     }

@@ -8,17 +8,20 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
+import java.net.UnknownHostException;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
-import java.util.LinkedList;
-import java.util.ArrayList;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 import logger.LogSetup;
@@ -26,26 +29,31 @@ import logger.LogSetup;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import common.md5;
 import common.KVConstants;
 import common.ServerMetaData;
-import common.md5;
+import common.messages.TextMessage;
 import cache.IKVCache.CacheStrategy;
 import cache.KVCache;
+import client.KVStore;
 
 public class KVServer implements IKVServer, Runnable {
 
 	private static Logger logger = Logger.getRootLogger();
-    private int serverPort;
-    private int serverIP;
-    private int zkPort;
+    //Server tools
     private ServerSocket serverSocket;
     private KVCache cache;
-    private boolean running;
-    private String KVServerName;
-    private String zkHostname;
-    private boolean locked;
+    //Metadata
     private ServerMetaData metadata;
     private Path metaDataFile;
+    private String serverFilePath;
+    //State
+    private boolean running = false;
+    private boolean writeLocked = true;     //start in a stopped state
+    private boolean readLocked = true;      //start in a stopped state
+    //Default values
+    private static final String UNSET_ADDR = null;
+    private static final String DEFAULT_CACHE = "FIFO";
     /**
 	 * Start KV Server with selected name
 	 * @param name			unique name of server
@@ -53,20 +61,17 @@ public class KVServer implements IKVServer, Runnable {
 	 * @param zkPort		port where zookeeper is running
 	 */
 	public KVServer(String name, String zkHostname, int zkPort) {
-		// TODO Auto-generated method stub
-        this.KVServerName = name;
-        this.zkHostname = zkHostname;
-        this.zkPort = zkPort;
-        // TODO: Figure out how to get cache parameters
-        // TODO: Figure out how to get own server port and name and addr/ip
+        this.metadata = new ServerMetaData(name, UNSET_ADDR, zkPort, KVConstants.MIN_HASH, KVConstants.MIN_HASH);
+        this.serverFilePath = "SERVER_" + Integer.toString(metadata.port);
+        this.cache = new KVCache(0, DEFAULT_CACHE);
 	}
 
 	public int getPort(){
-        return this.serverPort;
+        return this.metadata.port;
 	}
 
 	public String getHostname(){
-        return this.KVServerName;
+        return this.metadata.name;
 	}
 
 	public CacheStrategy getCacheStrategy(){
@@ -77,10 +82,12 @@ public class KVServer implements IKVServer, Runnable {
         return this.cache.getCacheSize();
 	}
 
-	public boolean inStorage(String key){
-        //TODO check if server is responsible for key
+    public void setupCache(int size, String strategy) {
+        this.cache = new KVCache(size, strategy);
+    }
+
+	public boolean inStorage(String key) {
         if (inCache(key)) return true;
-        // We need to check if key is in permanent disk storage as well!
 		String value = "";
 		try {
 			value = onDisk(key);
@@ -113,11 +120,10 @@ public class KVServer implements IKVServer, Runnable {
 	}
 
     public void putKV(String key, String value) throws Exception{
-        //TODO check that server is responsible for key
-        if(!isResponsible(key)) return;
+        if(!isResponsible(key) || isWriteLocked()) return;
         this.cache.insert(key, value);
-		storeKV(key, value);
         this.cache.print();
+		storeKV(key, value);
 	}
 
     public void clearCache(){
@@ -127,7 +133,7 @@ public class KVServer implements IKVServer, Runnable {
     public void clearStorage(){
         clearCache();
 
-        File file = new File(this.KVServerName);
+        File file = new File(this.serverFilePath);
         file.delete();
 	}
 
@@ -138,7 +144,6 @@ public class KVServer implements IKVServer, Runnable {
 	@Override
     public void run(){
         running = initializeServer();
-        this.serverPort = serverSocket.getLocalPort();
 
         if (serverSocket != null) {
             while(isRunning()){
@@ -169,15 +174,25 @@ public class KVServer implements IKVServer, Runnable {
         //TODO a server should be initialized with zookeeper information now
         logger.info("Initialize server ...");
         try {
-            serverSocket = new ServerSocket(serverPort);
+            serverSocket = new ServerSocket(this.metadata.port);
             logger.info("Server listening on port: " 
                     + serverSocket.getLocalPort());    
+            //set serverName
+            /*
+            try {
+                //TODO is this correct?
+                this.KVServerName = serverSocket.getInetAddress().getLocalHost().getHostAddress();
+            }
+            catch (UnknownHostException ex) {
+                logger.error("Unknown Host! Unable to get Hostname");
+            }
+            */
             return true;
         }
         catch (IOException e) {
             logger.error("Error! Cannot open server socket:");
             if (e instanceof BindException) {
-                logger.error("Port " + serverPort + " is already bound!");
+                logger.error("Port " + this.metadata.port + " is already bound!");
             }
             return false;
         }
@@ -190,7 +205,7 @@ public class KVServer implements IKVServer, Runnable {
             serverSocket.close();
         }
         catch (IOException ex) {
-            logger.error("Error! Unable to close socket on port: " + serverPort, ex);
+            logger.error("Error! Unable to close socket on port: " + metadata.port, ex);
         }
 	}
 
@@ -202,22 +217,25 @@ public class KVServer implements IKVServer, Runnable {
             serverSocket.close();
         }
         catch (IOException ex) {
-            logger.error("Error! Unable to close socket on port: " + serverPort, ex);
+            logger.error("Error! Unable to close socket on port: " + metadata.port, ex);
         }
 	}
 
     public String onDisk(String key) throws IOException {
 
 		String value = "";
-		String key_val, get_value;;
-		String filePath  = this.KVServerName;
+		String key_val, get_value;
+		String filePath  = this.serverFilePath;
 		BufferedReader br = null;
 		String KVPair;
 		try {
+            logger.info("before creating file");
 			File file = new File(filePath);
+            logger.info("after creating file");
 			
 			FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
 			FileLock lock = channel.lock();			
+            logger.info("after lock");
 
 			try {
 				lock = channel.tryLock();
@@ -225,6 +243,7 @@ public class KVServer implements IKVServer, Runnable {
     		} catch (OverlappingFileLockException e) {
 				 //System.out.println("Overlapping File Lock Error: " + e.getMessage());
             }
+            logger.info("after lock2");
 
 		    if(!file.exists()) {
 				System.out.println("File not found");
@@ -271,11 +290,17 @@ public class KVServer implements IKVServer, Runnable {
 		return value;		
 	}
 
+	@Override
+	public void deleteKV(String key) throws Exception {
+        putKV(key, null);		
+	}
+
+
     public void storeKV(String key, String value) throws IOException {
 
         //TODO : Cache it in KVServer
 
-		String filePath  = this.KVServerName;
+		String filePath  = this.serverFilePath;
 		BufferedWriter wr  = null;
 		PrintWriter pw = null;
 		boolean toBeDeleted = false; 
@@ -344,7 +369,7 @@ public class KVServer implements IKVServer, Runnable {
 
 		String key_val;
 		String KVPair;
-		String filePath  = this.KVServerName; 
+		String filePath  = this.serverFilePath; 
 		StringBuffer stringBuffer = new StringBuffer();			
 		BufferedReader br = null;
 		BufferedWriter wr  = null;
@@ -420,13 +445,16 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public boolean isResponsible(String key) {
+        return true;
+        /*
         String encodedKey = md5.encode(key);
         return ((encodedKey.compareTo(metadata.bHash) >= 0  && encodedKey.compareTo(metadata.eHash) < 0) ||
                (encodedKey.compareTo(metadata.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0) ||
                (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(metadata.eHash) < 0));
+        */
     }
 
-    public String getMetaDataStr() {
+    public String getMetaDataFromFile() {
         StringBuilder marshalledData = new StringBuilder();
         try {
             ArrayList<String> metaData = new ArrayList<>(Files.readAllLines(this.metaDataFile,
@@ -436,58 +464,73 @@ public class KVServer implements IKVServer, Runnable {
             }
         } catch (IOException e) {
             marshalledData.append("METADATA_FETCH_ERROR");
+            logger.error("METADATA_FETCH_ERROR could not fetch meta data");
         }
         return marshalledData.toString();
     }
 
-    //TODO serverIP and port and name??
-    public void setRange(String metaDataStr) {
-        String[] metaDataLines = metaDataStr.split(KVConstants.NEWLINE_DELIM);
+    public String getMetaDataByName(String name) {
+        String[] metaDataLines = getMetaDataFromFile().split(KVConstants.NEWLINE_DELIM);
         for(String line: metaDataLines) {
-            String[] data = line.split(KVConstants.DELIM);
-            if (data[ServerMetaData.SERVER_NAME].equals(KVServerName) &&
-                data[ServerMetaData.SERVER_IP].equals(serverIP) &&
-                data[ServerMetaData.SERVER_PORT].equals(serverPort)) {
-                
-                metadata.setBeginHash(data[ServerMetaData.BEGIN_HASH]); 
-                metadata.setEndHash(data[ServerMetaData.END_HASH]); 
-                logger.info("Set KVServer (" + KVServerName + ", " + serverIP + ", " + serverPort + ") " +
-                            "\nStart hash to: " + metadata.bHash + "\nEnd hash to: " + metadata.eHash);
-                break;
+            String[] data = line.split("\\" + KVConstants.DELIM);
+            //TODO serverIP and port and name??
+            if (data[ServerMetaData.SERVER_NAME].equals(name)) {
+                return String.join(KVConstants.DELIM, data);
             }
         }
+        logger.error("Error: could not find metadata for server \"" + name + "\"");
+        return null;
+    }
 
+    public void updateMetaData() {
+        metadata = new ServerMetaData(getMetaDataByName(getHostname()));
+        logger.info("Set KVServer (" + metadata.name + ", " + metadata.addr + ", " + metadata.port + ") " +
+                    "\nStart hash to: " + metadata.bHash + "\nEnd hash to: " + metadata.eHash);
     }
 
 	@Override
 	public void start() {
 		// TODO Starts the KVServer, all client requests and all ECS requests are processed.
+        writeLocked = false;
+        readLocked = false;
 	}
 
     @Override
     public void stop() {
 		// TODO Stops the KVServer, all client requests are rejected and only ECS requests are processed
+        writeLocked = true;
+        readLocked = true;
 	}
 
     @Override
     public void shutdown() {
 		// TODO Exits the KVServer application.
+        writeLocked = true;
+        readLocked = true;
+        running = false;
+        this.close();
 	}
 
     @Override
     public void lockWrite() {
-		// TODO Lock the KVServer for write operations.
-        this.locked = true;
+        this.writeLocked = true;
 	}
 
     @Override
     public void unlockWrite() {
-		// TODO Unlock the KVServer for write operations.
-        this.locked = false;
+        this.writeLocked = false;
 	}
 
     public boolean isWriteLocked() {
-        return this.locked;
+        return this.writeLocked;
+    }
+
+    public boolean isReadLocked() {
+        return this.readLocked;
+    }
+
+    public boolean isStopped() {
+        return (this.isWriteLocked() && this.isReadLocked());
     }
 
     @Override
@@ -495,6 +538,27 @@ public class KVServer implements IKVServer, Runnable {
 		// TODO Transfer a subset (range) of the KVServer's data to another KVServer (reallocation before
         // removing this server or adding a new KVServer to the ring); send a notification to the ECS,
         // if data transfer is completed.
+        StringBuilder toSend = new StringBuilder();
+        try {
+            Path serverPath = Paths.get(this.serverFilePath);
+            ArrayList<String> keyValuePairs = new ArrayList<>(Files.readAllLines(serverPath,
+                                                         StandardCharsets.UTF_8));
+            for(String line : keyValuePairs) {
+                String[] kvp = line.split("\\" + KVConstants.DELIM);
+                if(!isResponsible(kvp[0])) {
+                    toSend.append(line + KVConstants.NEWLINE_DELIM);
+                }
+            }
+        } catch (IOException e) {
+            logger.error("ERROR while moving data from server to target server" + targetName);
+        }
+        
+        //Send to receiving server
+        ServerMetaData targetMeta = new ServerMetaData(getMetaDataByName(targetName));
+        KVStore sender = new KVStore(targetMeta.addr, targetMeta.port);
+        sender.connect();
+        sender.sendMessage(new TextMessage(toSend.toString()));
+        sender.disconnect();
 		return false;
 	}
 
@@ -508,18 +572,12 @@ public class KVServer implements IKVServer, Runnable {
             new LogSetup("logs/server.log", Level.ALL);
             if(args.length < 2 || args.length > 3) {
                 System.out.println("Error! Invalid number of arguments!");
-                System.out.println("Usage: Server <port> <cacheSize> [<replacementPolicy>]!");
+                System.out.println("Usage: Server <name> <port>!");
             }
             else {
-                int port = Integer.parseInt(args[0]);
-                int cacheSize = Integer.parseInt(args[1]);
-                String replacementPolicy = "";
-                // Cache Replacement policy is supplied
-                if (args.length == 3) {
-                    replacementPolicy = args[2];
-                }
-                //TODO create new KVServer object here!
-                //new KVServer(port, cacheSize, replacementPolicy).start();
+                String name = args[0];
+                int port = Integer.parseInt(args[1]);
+                new KVServer(name, "zoo", port).run();
             }
         }
         catch (IOException e) {
@@ -528,15 +586,10 @@ public class KVServer implements IKVServer, Runnable {
             System.exit(1);
         }
         catch (NumberFormatException nfe) {
-            System.out.println("Error! Invalid argument <port> or <cacheSize>! Not a number!");
-            System.out.println("Usage: Server <port> <cacheSize> [<replacementPolicy>]!");
+            System.out.println("Error! Invalid argument <port>! Not a number!");
+            System.out.println("Usage: Server <name> <port>!");
             System.exit(1);
         }
     }
 
-	@Override
-	public void deleteKV(String key) throws Exception {
-		// TODO Auto-generated method stub
-		
-	}
 }

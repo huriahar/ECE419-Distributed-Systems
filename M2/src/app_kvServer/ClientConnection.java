@@ -7,6 +7,7 @@ import java.net.Socket;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.TreeMap;
+import java.util.Arrays;
 import cache.KVCache;
 import common.messages.TextMessage;
 import common.KVConstants;
@@ -33,7 +34,6 @@ public class ClientConnection implements Runnable {
     private static final int MAX_KEY_LENGTH = 20; 
     private static final int MAX_VALUE_LENGTH = 122880; //120KB
     private static final int DROP_SIZE = 128 * BUFFER_SIZE;
-    private TreeMap<String, ServerMetaData> ringNetwork;
     
     private Socket clientSocket;
     private KVServer server;
@@ -84,13 +84,22 @@ public class ClientConnection implements Runnable {
                         sendMessage(new TextMessage("SERVER_NOT_RESPONSIBLE"));
                         TextMessage getMetaData = receiveMessage();
                         if(getMetaData.getMsg().equals("GET_METADATA")) {
-                            sendMessage(new TextMessage(server.getMetaDataStr()));
+                            sendMessage(new TextMessage(server.getMetaDataFromFile()));
                         } else {
                             logger.info("ERROR!!! EXPECTED TO RECEIVE GET_METADATA MSG!!");
                         }
                         continue;
                     }
-
+                    if (command.equals("ECS")) {
+                        String[] ecsCmd = Arrays.copyOfRange(msgContent, 1, msgContent.length);
+                        handleECSCmd(ecsCmd);
+                        continue;
+                    }
+                    if (server.isStopped()){
+                        sendMessage(new TextMessage("SERVER_STOPPED"));
+                        logger.info("SERVER_STOPPED cannot handle client requests at the moment.");
+                        continue;
+                    }
                     if (command.equals("PUT")) {
                         if(server.isWriteLocked()){
                             sendMessage(new TextMessage("SERVER_WRITE_LOCK"));
@@ -100,7 +109,9 @@ public class ClientConnection implements Runnable {
                         handlePutCmd(key, value);
                     }
                     else if (command.equals("GET")) {
-                        handleGetCmd(key);
+                        if(!server.isReadLocked()) {
+                            handleGetCmd(key);
+                        }
                     }
                     else {
                         logger.error("Received invalid message type from client.");
@@ -157,6 +168,49 @@ public class ClientConnection implements Runnable {
         return result;
     }
 
+    private void handleECSCmd (String[] msg) {
+        try {
+            switch(msg[0]) {
+                case "SETUP_NODE":
+                    int cacheSize = Integer.parseInt(msg[1]);
+                    server.setupCache(cacheSize, msg[2]);
+                    sendMessage(new TextMessage("SETUP_SUCCESS"));
+                    return;
+                case "START_NODE":
+                    server.start();
+                    sendMessage(new TextMessage("START_SUCCESS"));
+                    return;
+                case "STOP_NODE":
+                    server.stop();
+                    sendMessage(new TextMessage("STOP_SUCCESS"));
+                    return;
+                case "SHUTDOWN_NODE":
+                    server.shutdown();
+                    sendMessage(new TextMessage("SHUTDOWN_SUCCESS"));
+                    return;
+                case "UPDATE_METADATA":
+                    server.updateMetaData();
+                    //targetRange in msg[1], msg[2]
+                    String[] targetRange = Arrays.copyOfRange(msg, 1, 2);
+                    String targetName = msg[3];
+                    boolean success = server.moveData(targetRange, targetName);
+                    if(success) {
+                        sendMessage(new TextMessage("UPDATE_SUCCESS"));
+                    } else {
+                        sendMessage(new TextMessage("UPDATE_FAILED"));
+                    }
+                    return;
+                default:
+                    logger.error("Unknown ECS cmd!");
+                    return;
+            } 
+        }
+        catch (Exception ex) {
+            logger.error("ERROR! could not send ACK back to ECS!");
+        }
+
+    }
+
     private void handlePutCmd (String key, String value) {
         String result = "PUT_ERROR";
 
@@ -165,8 +219,11 @@ public class ClientConnection implements Runnable {
             // If Value is not null or empty, insert in $ and disk
             if (value != null && !value.equals("") && !value.equals("null")) {
                 try {
+                    logger.info("before storage check");
                     result = (server.inStorage(key)) ? "PUT_UPDATE" : "PUT_SUCCESS";
+                    logger.info("after storage check");
                     server.putKV(key, value);
+                    logger.info("after putkv");
                     logger.info("Success " + result + " with key " + key + " and value " 
                         + value + " on server");
                 }

@@ -144,6 +144,7 @@ public class KVStore implements KVCommInterface {
         
         // step 4 - retry put if possible
         switch(kvreply.getStatus()){
+            //TODO if server is stopped, do you return PUT/GET failed or SERVER_STOPPED?
             case SERVER_NOT_RESPONSIBLE:
                 kvreply = retryRequest(key, value, KVConstants.PUT_CMD);
             default:
@@ -166,7 +167,7 @@ public class KVStore implements KVCommInterface {
 
         // step 3 - get the server's response and forward it to the client
         TextMessage reply = receiveMessage();
-        String[] tokens = (reply.getMsg()).split("\\|");
+        String[] tokens = (reply.getMsg()).split("\\" + KVConstants.DELIM);
         String getStatus = tokens[0];
         
         if (tokens.length < 2) {
@@ -228,17 +229,13 @@ public class KVStore implements KVCommInterface {
         String[] dataEntries = marshalledData.split(KVConstants.NEWLINE_DELIM);
 
         for(int i = 0; i < dataEntries.length ; i++) {
-            String[] line = dataEntries[i].split(KVConstants.DELIM);
+            String[] line = dataEntries[i].split("\\" + KVConstants.DELIM);
 
-            String serverHash = md5.encode(line[ServerMetaData.SERVER_NAME] + 
-                                                KVConstants.DELIM + line[ServerMetaData.SERVER_IP] + 
-                                                KVConstants.DELIM + line[ServerMetaData.SERVER_PORT]);
+            ServerMetaData meta = new ServerMetaData(dataEntries[i]);
+            String serverHash = md5.encode(meta.name + KVConstants.DELIM +
+                                           meta.addr + KVConstants.DELIM +
+                                           meta.port);
 
-            ServerMetaData meta = new ServerMetaData(line[ServerMetaData.SERVER_NAME],
-                                                     line[ServerMetaData.SERVER_IP],
-                                                     Integer.parseInt(line[ServerMetaData.SERVER_PORT]),
-                                                     line[ServerMetaData.BEGIN_HASH],
-                                                     line[ServerMetaData.BEGIN_HASH]);
             this.ringNetwork.put(serverHash, meta);
         }
     }

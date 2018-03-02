@@ -30,8 +30,6 @@ import org.apache.zookeeper.ZooKeeper;
 import common.*;
 import common.messages.TextMessage;
 
-import ecs.CreateGroup;
-
 public class ECS {
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 128 * BUFFER_SIZE;
@@ -73,8 +71,7 @@ public class ECS {
             int numServers = lines.size();		
             
             for (int i = 0; i < numServers ; ++i) {
-                String[] line = lines.get(i).split("\\" + KVConstants.DELIM);
-                IECSNode node = new ECSNode(line[ServerMetaData.SERVER_NAME], line[ServerMetaData.SERVER_IP], Integer.parseInt(line[ServerMetaData.SERVER_PORT]), line[ServerMetaData.BEGIN_HASH], line[ServerMetaData.END_HASH]);
+                IECSNode node = new ECSNode(lines.get(i));
                 String status = "AVAILABLE";
                 allAvailableNodes.put(node, status);
             }    
@@ -89,11 +86,10 @@ public class ECS {
         int numServers = lines.size();		
         
         for (int i = 0; i < numServers ; ++i) {
-            String[] line = lines.get(i).split("\\" + KVConstants.DELIM);
-            String serverHash = md5.encode(line[ServerMetaData.SERVER_NAME] + "\\" + KVConstants.DELIM +
-                                           line[ServerMetaData.SERVER_IP] + "\\" + KVConstants.DELIM +
-                                           line[ServerMetaData.SERVER_PORT]);
-            IECSNode node = new ECSNode(line[ServerMetaData.SERVER_NAME], line[ServerMetaData.SERVER_IP], Integer.parseInt(line[ServerMetaData.SERVER_PORT]), line[ServerMetaData.BEGIN_HASH], line[ServerMetaData.END_HASH]);
+            IECSNode node = new ECSNode(lines.get(i));
+            String serverHash = md5.encode(node.getNodeName() + KVConstants.DELIM +
+                                           node.getNodeHost() + KVConstants.DELIM +
+                                           node.getNodePort());
             this.ringNetwork.put(serverHash, node);
         }
     }
@@ -107,7 +103,7 @@ public class ECS {
         TextMessage message, response; 
             
         try { 
-            message = new TextMessage("ECS" + "\\" + KVConstants.DELIM + "START_NODE");
+            message = new TextMessage("ECS" + KVConstants.DELIM + "START_NODE");
             response = sendNodeMessage(message, node);
             if(response.getMsg().equals("START_SUCCESS")) 
                 logger.info("Started KVServer: " + node.getNodeName() + " <" + node.getNodeHost() + "> <" + 
@@ -125,7 +121,7 @@ public class ECS {
         TextMessage message, response; 
         
         try { 
-            message = new TextMessage("ECS" + "\\" + KVConstants.DELIM + "STOP_NODE");
+            message = new TextMessage("ECS"  + KVConstants.DELIM + "STOP_NODE");
             response = sendNodeMessage(message, node);
             if(response.getMsg().equals("STOP_SUCCESS")) 
                 logger.info("Stop KVServer: " + node.getNodeName() + " <" + node.getNodeHost() + "> <" + 
@@ -157,7 +153,7 @@ public class ECS {
     }
        
     public void alertMetaDataUpdate() {
-        TextMessage message = new TextMessage("ECS" + "\\" + KVConstants.DELIM + "UPDATE_METADATA");
+        TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_METADATA");
         TextMessage response;
         IECSNode node = new ECSNode();
         for(Map.Entry<String, IECSNode> entry: ringNetwork.entrySet()) {
@@ -189,8 +185,8 @@ public class ECS {
                     //Add the server to the ringNetwork and update HashMap 
                     entry.setValue("TAKEN");
                     node = entry.getKey();
-                    String serverHash = md5.encode(node.getNodeName() + "\\" + KVConstants.DELIM +
-                                               node.getNodeHost() + "\\" + KVConstants.DELIM +
+                    String serverHash = md5.encode(node.getNodeName() +  KVConstants.DELIM +
+                                               node.getNodeHost() + KVConstants.DELIM +
                                                node.getNodePort());
                     //Update the hashing for all servers in the ring
                     node = updateHash(serverHash, node);
@@ -199,8 +195,8 @@ public class ECS {
 
                     //Prepare writable content to write to metaDatafile    
                     //TODO double check that data per server is written separate lines 
-                    metaDataContent.add(node.getNodeName() + "\\" + KVConstants.DELIM + node.getNodeHost() + "\\" + KVConstants.DELIM + node.getNodePort() + "\\" + KVConstants.DELIM
-                                        + node.getNodeHashRange()[0] + "\\" + KVConstants.DELIM + node.getNodeHashRange()[1]);     
+                    metaDataContent.add(node.getNodeName() + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM
+                                        + node.getNodeHashRange()[0] + KVConstants.DELIM + node.getNodeHashRange()[1]);     
 
                 }
             } 
@@ -227,8 +223,8 @@ public class ECS {
                         counter++;
                         entry.setValue("TAKEN");
                         IECSNode node = entry.getKey();
-                        String serverHash = md5.encode(node.getNodeName() + "\\" + KVConstants.DELIM +
-                                                   node.getNodeHost() + "\\" + KVConstants.DELIM +
+                        String serverHash = md5.encode(node.getNodeName() + KVConstants.DELIM +
+                                                   node.getNodeHost() + KVConstants.DELIM +
                                                    node.getNodePort());
                         //Setup begin and end hashing for server 
                         node = updateHash(serverHash, node);   
@@ -237,8 +233,8 @@ public class ECS {
                 
                         //Prepare writable content to write to metaDatafile    
                         //TODO double check that data per server is written separate lines 
-                        metaDataContent.add(node.getNodeName() + "\\" + KVConstants.DELIM + node.getNodeHost() + "\\" + KVConstants.DELIM + node.getNodePort() + "\\" + KVConstants.DELIM
-                                            + node.getNodeHashRange()[0] + "\\" + KVConstants.DELIM + node.getNodeHashRange()[1]);      
+                        metaDataContent.add(node.getNodeName() + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM
+                                            + node.getNodeHashRange()[0] + KVConstants.DELIM + node.getNodeHashRange()[1]);      
 
                         //Add chosen node to collection
                         chosenNodes.add(node);
@@ -257,7 +253,7 @@ public class ECS {
 
     public Collection<IECSNode> setupNodesCacheConfig(int count, String cacheStrategy, int cacheSize) {
         Collection<IECSNode> nodes = new ArrayList<IECSNode>();
-        TextMessage message = new TextMessage("ECS" + "\\" + KVConstants.DELIM + "SETUP_NODE" + "\\" + KVConstants.DELIM + cacheStrategy + "\\" + KVConstants.DELIM + cacheSize); 
+        TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "SETUP_NODE" + KVConstants.DELIM + cacheStrategy + KVConstants.DELIM + cacheSize); 
         TextMessage response;
         for(Map.Entry<String, IECSNode> entry: ringNetwork.entrySet()) {
             IECSNode node = entry.getValue();

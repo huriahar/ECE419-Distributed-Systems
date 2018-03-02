@@ -8,7 +8,7 @@ public class ServerMetaData {
     public String eHash;
 
     public static final int SERVER_NAME = 0;
-    public static final int SERVER_IP = 1;
+    public static final int SERVER_ADDR = 1;
     public static final int SERVER_PORT = 2;
     public static final int BEGIN_HASH = 3;
     public static final int END_HASH = 4;
@@ -21,8 +21,21 @@ public class ServerMetaData {
         this.eHash = eHash;
     }
 
+    public ServerMetaData(String dataStr) {
+        String[] data = dataStr.split("\\" + KVConstants.DELIM);
+        this.name = data[SERVER_NAME];
+        this.addr = data[SERVER_ADDR];
+        this.port = Integer.parseInt(data[SERVER_PORT]);
+        this.bHash = data[BEGIN_HASH];
+        this.eHash = data[END_HASH];
+    }
+
     public ServerMetaData(String name, String addr, int port) {
         this(name, addr, port, null, null);
+    }
+
+    public void setAddr(String addr) {
+        this.addr = addr;
     }
 
     public void setBeginHash(String s) {
@@ -32,5 +45,6 @@ public class ServerMetaData {
     public void setEndHash(String s) {
         this.eHash = s;
     }
+
 }
 
