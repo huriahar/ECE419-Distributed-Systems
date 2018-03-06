@@ -326,24 +326,24 @@ public class ECS implements IECS {
         return nodes;
     }
 
-    public IECSNode updateHash(String nodeHash, IECSNode node) {
+    public IECSNode updateHash(String nodeHash, IECSNode currNode) {
     	
-    	assert node != null;
+    	assert currNode != null;
         
-        IECSNode prevNode = new ECSNode(), currNode = new ECSNode(), nextNode = new ECSNode();
+        IECSNode prevNode = new ECSNode(), nextNode = new ECSNode();
         String eHash = nodeHash;
 
         // Only one in network, so start and end are yours
         if(ringNetwork.isEmpty()) {
-            node.setNodeBeginHash(eHash);
-            node.setNodeEndHash(eHash);
-            return node;
+            currNode.setNodeBeginHash(eHash);
+            currNode.setNodeEndHash(eHash);
+            return currNode;
         }
         else if(ringNetwork.containsKey(nodeHash)) {
             logger.error("ERROR KVServer already in ringNetwork");
             return null;
         }
-        else if(ringNetwork.higherKey(nodeHash) == null) {// the current hash is the highest value
+        if(ringNetwork.higherKey(nodeHash) == null) {// the current hash is the highest value
             prevNode = ringNetwork.firstEntry().getValue();
             currNode.setNodeBeginHash(prevNode.getNodeHashRange()[0]);   //prevNode authority only goes as far currently added node                     
             prevNode.setNodeBeginHash(nodeHash);
@@ -359,10 +359,12 @@ public class ECS implements IECS {
     public boolean launchKVServer(IECSNode node, String cacheStrategy, int cacheSize) {
         //TODO SSH stuff initializing with server's own name and port
         boolean success = true;
-        Process proc; 
+        Process proc;
+ 
         Runtime run = Runtime.getRuntime();
         try {
-            proc = run.exec("script.sh"/*Script*/);
+            String launchCmd = "script.sh " + node.getNodeName() + " " + node.getNodePort();
+            proc = run.exec(launchCmd/*Script*/);
             Thread.sleep(LAUNCH_TIMEOUT);
 
         } catch (InterruptedException ex) {
@@ -370,6 +372,7 @@ public class ECS implements IECS {
             success = false;
         } catch (IOException io) {
             logger.error("ERROR: KVServer IOException: " + io);
+            success = false;
         }
 
         logger.info("KVServer process initiated successfully");
@@ -453,10 +456,10 @@ public class ECS implements IECS {
 
     public TextMessage sendNodeMessage(TextMessage message, IECSNode node) throws IOException {
         TextMessage response = new TextMessage("") ; 
-            connect(node);
-            sendMessage(message);
-            response = receiveMessage();
-            disconnect(node);
+        connect(node);
+        sendMessage(message);
+        response = receiveMessage();
+        disconnect(node);
         return response;
     }
 
@@ -487,6 +490,7 @@ public class ECS implements IECS {
      */
     public void sendMessage(TextMessage msg)
             throws IOException {
+        output = this.ECSSocket.getOutputStream();
         byte[] msgBytes = msg.getMsgBytes();
         output.write(msgBytes, 0, msgBytes.length);
         output.flush();
@@ -503,6 +507,7 @@ public class ECS implements IECS {
         byte[] bufferBytes = new byte[BUFFER_SIZE];
         
         /* read first char from stream */
+        input = this.ECSSocket.getInputStream();
         byte read = (byte) input.read();    
         boolean reading = true;
 

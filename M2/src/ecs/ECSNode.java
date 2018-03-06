@@ -72,6 +72,9 @@ public class ECSNode implements IECSNode{
      * @return  array of two strings representing the low and high range of the hashes that the given node is responsible for
      */
     public void setNodeBeginHash(String bHash) {
+        if(this.meta == null) {
+            System.out.println("this.meta not initialized!");
+        }
         this.meta.bHash = bHash;
     }
 
