@@ -21,13 +21,19 @@ public class ServerMetaData {
         this.eHash = eHash;
     }
 
-    public ServerMetaData(String dataStr) {
-        String[] data = dataStr.split("\\" + KVConstants.DELIM);
+    public ServerMetaData(String dataStr, String delim) {
+        String[] data = dataStr.split(delim);
         this.name = data[SERVER_NAME];
         this.addr = data[SERVER_ADDR];
         this.port = Integer.parseInt(data[SERVER_PORT]);
-        this.bHash = data[BEGIN_HASH];
-        this.eHash = data[END_HASH];
+        if(data.length > 3) {
+            this.bHash = data[BEGIN_HASH];
+            this.eHash = data[END_HASH];
+        }
+    }
+
+    public ServerMetaData(String dataStr) {
+        this(dataStr, "\\" + KVConstants.DELIM);
     }
 
     public ServerMetaData(String name, String addr, int port) {

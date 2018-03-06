@@ -13,8 +13,8 @@ public class ECSNode implements IECSNode{
         this.meta = new ServerMetaData(dataStr);
     }
     
-    public ECSNode(String name, String addr, int port) {
-    	this.meta = new ServerMetaData(name, addr, port);
+    public ECSNode(String data, String delim) {
+    	this.meta = new ServerMetaData(data, delim);
     }
     
     public ECSNode() {

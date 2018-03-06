@@ -81,9 +81,7 @@ public class ECS implements IECS {
             
             
             for (int i = 0; i < numServers ; ++i) {
-            	String[] serverInfo = lines.get(i).split(" ");
-            	int serverPort = Integer.parseInt(serverInfo[2]);
-                IECSNode node = new ECSNode(serverInfo[0], serverInfo[1], serverPort);
+                IECSNode node = new ECSNode(lines.get(i), KVConstants.CONFIG_DELIM);
                 // TODO: Change this to an ENUM
                 String status = "AVAILABLE";
                 allAvailableServers.put(node, status);
