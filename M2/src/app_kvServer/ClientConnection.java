@@ -6,13 +6,9 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.TreeMap;
 import java.util.Arrays;
-import cache.KVCache;
 import common.messages.TextMessage;
 import common.KVConstants;
-import common.ServerMetaData;
-import common.KVConstants.*;
 
 import org.apache.log4j.*;
 
@@ -234,8 +230,8 @@ public class ClientConnection implements Runnable {
                 // Delete the value from $ and disk
                 try {
                     result = (server.inStorage(key)) ? "DELETE_SUCCESS" : "DELETE_ERROR";
-					if(result.equals("DELETE_SUCCESS")) 
-	                    server.deleteKV(key);
+                    if(result.equals("DELETE_SUCCESS")) 
+                        server.deleteKV(key);
                     logger.info("Success " + result + " with key " + key + " on server");
                 }
                 catch (Exception ex) {

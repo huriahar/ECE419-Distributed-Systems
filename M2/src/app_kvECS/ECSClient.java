@@ -47,7 +47,7 @@ public class ECSClient implements IECSClient {
         }
     }
 
-	private void handleCommand (String cmdLine) {
+    private void handleCommand (String cmdLine) {
         String[] tokens = cmdLine.split("\\s+");
 
         switch (tokens[0]) {
@@ -326,7 +326,6 @@ public class ECSClient implements IECSClient {
         //Setup the zookeeper 
         //Add nodes to hashRing and set up the hashing 
         Collection<IECSNode> nodes  = ecsInstance.initAddNodesToHashRing(count);
-        boolean success = true; 
         for(IECSNode entry: nodes) {
             //for each node, launch server and set status as stopped
             if(ecsInstance.launchKVServer(entry, cacheStrategy, cacheSize)) {
@@ -395,7 +394,6 @@ public class ECSClient implements IECSClient {
                 System.out.println("Usage: ecs <ecs.config>");
             }
             else {
-                System.out.println("Config file " + args[0]);
                 String configFile = args[0];
                 ECSClient ECSClientApp = new ECSClient(configFile);
                 ECSClientApp.run();

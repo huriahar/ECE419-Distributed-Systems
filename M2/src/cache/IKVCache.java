@@ -1,8 +1,8 @@
 package cache;
 
 public interface IKVCache {
-	
-	public enum CacheStrategy {
+    
+    public enum CacheStrategy {
         None,
         LRU,
         LFU,

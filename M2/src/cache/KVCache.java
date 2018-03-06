@@ -10,12 +10,12 @@ public class KVCache implements IKVCache {
     }
     
     public static boolean isValidStrategy(String strategy) {
-    	for (CacheStrategy c : CacheStrategy.values()) {
-    		if (c.name().equals(strategy)) {
-    			return true;
-    		}
-    	}
-    	return false;
+        for (CacheStrategy c : CacheStrategy.values()) {
+            if (c.name().equals(strategy)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static KVCache createKVCache(int cacheSize, String strategy) {

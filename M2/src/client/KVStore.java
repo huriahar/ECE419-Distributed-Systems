@@ -15,11 +15,9 @@ import java.util.TreeMap;
 import java.net.UnknownHostException;
 import java.io.IOException;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import common.*;
-import common.ServerMetaData.*;
 import common.messages.*;
 import app_kvClient.*;
 
@@ -193,7 +191,7 @@ public class KVStore implements KVCommInterface {
     }
 
     private KVReplyMessage retryRequest(String key, String value, String request)
-    		throws Exception {
+            throws Exception {
         // step 1 - Update ServerMetaData
         String status = (value == null) ? "DELETE_ERROR" : "PUT_ERROR";
         status = (request.equals(KVConstants.GET_CMD)) ? "GET_ERROR" : status;

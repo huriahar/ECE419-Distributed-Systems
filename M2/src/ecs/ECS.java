@@ -48,27 +48,27 @@ public class ECS {
         
     private ZooKeeper zk;
     
-	public ECS(String configFile) {
+    public ECS(String configFile) {
         this.configFile = Paths.get(configFile);
         this.ringNetwork = new TreeMap<String, IECSNode>();
         try {
             if(!Files.exists(Paths.get(metaFile)))
                 this.metaDataFile = Files.createFile(Paths.get(metaFile));
             else {
-			    this.metaDataFile = Paths.get(metaFile);    
+                this.metaDataFile = Paths.get(metaFile);    
                 populateRingNetwork();
             }
             populateAvailableNodes();
             
-		} catch (IOException e) {
-			logger.error("Unable to open metaDataFile " + e);
-		}
+        } catch (IOException e) {
+            logger.error("Unable to open metaDataFile " + e);
+        }
     }
     
     private void populateAvailableNodes() {
         try {
             ArrayList<String> lines = new ArrayList<>(Files.readAllLines(this.configFile, StandardCharsets.UTF_8));
-            int numServers = lines.size();		
+            int numServers = lines.size();        
             
             for (int i = 0; i < numServers ; ++i) {
                 IECSNode node = new ECSNode(lines.get(i));
@@ -81,9 +81,9 @@ public class ECS {
     }
 
     private void populateRingNetwork()
-    		throws IOException {
+            throws IOException {
         ArrayList<String> lines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
-        int numServers = lines.size();		
+        int numServers = lines.size();        
         
         for (int i = 0; i < numServers ; ++i) {
             IECSNode node = new ECSNode(lines.get(i));
@@ -95,7 +95,7 @@ public class ECS {
     }
 
     public int maxServers() {
-    	return ringNetwork.size();
+        return ringNetwork.size();
     }
 
     public boolean start(IECSNode node) {
@@ -109,7 +109,7 @@ public class ECS {
                 logger.info("Started KVServer: " + node.getNodeName() + " <" + node.getNodeHost() + "> <" + 
                 node.getNodePort() + ">"); 
         } catch(IOException io) {
-		    logger.error("START ERROR for KVServer: " + node.getNodeName() + ". Error: " + io);
+            logger.error("START ERROR for KVServer: " + node.getNodeName() + ". Error: " + io);
             success = false;
         } 
         return success;
@@ -127,12 +127,12 @@ public class ECS {
                 logger.info("Stop KVServer: " + node.getNodeName() + " <" + node.getNodeHost() + "> <" + 
                 node.getNodePort() + ">"); 
             else if(response.getMsg().equals("STOP_FAILURE")) { 
-		        logger.error("STOP ERROR for KVServer: " + node.getNodeName());
+                logger.error("STOP ERROR for KVServer: " + node.getNodeName());
                 success = false;
             }
 
         } catch(IOException ex) {
-		    logger.error("STOP ERROR for KVServer: " + node.getNodeName() + ". Error: " +  ex);
+            logger.error("STOP ERROR for KVServer: " + node.getNodeName() + ". Error: " +  ex);
             success = false;
         } 
         return success;
