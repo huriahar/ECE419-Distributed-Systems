@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.net.Socket;
 
 import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
 import java.lang.InterruptedException;
 
 import java.io.OutputStream;
@@ -15,19 +14,15 @@ import java.io.InputStream;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import java.math.BigInteger;
 import java.util.Collection;
-import java.util.concurrent.CountDownLatch;
 
 import org.apache.log4j.Logger;
 import java.lang.Process;
 
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooKeeper;
 
 import common.*;
 import common.messages.TextMessage;
@@ -43,7 +38,7 @@ public class ECS implements IECS {
     private Socket ECSSocket;
 
     private TreeMap<String, IECSNode> ringNetwork;
-    // IECSNode and status {"Available", "Taken"}
+    // IECSNode and status {"Available", "Taken"} - TODO: Convert to an ENUM
     private HashMap<IECSNode, String> allAvailableServers;
     private static Logger logger = Logger.getRootLogger();
     private OutputStream output; 
@@ -65,7 +60,8 @@ public class ECS implements IECS {
             }
             populateAvailableNodes();
             ZKImpl.zkConnect("localhost");
-            ZKImpl.createGroup("zoo");
+            ZKImpl.deleteGroup(KVConstants.ZK_ROOT);
+            ZKImpl.createGroup(KVConstants.ZK_ROOT);
         }
         catch (IOException e) {
             logger.error("Unable to open metaDataFile " + e);
@@ -75,8 +71,7 @@ public class ECS implements IECS {
 		}
         catch (KeeperException e) {
 			logger.error("Unable to create group in Zookeeper " + e);
-		}
-        
+		}     
     }
     
     private void populateAvailableNodes() {
@@ -230,21 +225,23 @@ public class ECS implements IECS {
     }
  
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
-        // TODO Zookeeper stuff to figure out
-       
         //Select node from available, update hashing, add to hashRing and alert all servers to upate metaData 
         IECSNode node = new ECSNode();     
         try { 
             ArrayList<String> metaDataContent = new ArrayList<String>();
             for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
                 if(entry.getValue().equals("AVAILABLE")) {
-                    //Add the server to the ringNetwork and update HashMap 
+                	//Add the server to the ringNetwork and update HashMap 
                     entry.setValue("TAKEN");
                     node = entry.getKey();
                     String serverHash = md5.encode(node.getNodeName() +  KVConstants.DELIM +
                                                node.getNodeHost() + KVConstants.DELIM +
                                                node.getNodePort());
-                    //Update the hashing for all servers in the ring
+                    
+                    // Add the node to ZK
+                	ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
+                    ZKImpl.list(KVConstants.ZK_ROOT);
+                	//Update the hashing for all servers in the ring
                     node = updateHash(serverHash, node);
                     //add node to hash Ring
                     ringNetwork.put(serverHash, node);
@@ -258,8 +255,12 @@ public class ECS implements IECS {
             //Once all nodes are added, write to metaDataFile and alert nodes to update their metaData
             updateMetaData(metaDataContent);
 
-        } catch (IOException io) {
+        }
+        catch (IOException io) {
             logger.error("Unable to write to metaDataFile"); 
+        }
+        catch (KeeperException | InterruptedException e) {
+			logger.error("Unable to join group. Exception: " + e);
         }
         //Other errors ??
         return node; 
@@ -301,7 +302,6 @@ public class ECS implements IECS {
         } catch (IOException io) {
             logger.error("Unable to write to metaDataFile"); 
         }
-        //Other errors ??
         
         return chosenNodes; 
     }
@@ -329,12 +329,18 @@ public class ECS implements IECS {
     }
 
     public IECSNode updateHash(String nodeHash, IECSNode node) {
+    	
+    	assert node != null;
         
         IECSNode prevNode = new ECSNode(), currNode = new ECSNode(), nextNode = new ECSNode();
         String eHash = nodeHash;
 
-        if(ringNetwork.isEmpty()) // Only one in network, so start and end are yours
+        // Only one in network, so start and end are yours
+        if(ringNetwork.isEmpty()) {
             node.setNodeBeginHash(eHash);
+            node.setNodeEndHash(eHash);
+            return node;
+        }
         else if(ringNetwork.containsKey(nodeHash)) {
             logger.error("ERROR KVServer already in ringNetwork");
             return null;

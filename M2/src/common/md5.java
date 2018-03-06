@@ -5,7 +5,8 @@ import java.security.NoSuchAlgorithmException;
 
 public class md5 {
 
-    public static String encode(String m){
+    // Why are we using String and not BigInteger? String comparisons are highly inefficient...
+	public static String encode(String m){
         MessageDigest hash = null;
         try {
             hash = MessageDigest.getInstance("MD5");
