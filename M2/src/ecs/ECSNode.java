@@ -12,28 +12,33 @@ public class ECSNode implements IECSNode{
     public ECSNode(String dataStr) {
         this.meta = new ServerMetaData(dataStr);
     }
-   
+    
+    public ECSNode(String name, String addr, int port) {
+    	this.meta = new ServerMetaData(name, addr, port);
+    }
+    
     public ECSNode() {
-    } 
+    	
+    }
 
     /**
      * @return  the name of the node (ie "Server 8.8.8.8")
      */
     public String getNodeName() {
-        return this.meta.name;
+        return this.meta.getServerName();
     }
 
     /**
      * @return  the hostname of the node (ie "8.8.8.8")
      */
     public String getNodeHost() {
-        return this.meta.addr;
+        return this.meta.getServerAddr();
     }
     /**
      * @return  the port number of the node (ie 8080)
      */
     public int getNodePort() {
-        return this.meta.port;
+        return this.meta.getServerPort();
     }
     /**
      * @return  array of two strings representing the low and high range of the hashes that the given node is responsible for
@@ -75,5 +80,9 @@ public class ECSNode implements IECSNode{
      */
     public void setNodeEndHash(String eHash) {
         this.meta.eHash = eHash;
+    }
+    
+    public void printMeta() {
+    	System.out.println("Server Name: " + meta.getServerName() + " ServerAddr: " + meta.getServerAddr() + " ServerPort: " + meta.getServerPort());
     }
 }

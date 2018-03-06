@@ -8,6 +8,9 @@ import java.io.IOException;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
 
 import logger.LogSetup;
 import org.apache.log4j.Logger;
@@ -27,7 +30,16 @@ public class ECSClient implements IECSClient {
     private boolean stop = false;
 
     public ECSClient (String configFile) {
-        this.ecsInstance = new ECS(configFile); 
+    	Path ecsConfig = Paths.get(configFile);
+    	// If file doesn't exist or does not point to a valid file
+    	if (!Files.exists(ecsConfig)) {
+    		printError("ECS Config file does not exist!");
+            logger.error("ECS Config file does not exist!");
+            System.exit(1);
+    	}
+    	else {
+            this.ecsInstance = new ECS(ecsConfig);
+    	} 
     }
 
     public void run() {
@@ -62,10 +74,11 @@ public class ECSClient implements IECSClient {
                 if(tokens.length == 4) {
                     try {
                         int numNodes = Integer.parseInt(tokens[1]);
-                        int cacheSize = Integer.parseInt(tokens[2]);
-                        String cacheStrategy = tokens[3];
+                        String cacheStrategy = tokens[2];
+                        int cacheSize = Integer.parseInt(tokens[3]);
+                        System.out.println(numNodes + " " + cacheSize + " " + cacheStrategy);
 
-                        if(numNodes <= ecsInstance.maxServers()) {
+                        if(numNodes <= ecsInstance.availableServers()) {
                             if (KVCache.isValidStrategy(cacheStrategy)) {
                                 nodesLaunched = addNodes(numNodes, cacheStrategy, cacheSize);
                                 if(nodesLaunched == null) {
@@ -207,7 +220,7 @@ public class ECSClient implements IECSClient {
         sb.append(PROMPT);
         sb.append("::::::::::::::::::::::::::::::::");
         sb.append("::::::::::::::::::::::::::::::::\n");
-        sb.append(PROMPT).append("init <numNodes> <cacheSize> <cacheStrategy>");
+        sb.append(PROMPT).append("init <numNodes> <cacheStrategy> <cacheSize>");
         sb.append("\t Launches numNodes servers with cacheSize and cacheStrategy\n");
         sb.append(PROMPT).append("start");
         sb.append("\t 1) Starts storage service on all launched server instances \n");

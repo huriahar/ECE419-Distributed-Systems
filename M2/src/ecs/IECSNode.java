@@ -44,4 +44,6 @@ public interface IECSNode {
      * @return  array of two strings representing the low and high range of the hashes that the given node is responsible for
      */
     public void setNodeEndHash(String eHash);
+    
+    public void printMeta();
 }

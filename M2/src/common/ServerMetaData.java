@@ -45,6 +45,18 @@ public class ServerMetaData {
     public void setEndHash(String s) {
         this.eHash = s;
     }
+    
+    public String getServerName() {
+    	return this.name;
+    }
+    
+    public String getServerAddr() {
+    	return this.addr;
+    }
+    
+    public int getServerPort() {
+    	return this.port;
+    }
 
 }
 

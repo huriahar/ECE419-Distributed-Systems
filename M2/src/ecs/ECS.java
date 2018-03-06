@@ -41,21 +41,23 @@ public class ECS {
     private Socket ECSSocket;
 
     private TreeMap<String, IECSNode> ringNetwork;
-    private HashMap<IECSNode, String> allAvailableNodes;
+    // IECSNode and status {"Available", "Taken"}
+    private HashMap<IECSNode, String> allAvailableServers;
     private static Logger logger = Logger.getRootLogger();
     private OutputStream output; 
     private InputStream input;
         
     private ZooKeeper zk;
     
-    public ECS(String configFile) {
-        this.configFile = Paths.get(configFile);
+    public ECS(Path configFile) {
+        this.configFile = configFile;
         this.ringNetwork = new TreeMap<String, IECSNode>();
+        this.allAvailableServers = new HashMap<IECSNode, String>();
         try {
             if(!Files.exists(Paths.get(metaFile)))
                 this.metaDataFile = Files.createFile(Paths.get(metaFile));
             else {
-                this.metaDataFile = Paths.get(metaFile);    
+                this.metaDataFile = Paths.get(metaFile);
                 populateRingNetwork();
             }
             populateAvailableNodes();
@@ -68,12 +70,16 @@ public class ECS {
     private void populateAvailableNodes() {
         try {
             ArrayList<String> lines = new ArrayList<>(Files.readAllLines(this.configFile, StandardCharsets.UTF_8));
-            int numServers = lines.size();        
+            int numServers = lines.size();
+            
             
             for (int i = 0; i < numServers ; ++i) {
-                IECSNode node = new ECSNode(lines.get(i));
+            	String[] serverInfo = lines.get(i).split(" ");
+            	int serverPort = Integer.parseInt(serverInfo[2]);
+                IECSNode node = new ECSNode(serverInfo[0], serverInfo[1], serverPort);
+                // TODO: Change this to an ENUM
                 String status = "AVAILABLE";
-                allAvailableNodes.put(node, status);
+                allAvailableServers.put(node, status);
             }    
         } catch (IOException io) {
             logger.error("Unable to open config file");
@@ -83,19 +89,21 @@ public class ECS {
     private void populateRingNetwork()
             throws IOException {
         ArrayList<String> lines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
-        int numServers = lines.size();        
+        int numServers = lines.size();
         
         for (int i = 0; i < numServers ; ++i) {
+        	System.out.println(lines.get(i));
             IECSNode node = new ECSNode(lines.get(i));
             String serverHash = md5.encode(node.getNodeName() + KVConstants.DELIM +
                                            node.getNodeHost() + KVConstants.DELIM +
                                            node.getNodePort());
+            System.out.println("serverHash " + serverHash);
             this.ringNetwork.put(serverHash, node);
         }
     }
 
-    public int maxServers() {
-        return ringNetwork.size();
+    public int availableServers() {
+        return allAvailableServers.size();
     }
 
     public boolean start(IECSNode node) {
@@ -165,7 +173,7 @@ public class ECS {
 
         //clear the Hash Ring and the set of available nodes
         ringNetwork.clear();
-        allAvailableNodes.clear();
+        allAvailableServers.clear();
 
         try {
             deleteMetaDataFile();
@@ -216,7 +224,7 @@ public class ECS {
         IECSNode node = new ECSNode();     
         try { 
             ArrayList<String> metaDataContent = new ArrayList<String>();
-            for(Map.Entry<IECSNode, String> entry : allAvailableNodes.entrySet()) {
+            for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
                 if(entry.getValue().equals("AVAILABLE")) {
                     //Add the server to the ringNetwork and update HashMap 
                     entry.setValue("TAKEN");
@@ -252,15 +260,15 @@ public class ECS {
         try { 
             //Initialize own hashRing
             ArrayList<String> metaDataContent = new ArrayList<String>();
-            for(Map.Entry<IECSNode, String> entry : allAvailableNodes.entrySet()) {
+            for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
                 if(counter < numNodes) {
                     if(entry.getValue().equals("AVAILABLE")) {
                         counter++;
                         entry.setValue("TAKEN");
                         IECSNode node = entry.getKey();
-                        String serverHash = md5.encode(node.getNodeName() + KVConstants.DELIM +
-                                                   node.getNodeHost() + KVConstants.DELIM +
-                                                   node.getNodePort());
+                        node.printMeta();
+                        String serverHash = md5.encode(node.getNodeHost() + KVConstants.HASH_DELIM +
+                                                   Integer.toString(node.getNodePort()));
                         //Setup begin and end hashing for server 
                         node = updateHash(serverHash, node);   
                         //Add node to ringNetwork
@@ -311,7 +319,7 @@ public class ECS {
     public IECSNode updateHash(String nodeHash, IECSNode node) {
         
         IECSNode prevNode = new ECSNode(), currNode = new ECSNode(), nextNode = new ECSNode();
-        String eHash  = nodeHash;
+        String eHash = nodeHash;
 
         if(ringNetwork.isEmpty()) // Only one in network, so start and end are yours
             node.setNodeBeginHash(eHash);
@@ -378,7 +386,7 @@ public class ECS {
                     }
                     nextNode.setNodeBeginHash(currNode.getNodeHashRange()[0]);
                     ringNetwork.remove(currNodeHash);
-                    allAvailableNodes.put(currNode, "AVAILABLE");
+                    allAvailableServers.put(currNode, "AVAILABLE");
                 }
             }
         }

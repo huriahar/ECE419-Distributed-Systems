@@ -21,7 +21,7 @@ public interface IECS {
     
     public boolean awaitNodes(int count, int timeout) throws Exception;
     
-    public boolean removeNodes(Collection<String> nodeNames);
+    public boolean removeNodes(Collection<IECSNode> nodeNames);
     
     public Map<String, IECSNode> getNodes();
     
