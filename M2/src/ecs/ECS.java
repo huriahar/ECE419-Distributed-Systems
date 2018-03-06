@@ -19,18 +19,20 @@ import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-
 import java.math.BigInteger;
 import java.util.Collection;
+import java.util.concurrent.CountDownLatch;
 
 import org.apache.log4j.Logger;
 import java.lang.Process;
+
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 
 import common.*;
 import common.messages.TextMessage;
 
-public class ECS {
+public class ECS implements IECS {
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 128 * BUFFER_SIZE;
     private static final int LAUNCH_TIMEOUT = 2000;
@@ -46,13 +48,14 @@ public class ECS {
     private static Logger logger = Logger.getRootLogger();
     private OutputStream output; 
     private InputStream input;
-        
-    private ZooKeeper zk;
     
+    private ZKImplementation ZKImpl;
+
     public ECS(Path configFile) {
         this.configFile = configFile;
         this.ringNetwork = new TreeMap<String, IECSNode>();
         this.allAvailableServers = new HashMap<IECSNode, String>();
+        this.ZKImpl = new ZKImplementation();
         try {
             if(!Files.exists(Paths.get(metaFile)))
                 this.metaDataFile = Files.createFile(Paths.get(metaFile));
@@ -61,10 +64,19 @@ public class ECS {
                 populateRingNetwork();
             }
             populateAvailableNodes();
-            
-        } catch (IOException e) {
+            ZKImpl.zkConnect("localhost");
+            ZKImpl.createGroup("zoo");
+        }
+        catch (IOException e) {
             logger.error("Unable to open metaDataFile " + e);
         }
+        catch (InterruptedException e) {
+        	logger.error("Unable to connect to Zookeeper " + e);
+		}
+        catch (KeeperException e) {
+			logger.error("Unable to create group in Zookeeper " + e);
+		}
+        
     }
     
     private void populateAvailableNodes() {
@@ -543,6 +555,26 @@ public class ECS {
                 + msg.getMsg().trim() + "'");
         return msg;
     }
+
+	@Override
+	public boolean shutdown() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public Collection<IECSNode> addNodes(int count, String cacheStrategy,
+			int cacheSize) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Collection<IECSNode> setupNodes(int count, String cacheStrategy,
+			int cacheSize) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
 
 }

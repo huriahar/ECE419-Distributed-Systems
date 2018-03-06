@@ -5,8 +5,6 @@ import java.util.Map;
 
 public interface IECS {
     
-    public int maxServers();
-    
     public boolean start(IECSNode server);
     
     public boolean stop(IECSNode server);
