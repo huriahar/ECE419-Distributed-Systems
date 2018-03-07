@@ -235,6 +235,7 @@ public class ECS implements IECS {
                 logger.error("UPDATE_ERROR: Update for KVServer failed");
             }
         }
+        return success;
     }
  
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
@@ -510,7 +511,7 @@ public class ECS implements IECS {
         //TODO Add check that received connection message is right
         response = receiveMessage();
         //Receive the response regarding the message sent
-        response = receiveMessage()
+        response = receiveMessage();
         disconnect();
         return response;
     }
