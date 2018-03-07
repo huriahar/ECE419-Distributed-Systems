@@ -101,8 +101,8 @@ public class ECSClient implements IECSClient {
                         }
                     }
                     catch(NumberFormatException nfe) {
-                        printError(PROMPT + "Invalid numNodes/cacheSize. numNodes/cacheSize  must be a number!");
-                        logger.error("Invalid numNodes/cacheSize. numNodes/cacheSize must be a number!", nfe);
+                        printError(PROMPT + "Invalid numNodes/cacheSize. Must be a number!");
+                        logger.error("Invalid numNodes/cacheSize. Must be a number!", nfe);
                     }
                 }
                 else {
@@ -280,7 +280,7 @@ public class ECSClient implements IECSClient {
     }
 
     private void disconnect() {
-        
+        ecsInstance.disconnect();    
     }
 
     private void printError(String error) {
@@ -338,6 +338,7 @@ public class ECSClient implements IECSClient {
         // TODO
         //Setup the zookeeper 
         //Add nodes to hashRing and set up the hashing 
+        boolean success = true;
         Collection<IECSNode> nodes  = ecsInstance.initAddNodesToHashRing(count);
         for(IECSNode entry: nodes) {
             //for each node, launch server and set status as stopped
@@ -348,7 +349,9 @@ public class ECSClient implements IECSClient {
                 logger.error("ERROR. Unable to launch KVServer :" + entry.getNodeName() + " Host: " + entry.getNodeHost()+ " Port: " + entry.getNodePort());           
             }
         }
-        setupNodes(count, cacheStrategy, cacheSize);
+        success = ecsInstance.alertMetaDataUpdate();
+        if(success)
+            setupNodes(count, cacheStrategy, cacheSize);
         return nodes;
         
     }
@@ -390,13 +393,13 @@ public class ECSClient implements IECSClient {
     @Override
     public Map<String, IECSNode> getNodes() {
         // TODO
-        return null;
+        return ecsInstance.getNodes();
     }
 
     @Override
     public IECSNode getNodeByKey(String Key) {
         // TODO
-        return null;
+        return ecsInstance.getNodeByKey(Key);
     }
 
     public static void main(String[] args) {

@@ -75,6 +75,11 @@ public class ClientConnection implements Runnable {
                     String value = String.join(KVConstants.DELIM, valueParts);
                     String key = msgContent[1];
 
+                    if (command.equals("ECS")) {
+                        String[] ecsCmd = Arrays.copyOfRange(msgContent, 1, msgContent.length);
+                        handleECSCmd(ecsCmd);
+                        continue;
+                    }
                     // Check if server is responsible for this key
                     if (!server.isResponsible(key)){
                         sendMessage(new TextMessage("SERVER_NOT_RESPONSIBLE"));
@@ -84,11 +89,6 @@ public class ClientConnection implements Runnable {
                         } else {
                             logger.info("ERROR!!! EXPECTED TO RECEIVE GET_METADATA MSG!!");
                         }
-                        continue;
-                    }
-                    if (command.equals("ECS")) {
-                        String[] ecsCmd = Arrays.copyOfRange(msgContent, 1, msgContent.length);
-                        handleECSCmd(ecsCmd);
                         continue;
                     }
                     if (server.isStopped()){
@@ -188,12 +188,14 @@ public class ClientConnection implements Runnable {
                     boolean success = server.updateMetaData();
                     if(success) {
                         //targetRange in msg[1], msg[2]
+                        System.out.println("Updated metadata. Now moving data");
                         String[] targetRange = Arrays.copyOfRange(msg, 1, 2);
                         String targetName = msg[3];
                         success = server.moveData(targetRange, targetName);
                     }
                     if(success) {
                         sendMessage(new TextMessage("UPDATE_SUCCESS"));
+                        System.out.println("Updated Success!!!");
                     } else {
                         System.out.println("hereh!!!");
                         sendMessage(new TextMessage("UPDATE_FAILED"));

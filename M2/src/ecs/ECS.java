@@ -211,11 +211,11 @@ public class ECS implements IECS {
 
     public void updateMetaData(ArrayList<String> data) throws IOException {
         Files.write(metaDataFile,data, StandardCharsets.UTF_8);
-        alertMetaDataUpdate();
         return;
     }
        
-    public void alertMetaDataUpdate() {
+    public boolean alertMetaDataUpdate() {
+        boolean success = true;
         TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_METADATA");
         TextMessage response;
         IECSNode node = new ECSNode();
@@ -228,8 +228,10 @@ public class ECS implements IECS {
                 }
                 else if(response.getMsg().equals("UPDATE_FAILED")) {
                     logger.error("ERROR: MetaData not updated for KVServer: " + node.getNodeName());
+                    success = false;
                 }
             } catch (IOException ex) {
+                success = false;
                 logger.error("UPDATE_ERROR: Update for KVServer failed");
             }
         }
@@ -238,6 +240,7 @@ public class ECS implements IECS {
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
         //Select node from available, update hashing, add to hashRing and alert all servers to upate metaData 
         IECSNode node = new ECSNode();     
+        boolean success = true;
         try { 
             ArrayList<String> metaDataContent = new ArrayList<String>();
             for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
@@ -263,6 +266,11 @@ public class ECS implements IECS {
             } 
             //Once all nodes are added, write to metaDataFile and alert nodes to update their metaData
             updateMetaData(metaDataContent);
+            success = alertMetaDataUpdate();
+            if(!success) {
+                logger.error("Unable to update metaData in Servers");
+                printDebug("Unable to update metaData in Servers");
+            }
 
         }
         catch (IOException io) {
@@ -351,6 +359,7 @@ public class ECS implements IECS {
 
         // Only one in network, so start and end are yours
         if(ringNetwork.isEmpty()) {
+            printDebug("Ring empty so adding 1 node");
             currNode.setNodeBeginHash(nodeHash);
             currNode.setNodeEndHash(nodeHash);
             return currNode;
@@ -362,7 +371,7 @@ public class ECS implements IECS {
         
         // the current hash is the highest value
         if(ringNetwork.higherKey(nodeHash) == null) {
-        	System.out.println("Hereee!");
+        	printDebug("CurrNode is highest hash");
             prevNode = ringNetwork.firstEntry().getValue();
             // prevNode authority only goes as far currently added node
             currNode.setNodeBeginHash(prevNode.getNodeHashRange()[0]);                     
@@ -370,6 +379,7 @@ public class ECS implements IECS {
         }
         else { 
         	//currNode is at beginning or in between
+            printDebug("Server somewhere in between or at beginning");
             nextNode = ringNetwork.higherEntry(nodeHash).getValue();
             currNode.setNodeBeginHash(nextNode.getNodeHashRange()[0]);
             nextNode.setNodeBeginHash(nodeHash);
@@ -379,24 +389,27 @@ public class ECS implements IECS {
 
     public boolean launchKVServer(IECSNode node, String cacheStrategy, int cacheSize) {
         //TODO SSH stuff initializing with server's own name and port
+        //TEMP COMMENTED OUT UNTIL SSH  W/ PASSWORD IS FIGURED OUT
         boolean success = true;
         Process proc;
+        printDebug("Launching " + node.getNodeName() + " and " + node.getNodePort() + " ...");
  
         Runtime run = Runtime.getRuntime();
-        try {
-            String launchCmd = "script.sh " + node.getNodeName() + " " + node.getNodePort();
-            proc = run.exec(launchCmd/*Script*/);
-            Thread.sleep(LAUNCH_TIMEOUT);
-
-        } catch (InterruptedException ex) {
-            logger.error("ERROR: KVServer Thread unable to sleep");
-            success = false;
-        } catch (IOException io) {
-            logger.error("ERROR: KVServer IOException: " + io);
-            success = false;
-        }
-
-        logger.info("KVServer process launched successfully");
+//        try {
+//            String launchCmd = "script.sh " + node.getNodeName() + " " + node.getNodePort();
+//            printDebug("Launch command is: " + launchCmd);
+//            proc = run.exec(launchCmd);
+//            Thread.sleep(LAUNCH_TIMEOUT);
+//
+//        } catch (InterruptedException ex) {
+//            logger.error("ERROR: KVServer Thread unable to sleep");
+//            success = false;
+//        } catch (IOException io) {
+//            logger.error("ERROR: KVServer IOException: " + io);
+//            success = false;
+//        }
+//
+//        logger.info("KVServer process launched successfully");
         return success;
     }
 
@@ -404,6 +417,10 @@ public class ECS implements IECS {
     public boolean awaitNodes(int count, int timeout) throws Exception {
         // TODO
         return false;
+    }
+
+    public void printDebug(String dbgmsg) {
+        System.out.println("DEBUG! " + dbgmsg);
     }
 
     public boolean removeNodes(Collection<IECSNode> nodes) {
@@ -437,6 +454,7 @@ public class ECS implements IECS {
                 metaDataContent.add(node.getNodeName() + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + node.getNodeHashRange()[0] + KVConstants.DELIM + node.getNodeHashRange()[1]);     
             }
             updateMetaData(metaDataContent);
+            success = alertMetaDataUpdate();
         } catch (IOException io) {
             logger.error("ERROR: Unable to update metaData with nodes removed");
             success = false;
@@ -463,7 +481,11 @@ public class ECS implements IECS {
     // Return a map of all nodes.
     // Server Name -> IECSNode
     public Map<String, IECSNode> getNodes() {
-        return null;
+        Map<String, IECSNode> map = new HashMap<String, IECSNode>();
+        for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
+            map.put(entry.getValue().getNodeName(), entry.getValue());
+        }
+        return map;
     }
 
     public IECSNode getNodeByKey(String Key) {
@@ -480,35 +502,40 @@ public class ECS implements IECS {
     public TextMessage sendNodeMessage(TextMessage message, IECSNode node) throws IOException {
         TextMessage response = new TextMessage("") ; 
         try {
-            connect(node);
+            connectNode(node);
         } catch (IOException e) {
             logger.error("Failed to connect to server <" + node.getNodeHost() + ":" + node.getNodePort() + ">. KVServer launch script may have failed.");
         }
         sendMessage(message);
+        //TODO Add check that received connection message is right
         response = receiveMessage();
-        disconnect(node);
+        //Receive the response regarding the message sent
+        response = receiveMessage()
+        disconnect();
         return response;
     }
 
-    public void connect(IECSNode server) throws IOException {
+    public void connectNode(IECSNode server) throws IOException {
         this.ECSSocket = new Socket(server.getNodeHost(), server.getNodePort());
         logger.info("ECS Connection to name: " + server.getNodeName() + " successful");
     }
 
-    public void disconnect(IECSNode server) {
-        try { 
 
+    public void disconnect() {
+        logger.info("Closing ECS socket");
+
+        try {
             if(ECSSocket != null) {
                 ECSSocket.close();
                 ECSSocket = null;
-                logger.info("Successfully closed ECS connection to server: " + server.getNodeName());
-
+                logger.info("ECS socket closed");
             }
-        } catch (IOException io) {
-            logger.error("Unable to close ECS to server connection");
-        }
 
+        } catch(Exception io) {
+            logger.error("ERROR: Unable to close ECS socket");
+        }
     }
+
         
     /**
      * Method sends a TextMessage using this socket.
