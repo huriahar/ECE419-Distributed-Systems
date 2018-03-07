@@ -168,8 +168,8 @@ public class ClientConnection implements Runnable {
         try {
             switch(msg[0]) {
                 case "SETUP_NODE":
-                    int cacheSize = Integer.parseInt(msg[1]);
-                    server.setupCache(cacheSize, msg[2]);
+                    int cacheSize = Integer.parseInt(msg[2]);
+                    server.setupCache(cacheSize, msg[1]);
                     sendMessage(new TextMessage("SETUP_SUCCESS"));
                     return;
                 case "START_NODE":
@@ -189,8 +189,8 @@ public class ClientConnection implements Runnable {
                     if(success) {
                         //targetRange in msg[1], msg[2]
                         System.out.println("Updated metadata. Now moving data");
-                        String[] targetRange = Arrays.copyOfRange(msg, 1, 2);
-                        String targetName = msg[3];
+                        String[] targetRange = Arrays.copyOfRange(msg, 2, 2);
+                        String targetName = msg[1];
                         success = server.moveData(targetRange, targetName);
                     }
                     if(success) {

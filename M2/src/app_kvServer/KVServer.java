@@ -542,6 +542,9 @@ public class KVServer implements IKVServer, Runnable {
         // TODO Transfer a subset (range) of the KVServer's data to another KVServer (reallocation before
         // removing this server or adding a new KVServer to the ring); send a notification to the ECS,
         // if data transfer is completed.
+        System.out.println("DEBUG: getHostname() = " + getHostname());
+        System.out.println("DEBUG: taretName() = " + targetName);
+        if(targetName.equals(getHostname())) return true;
         lockWrite();
         StringBuilder toSend = new StringBuilder();
         try {
@@ -556,6 +559,7 @@ public class KVServer implements IKVServer, Runnable {
             }
         } catch (IOException e) {
             logger.error("ERROR while moving data from server to target server" + targetName);
+            return false;
         }
         
         //Send to receiving server
@@ -565,7 +569,7 @@ public class KVServer implements IKVServer, Runnable {
         sender.sendMessage(new TextMessage(toSend.toString()));
         sender.disconnect();
         unlockWrite();
-        return false;
+        return true;
     }
 
     /**

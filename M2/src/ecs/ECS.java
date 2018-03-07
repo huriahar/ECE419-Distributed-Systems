@@ -221,14 +221,25 @@ public class ECS implements IECS {
         printDebug("In alertMetaDataUpdate");
         for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
             node = entry.getValue();
-            nextNode = ringNetwork.higherEntry(entry.getKey()).getValue();
-            if(nextNode != null) {
+            printDebug("ringNetwork size is " + ringNetwork.size());
+            BigInteger hash = entry.getKey();
+            Map.Entry<BigInteger, IECSNode> nextEntry = ringNetwork.higherEntry(entry.getKey());
+            if(nextEntry != null) {
+                nextNode = nextEntry.getValue();
                 printDebug("Node has a higher value");
-                message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_METADATA" + KVConstants.DELIM + nextNode.getNodeName() + KVConstants.DELIM + nextNode.getNodeHashRange()[0] + KVConstants.DELIM + nextNode.getNodeHashRange()[1]);
+                message = new TextMessage("ECS" + KVConstants.DELIM +
+                                        "UPDATE_METADATA" + KVConstants.DELIM +
+                                        nextNode.getNodeName() + KVConstants.DELIM +
+                                        nextNode.getNodeHashRange()[0] + KVConstants.DELIM +
+                                        nextNode.getNodeHashRange()[1]);
             }
             else {
                 printDebug("Node is the only one in ringNetwork");
-                message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_METADATA" + KVConstants.DELIM + node.getNodeName() + KVConstants.DELIM + node.getNodeHashRange()[0] + KVConstants.DELIM + node.getNodeHashRange()[1]);
+                message = new TextMessage("ECS" + KVConstants.DELIM +
+                                        "UPDATE_METADATA" + KVConstants.DELIM +
+                                         node.getNodeName() + KVConstants.DELIM +
+                                         node.getNodeHashRange()[0] + KVConstants.DELIM +
+                                         node.getNodeHashRange()[1]);
             }
             try {
                 response = sendNodeMessage(message, node);
