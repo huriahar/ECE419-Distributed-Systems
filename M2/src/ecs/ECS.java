@@ -215,7 +215,6 @@ public class ECS implements IECS {
         IECSNode node;
         for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
             //Prepare writable content to write to metaDatafile    
-            //TODO 
             node = entry.getValue();
             metaDataContent.add(node.getNodeName() + KVConstants.DELIM +
                             node.getNodeHost() + KVConstants.DELIM +
@@ -245,7 +244,6 @@ public class ECS implements IECS {
         printDebug("In alertMetaDataUpdate");
         for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
             node = entry.getValue();
-            printDebug("ringNetwork size is " + ringNetwork.size());
             BigInteger hash = entry.getKey();
             Map.Entry<BigInteger, IECSNode> nextEntry = ringNetwork.higherEntry(entry.getKey());
             if(nextEntry != null) {
@@ -355,7 +353,8 @@ public class ECS implements IECS {
              
             //Once all nodes are added, write to metaDataFile
             printDebug("Updating metadata file");
-            updateMetaData();
+            updateMetaData();   
+            //the alert will be called once launching of the servers is done from ECSClient
         } catch (IOException io) {
             logger.error("Unable to write to metaDataFile"); 
         }
@@ -463,9 +462,9 @@ public class ECS implements IECS {
     }
 
     public boolean removeNodes(Collection<IECSNode> nodes) {
-        // TODO
     	BigInteger currNodeHash;    
         IECSNode nextNode = null, currNode = null, node;
+        boolean onlyOneNode = false;
         boolean success = true;
 
         for(IECSNode server: nodes) {
@@ -475,12 +474,17 @@ public class ECS implements IECS {
                     currNodeHash = entry.getKey();
                     currNode = entry.getValue();
                     nextNode = findNextNode(currNodeHash);
+                    if(nextNode.getNodeHashRange()[1] == currNodeHash)
+                        onlyOneNode = true;
                     if(nextNode == null) {
                         logger.error("ERROR: Removing node error");
                         success = false;
                     }
                     nextNode.setNodeBeginHash(currNode.getNodeHashRange()[0]);
                     ringNetwork.remove(currNodeHash);
+                    //Update the changed hashRange to the ring
+                    if(!onlyOneNode)
+                        ringNetwork.put(nextNode.getNodeHashRange()[1], nextNode);
                     allAvailableServers.put(currNode, "AVAILABLE");
                 }
             }
@@ -499,7 +503,8 @@ public class ECS implements IECS {
 
     public IECSNode findNextNode(BigInteger currHash) {
         IECSNode nextNode = new ECSNode();
-        if(ringNetwork.size() <= 1 || !ringNetwork.containsKey(currHash))
+        //We only want to return null if ring is empty or node not in ring
+        if(ringNetwork.size() < 1 || !ringNetwork.containsKey(currHash))
             nextNode = null;
         else {
             if(ringNetwork.higherKey(currHash) == null) {
