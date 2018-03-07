@@ -172,7 +172,7 @@ public class ECSClient implements IECSClient {
 
             case "removeNode":
                 if(tokens.length >= 2) {
-                    Collection<String> nodeNames = null;
+                    Collection<String> nodeNames = new ArrayList<String>();
                     for (int i = 1; i < tokens.length; ++i) {
                         nodeNames.add(tokens[i]);
                     }

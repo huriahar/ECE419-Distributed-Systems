@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.math.BigInteger;
 import java.net.Socket;
-
+import java.util.Iterator;
 import java.io.IOException;
 import java.lang.InterruptedException;
 
@@ -291,17 +291,20 @@ public class ECS implements IECS {
                     entry.setValue("TAKEN");
                     node = entry.getKey();
                     BigInteger serverHash = md5.encode(node.getNodeHost() + KVConstants.DELIM + node.getNodePort());
-                    
+                    printDebug("Adding node: " + node.getNodeName());
                     // Add the node to ZK
+                    //TODO Can't add new node --> WHY?????
                 	ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
                     ZKImpl.list(KVConstants.ZK_ROOT);
                 	//Update the hashing for all servers in the ring
                     node = updateHash(serverHash, node);
-                    printRing();
-                    //add node to hash Ring
-                    ringNetwork.put(serverHash, node);
+                    if(!inRingNetwork(node)) {
+                        //add node to hash Ring
+                        ringNetwork.put(serverHash, node);
+                    }
                 }
-            } 
+            }
+            printRing();
             //Once all nodes are added, write to metaDataFile and alert nodes to update their metaData
             updateMetaData();
             success = alertMetaDataUpdate();
@@ -462,14 +465,18 @@ public class ECS implements IECS {
     }
 
     public boolean removeNodes(Collection<IECSNode> nodes) {
+        //Need to let the node know to stop
     	BigInteger currNodeHash;    
         IECSNode nextNode = null, currNode = null, node;
         boolean onlyOneNode = false;
         boolean success = true;
-
+        printDebug("In removeNodes");
         for(IECSNode server: nodes) {
-            for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
+            Iterator<Map.Entry<BigInteger, IECSNode>> iter = ringNetwork.entrySet().iterator();
+            while( iter.hasNext()) {
+                Map.Entry<BigInteger, IECSNode> entry = iter.next();
                 if(server.getNodeName().equals(entry.getValue().getNodeName())) {
+                    printDebug("node found");
                     //Found the node we want to remove
                     currNodeHash = entry.getKey();
                     currNode = entry.getValue();
@@ -481,16 +488,25 @@ public class ECS implements IECS {
                         success = false;
                     }
                     nextNode.setNodeBeginHash(currNode.getNodeHashRange()[0]);
-                    ringNetwork.remove(currNodeHash);
-                    //Update the changed hashRange to the ring
-                    if(!onlyOneNode)
-                        ringNetwork.put(nextNode.getNodeHashRange()[1], nextNode);
-                    allAvailableServers.put(currNode, "AVAILABLE");
+                    try {
+                        stop(currNode);
+                        shutDownNode(currNode);
+                        //Update the changed hashRange to the ring
+                        if(!onlyOneNode)
+                            ringNetwork.put(nextNode.getNodeHashRange()[1], nextNode);
+                        allAvailableServers.put(currNode, "AVAILABLE");
+//                      ringNetwork.remove(currNodeHash);
+                        iter.remove();
+                    } catch(IOException io) {
+                        logger.error("ERROR: Unable to shutdown node");
+                    }
                 }
+                
             }
         }
        
         try { 
+            printRing();
             updateMetaData();
             success = alertMetaDataUpdate();
         } catch (IOException io) {
