@@ -89,6 +89,7 @@ public class ECSNode implements IECSNode{
     
     public void printMeta() {
     	System.out.println("Server Name: " + meta.getServerName() + " ServerAddr: " + meta.getServerAddr() + " ServerPort: " + meta.getServerPort());
-    	System.out.println("Server bHash: " + meta.getBeginHash().toString() + " eHash: " + meta.getEndHash().toString());
+    	if ((meta.getBeginHash() != null) && (meta.getEndHash() != null))
+    		System.out.println("Server bHash: " + meta.getBeginHash().toString(16) + " eHash: " + meta.getEndHash().toString(16));
     }
 }

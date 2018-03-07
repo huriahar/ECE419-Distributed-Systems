@@ -3,6 +3,7 @@ package client;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import java.math.BigInteger;
 import java.net.Socket;
 
 import java.util.HashSet;
@@ -33,7 +34,7 @@ public class KVStore implements KVCommInterface {
     private Socket clientSocket;
     private OutputStream output;
     private InputStream input;
-    private TreeMap<String, ServerMetaData> ringNetwork;
+    private TreeMap<BigInteger, ServerMetaData> ringNetwork;
 
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
@@ -206,8 +207,8 @@ public class KVStore implements KVCommInterface {
             updateMetaData(reply.getMsg());
             
             // Find responsible server
-            String serverHash = getResponsibleServer(key);
-            if (serverHash == INVALID_SERVER) {
+            BigInteger serverHash = getResponsibleServer(key);
+            if (serverHash == null) {
                 return new KVReplyMessage(key, value, status);
             }
             
@@ -223,14 +224,14 @@ public class KVStore implements KVCommInterface {
     }
 
     private void updateMetaData(String marshalledData) {
-        this.ringNetwork = new TreeMap<String, ServerMetaData>();
+        this.ringNetwork = new TreeMap<BigInteger, ServerMetaData>();
         String[] dataEntries = marshalledData.split(KVConstants.NEWLINE_DELIM);
 
         for(int i = 0; i < dataEntries.length ; i++) {
             String[] line = dataEntries[i].split("\\" + KVConstants.DELIM);
 
             ServerMetaData meta = new ServerMetaData(dataEntries[i]);
-            String serverHash = md5.encode(meta.name + KVConstants.DELIM +
+            BigInteger serverHash = md5.encode(meta.name + KVConstants.DELIM +
                                            meta.addr + KVConstants.DELIM +
                                            meta.port);
 
@@ -238,9 +239,9 @@ public class KVStore implements KVCommInterface {
         }
     }
 
-    private String getResponsibleServer(String key) {
-        if(ringNetwork.isEmpty()) return INVALID_SERVER;
-        String encodedKey = md5.encode(key);
+    private BigInteger getResponsibleServer(String key) {
+        if(ringNetwork.isEmpty()) return null;
+        BigInteger encodedKey = md5.encode(key);
         /*
             TODO this comment is copied verbatum
             Return the server that has the next highest hash to the encodedKey.

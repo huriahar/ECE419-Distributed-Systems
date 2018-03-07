@@ -1,6 +1,7 @@
 package ecs;
 
 import java.util.ArrayList;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.Map;
 import java.util.HashMap;
@@ -244,9 +245,7 @@ public class ECS implements IECS {
                 	//Add the server to the ringNetwork and update HashMap 
                     entry.setValue("TAKEN");
                     node = entry.getKey();
-                    BigInteger serverHash = md5.encode(node.getNodeName() +  KVConstants.DELIM +
-                                               node.getNodeHost() + KVConstants.DELIM +
-                                               node.getNodePort());
+                    BigInteger serverHash = md5.encode(node.getNodeHost() + KVConstants.DELIM + node.getNodePort());
                     
                     // Add the node to ZK
                 	ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
@@ -291,6 +290,7 @@ public class ECS implements IECS {
                         IECSNode node = entry.getKey();
                         BigInteger serverHash = md5.encode(node.getNodeHost() + KVConstants.HASH_DELIM +
                                                    Integer.toString(node.getNodePort()));
+                        System.out.println("updateHash " + serverHash.toString(16));
                         //Setup begin and end hashing for server 
                         node = updateHash(serverHash, node);
                         node.printMeta();
@@ -348,12 +348,11 @@ public class ECS implements IECS {
     	assert currNode != null;
         
         IECSNode prevNode = new ECSNode(), nextNode = new ECSNode();
-        BigInteger eHash = nodeHash;
 
         // Only one in network, so start and end are yours
         if(ringNetwork.isEmpty()) {
-            currNode.setNodeBeginHash(eHash);
-            currNode.setNodeEndHash(eHash);
+            currNode.setNodeBeginHash(nodeHash);
+            currNode.setNodeEndHash(nodeHash);
             return currNode;
         }
         else if(ringNetwork.containsKey(nodeHash)) {
@@ -363,6 +362,7 @@ public class ECS implements IECS {
         
         // the current hash is the highest value
         if(ringNetwork.higherKey(nodeHash) == null) {
+        	System.out.println("Hereee!");
             prevNode = ringNetwork.firstEntry().getValue();
             // prevNode authority only goes as far currently added node
             currNode.setNodeBeginHash(prevNode.getNodeHashRange()[0]);                     

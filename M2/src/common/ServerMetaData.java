@@ -29,8 +29,12 @@ public class ServerMetaData {
         this.addr = data[SERVER_ADDR];
         this.port = Integer.parseInt(data[SERVER_PORT]);
         if(data.length > 3) {
-            this.bHash = new BigInteger(data[BEGIN_HASH]);
-            this.eHash = new BigInteger(data[END_HASH]);
+            this.bHash = new BigInteger(data[BEGIN_HASH], 16);
+            this.eHash = new BigInteger(data[END_HASH], 16);
+        }
+        else {
+        	this.bHash = null;
+        	this.eHash = null;
         }
     }
 
