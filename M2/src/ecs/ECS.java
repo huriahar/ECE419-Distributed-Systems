@@ -209,10 +209,34 @@ public class ECS implements IECS {
 
     }
 
-    public void updateMetaData(ArrayList<String> data) throws IOException {
-        Files.write(metaDataFile,data, StandardCharsets.UTF_8);
+    public void updateMetaData() throws IOException {
+
+        ArrayList<String> metaDataContent = new ArrayList<String>();
+        IECSNode node;
+        for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
+            //Prepare writable content to write to metaDatafile    
+            //TODO 
+            node = entry.getValue();
+            metaDataContent.add(node.getNodeName() + KVConstants.DELIM +
+                            node.getNodeHost() + KVConstants.DELIM +
+                            node.getNodePort() + KVConstants.DELIM +
+                            node.getNodeHashRange()[0] + KVConstants.DELIM +
+                            node.getNodeHashRange()[1]);      
+
+        }
+
+        Files.write(metaDataFile, metaDataContent, StandardCharsets.UTF_8);
         return;
     }
+
+    public void printRing() {
+        IECSNode node;        
+        for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
+            node = entry.getValue();
+            System.out.println(node.getNodeName() + " : " + node.getNodeHashRange()[0] + " : " + node.getNodeHashRange()[1]);
+            
+        }               
+    } 
        
     public boolean alertMetaDataUpdate() {
         boolean success = true;
@@ -234,7 +258,7 @@ public class ECS implements IECS {
                                         nextNode.getNodeHashRange()[1]);
             }
             else {
-                printDebug("Node is the only one in ringNetwork");
+                printDebug("Node is the only one in ringNetwork or nothing higher exists");
                 message = new TextMessage("ECS" + KVConstants.DELIM +
                                         "UPDATE_METADATA" + KVConstants.DELIM +
                                          node.getNodeName() + KVConstants.DELIM +
@@ -263,7 +287,6 @@ public class ECS implements IECS {
         IECSNode node = new ECSNode();     
         boolean success = true;
         try { 
-            ArrayList<String> metaDataContent = new ArrayList<String>();
             for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
                 if(entry.getValue().equals("AVAILABLE")) {
                 	//Add the server to the ringNetwork and update HashMap 
@@ -276,17 +299,13 @@ public class ECS implements IECS {
                     ZKImpl.list(KVConstants.ZK_ROOT);
                 	//Update the hashing for all servers in the ring
                     node = updateHash(serverHash, node);
+                    printRing();
                     //add node to hash Ring
                     ringNetwork.put(serverHash, node);
-
-                    //Prepare writable content to write to metaDatafile    
-                    //TODO double check that data per server is written separate lines 
-                    metaDataContent.add(node.getNodeName() + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + node.getNodeHashRange()[0] + KVConstants.DELIM + node.getNodeHashRange()[1]);     
-
                 }
             } 
             //Once all nodes are added, write to metaDataFile and alert nodes to update their metaData
-            updateMetaData(metaDataContent);
+            updateMetaData();
             success = alertMetaDataUpdate();
             if(!success) {
                 logger.error("Unable to update metaData in Servers");
@@ -310,7 +329,6 @@ public class ECS implements IECS {
     
         try { 
             // Initialize own hashRing
-            ArrayList<String> metaDataContent = new ArrayList<String>();
             for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
                 if(counter < numNodes) {
                     if(entry.getValue().equals("AVAILABLE")) {
@@ -322,30 +340,22 @@ public class ECS implements IECS {
                         System.out.println("updateHash " + serverHash.toString(16));
                         //Setup begin and end hashing for server 
                         node = updateHash(serverHash, node);
-                        printDebug("Before printing meta");
                         node.printMeta();
                         //Add node to ringNetwork
                         if(!inRingNetwork(node)) {
                             //if already in ringNetwork, dont add it
-                            printDebug("Adding node in ring");
                             ringNetwork.put(serverHash, node);
+                            printRing();
                         }
-                        //Prepare writable content to write to metaDatafile    
-                        //TODO double check that data per server is written separate lines 
-                        metaDataContent.add(node.getNodeName() + KVConstants.DELIM +
-                                            node.getNodeHost() + KVConstants.DELIM +
-                                            node.getNodePort() + KVConstants.DELIM +
-                                            node.getNodeHashRange()[0] + KVConstants.DELIM +
-                                            node.getNodeHashRange()[1]);      
-
                         //Add chosen node to collection
                         chosenNodes.add(node);
                     }
                 }
-            } 
+            }
+             
             //Once all nodes are added, write to metaDataFile
             printDebug("Updating metadata file");
-            updateMetaData(metaDataContent);
+            updateMetaData();
         } catch (IOException io) {
             logger.error("Unable to write to metaDataFile"); 
         }
@@ -398,15 +408,20 @@ public class ECS implements IECS {
         	printDebug("CurrNode is highest hash");
             prevNode = ringNetwork.firstEntry().getValue();
             // prevNode authority only goes as far currently added node
-            currNode.setNodeBeginHash(prevNode.getNodeHashRange()[0]);                     
+            currNode.setNodeBeginHash(prevNode.getNodeHashRange()[0]);                   
+            currNode.setNodeEndHash(nodeHash); 
             prevNode.setNodeBeginHash(nodeHash);
+            //Update the ringNetwork with the changed hash of the previous one as well
+            ringNetwork.put(prevNode.getNodeHashRange()[1], prevNode);
         }
         else { 
         	//currNode is at beginning or in between
             printDebug("Server somewhere in between or at beginning");
             nextNode = ringNetwork.higherEntry(nodeHash).getValue();
-            currNode.setNodeBeginHash(nextNode.getNodeHashRange()[0]);
+            currNode.setNodeBeginHash(nextNode.getNodeHashRange()[0]);  
+            currNode.setNodeEndHash(nodeHash);
             nextNode.setNodeBeginHash(nodeHash);
+            ringNetwork.put(nextNode.getNodeHashRange()[1], nextNode);
         }
         return currNode; 
     }
@@ -452,7 +467,6 @@ public class ECS implements IECS {
     	BigInteger currNodeHash;    
         IECSNode nextNode = null, currNode = null, node;
         boolean success = true;
-        ArrayList<String> metaDataContent = new ArrayList<String>();
 
         for(IECSNode server: nodes) {
             for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
@@ -473,11 +487,7 @@ public class ECS implements IECS {
         }
        
         try { 
-            for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
-                node = entry.getValue();
-                metaDataContent.add(node.getNodeName() + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + node.getNodeHashRange()[0] + KVConstants.DELIM + node.getNodeHashRange()[1]);     
-            }
-            updateMetaData(metaDataContent);
+            updateMetaData();
             success = alertMetaDataUpdate();
         } catch (IOException io) {
             logger.error("ERROR: Unable to update metaData with nodes removed");

@@ -142,8 +142,8 @@ public class ECSClient implements IECSClient {
             case "addNode":
                 if(tokens.length == 3) {
                     try {
-                        String cacheStrategy = tokens[2];
-                        int cacheSize = Integer.parseInt(tokens[1]);
+                        String cacheStrategy = tokens[1];
+                        int cacheSize = Integer.parseInt(tokens[2]);
                         if (KVCache.isValidStrategy(cacheStrategy)) {
                             IECSNode newNode = addNode(cacheStrategy, cacheSize);
                             if (newNode != null) {
