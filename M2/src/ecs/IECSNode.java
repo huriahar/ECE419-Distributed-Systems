@@ -1,5 +1,7 @@
 package ecs;
 
+import java.math.BigInteger;
+
 public interface IECSNode {
 
     /**
@@ -20,7 +22,7 @@ public interface IECSNode {
     /**
      * @return  array of two strings representing the low and high range of the hashes that the given node is responsible for
      */
-    public String[] getNodeHashRange();
+    public BigInteger[] getNodeHashRange();
 
     /**
      * @return  the name of the node (ie "Server 8.8.8.8")
@@ -38,12 +40,12 @@ public interface IECSNode {
     /**
      * @return  array of two strings representing the low and high range of the hashes that the given node is responsible for
      */
-    public void setNodeBeginHash(String bash);
+    public void setNodeBeginHash(BigInteger bash);
 
     /**
      * @return  array of two strings representing the low and high range of the hashes that the given node is responsible for
      */
-    public void setNodeEndHash(String eHash);
+    public void setNodeEndHash(BigInteger eHash);
     
     public void printMeta();
 }

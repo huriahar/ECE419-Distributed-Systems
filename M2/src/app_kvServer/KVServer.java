@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 
+import java.math.BigInteger;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -62,7 +63,7 @@ public class KVServer implements IKVServer, Runnable {
      * @param zkPort        port where zookeeper is running
      */
     public KVServer(String name, String zkHostname, int zkPort) {
-        this.metadata = new ServerMetaData(name, UNSET_ADDR, zkPort, KVConstants.MIN_HASH, KVConstants.MIN_HASH);
+        this.metadata = new ServerMetaData(name, UNSET_ADDR, zkPort, new BigInteger(KVConstants.MIN_HASH), new BigInteger(KVConstants.MIN_HASH));
         this.serverFilePath = "SERVER_" + Integer.toString(metadata.port);
         this.cache = KVCache.createKVCache(DEFAULT_CACHE_SIZE, DEFAULT_CACHE_STRATEGY);
     }

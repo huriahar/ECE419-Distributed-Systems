@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.TreeMap;
 import java.util.Map;
 import java.util.HashMap;
+import java.math.BigInteger;
 import java.net.Socket;
 
 import java.io.IOException;
@@ -37,7 +38,7 @@ public class ECS implements IECS {
     private Path metaDataFile;
     private Socket ECSSocket;
 
-    private TreeMap<String, IECSNode> ringNetwork;
+    private TreeMap<BigInteger, IECSNode> ringNetwork;
     // IECSNode and status {"Available", "Taken"} - TODO: Convert to an ENUM
     private HashMap<IECSNode, String> allAvailableServers;
     private static Logger logger = Logger.getRootLogger();
@@ -48,7 +49,7 @@ public class ECS implements IECS {
 
     public ECS(Path configFile) {
         this.configFile = configFile;
-        this.ringNetwork = new TreeMap<String, IECSNode>();
+        this.ringNetwork = new TreeMap<BigInteger, IECSNode>();
         this.allAvailableServers = new HashMap<IECSNode, String>();
         this.ZKImpl = new ZKImplementation();
         try {
@@ -99,10 +100,10 @@ public class ECS implements IECS {
         for (int i = 0; i < numServers ; ++i) {
         	System.out.println(lines.get(i));
             IECSNode node = new ECSNode(lines.get(i));
-            String serverHash = md5.encode(node.getNodeName() + KVConstants.DELIM +
+            BigInteger serverHash = md5.encode(node.getNodeName() + KVConstants.DELIM +
                                            node.getNodeHost() + KVConstants.DELIM +
                                            node.getNodePort());
-            System.out.println("serverHash " + serverHash);
+            System.out.println("serverHash " + serverHash.toString());
             this.ringNetwork.put(serverHash, node);
         }
     }
@@ -167,7 +168,7 @@ public class ECS implements IECS {
         //Shutdown ECS
         boolean success = true;
         if(ringNetwork.isEmpty()) return success;
-        for(Map.Entry<String, IECSNode> entry: ringNetwork.entrySet()) {
+        for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
             try {
                 shutDownNode(entry.getValue());
             } catch(IOException io) {
@@ -205,7 +206,7 @@ public class ECS implements IECS {
         TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_METADATA");
         TextMessage response;
         IECSNode node = new ECSNode();
-        for(Map.Entry<String, IECSNode> entry: ringNetwork.entrySet()) {
+        for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
             node = entry.getValue();
             try {
                 response = sendNodeMessage(message, node);
@@ -232,7 +233,7 @@ public class ECS implements IECS {
                 	//Add the server to the ringNetwork and update HashMap 
                     entry.setValue("TAKEN");
                     node = entry.getKey();
-                    String serverHash = md5.encode(node.getNodeName() +  KVConstants.DELIM +
+                    BigInteger serverHash = md5.encode(node.getNodeName() +  KVConstants.DELIM +
                                                node.getNodeHost() + KVConstants.DELIM +
                                                node.getNodePort());
                     
@@ -269,7 +270,7 @@ public class ECS implements IECS {
         int counter = 0;
     
         try { 
-            //Initialize own hashRing
+            // Initialize own hashRing
             ArrayList<String> metaDataContent = new ArrayList<String>();
             for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
                 if(counter < numNodes) {
@@ -277,13 +278,14 @@ public class ECS implements IECS {
                         counter++;
                         entry.setValue("TAKEN");
                         IECSNode node = entry.getKey();
-                        node.printMeta();
-                        String serverHash = md5.encode(node.getNodeHost() + KVConstants.HASH_DELIM +
+                        BigInteger serverHash = md5.encode(node.getNodeHost() + KVConstants.HASH_DELIM +
                                                    Integer.toString(node.getNodePort()));
                         //Setup begin and end hashing for server 
-                        node = updateHash(serverHash, node);   
+                        node = updateHash(serverHash, node);
+                        node.printMeta();
                         //Add node to ringNetwork
                         ringNetwork.put(serverHash, node);
+                        node.printMeta();
                 
                         //Prepare writable content to write to metaDatafile    
                         //TODO double check that data per server is written separate lines 
@@ -308,7 +310,7 @@ public class ECS implements IECS {
         Collection<IECSNode> nodes = new ArrayList<IECSNode>();
         TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "SETUP_NODE" + KVConstants.DELIM + cacheStrategy + KVConstants.DELIM + cacheSize); 
         TextMessage response;
-        for(Map.Entry<String, IECSNode> entry: ringNetwork.entrySet()) {
+        for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
             IECSNode node = entry.getValue();
             try {
                 response = sendNodeMessage(message, node);                      
@@ -326,12 +328,12 @@ public class ECS implements IECS {
         return nodes;
     }
 
-    public IECSNode updateHash(String nodeHash, IECSNode currNode) {
+    public IECSNode updateHash(BigInteger nodeHash, IECSNode currNode) {
     	
     	assert currNode != null;
         
         IECSNode prevNode = new ECSNode(), nextNode = new ECSNode();
-        String eHash = nodeHash;
+        BigInteger eHash = nodeHash;
 
         // Only one in network, so start and end are yours
         if(ringNetwork.isEmpty()) {
@@ -343,12 +345,16 @@ public class ECS implements IECS {
             logger.error("ERROR KVServer already in ringNetwork");
             return null;
         }
-        if(ringNetwork.higherKey(nodeHash) == null) {// the current hash is the highest value
+        
+        // the current hash is the highest value
+        if(ringNetwork.higherKey(nodeHash) == null) {
             prevNode = ringNetwork.firstEntry().getValue();
-            currNode.setNodeBeginHash(prevNode.getNodeHashRange()[0]);   //prevNode authority only goes as far currently added node                     
+            // prevNode authority only goes as far currently added node
+            currNode.setNodeBeginHash(prevNode.getNodeHashRange()[0]);                     
             prevNode.setNodeBeginHash(nodeHash);
         }
-        else { //currNode is at beginning or in between
+        else { 
+        	//currNode is at beginning or in between
             nextNode = ringNetwork.higherEntry(nodeHash).getValue();
             currNode.setNodeBeginHash(nextNode.getNodeHashRange()[0]);
             nextNode.setNodeBeginHash(nodeHash);
@@ -387,13 +393,13 @@ public class ECS implements IECS {
 
     public boolean removeNodes(Collection<IECSNode> nodes) {
         // TODO
-        String currNodeHash;    
+    	BigInteger currNodeHash;    
         IECSNode nextNode = null, currNode = null, node;
         boolean success = true;
         ArrayList<String> metaDataContent = new ArrayList<String>();
 
         for(IECSNode server: nodes) {
-            for(Map.Entry<String, IECSNode> entry : ringNetwork.entrySet()) {
+            for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
                 if(server.getNodeName().equals(entry.getValue().getNodeName())) {
                     //Found the node we want to remove
                     currNodeHash = entry.getKey();
@@ -411,7 +417,7 @@ public class ECS implements IECS {
         }
        
         try { 
-            for(Map.Entry<String, IECSNode> entry : ringNetwork.entrySet()) {
+            for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
                 node = entry.getValue();
                 metaDataContent.add(node.getNodeName() + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + node.getNodeHashRange()[0] + KVConstants.DELIM + node.getNodeHashRange()[1]);     
             }
@@ -424,7 +430,7 @@ public class ECS implements IECS {
         return success;
     }
 
-    public IECSNode findNextNode(String currHash) {
+    public IECSNode findNextNode(BigInteger currHash) {
         IECSNode nextNode = new ECSNode();
         if(ringNetwork.size() <= 1 || !ringNetwork.containsKey(currHash))
             nextNode = null;
@@ -439,14 +445,16 @@ public class ECS implements IECS {
         return nextNode; 
     }
     
+    // Return a map of all nodes.
+    // Server Name -> IECSNode
     public Map<String, IECSNode> getNodes() {
-        return this.ringNetwork;
+        return null;
     }
 
     public IECSNode getNodeByKey(String Key) {
         IECSNode serverNode;
         if(ringNetwork.isEmpty()) return null;
-        String encodedKey = md5.encode(Key);
+        BigInteger encodedKey = md5.encode(Key);
         if(ringNetwork.higherEntry(encodedKey) == null) {
             serverNode = ringNetwork.firstEntry().getValue();
         }

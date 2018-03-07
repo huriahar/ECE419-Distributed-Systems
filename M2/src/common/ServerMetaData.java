@@ -1,11 +1,13 @@
 package common;
 
+import java.math.BigInteger;
+
 public class ServerMetaData {
     public String name;
     public String addr;
     public int port;
-    public String bHash;
-    public String eHash;
+    public BigInteger bHash;
+    public BigInteger eHash;
 
     public static final int SERVER_NAME = 0;
     public static final int SERVER_ADDR = 1;
@@ -13,7 +15,7 @@ public class ServerMetaData {
     public static final int BEGIN_HASH = 3;
     public static final int END_HASH = 4;
 
-    public ServerMetaData(String name, String addr, int port, String bHash, String eHash) {
+    public ServerMetaData(String name, String addr, int port, BigInteger bHash, BigInteger eHash) {
         this.name = name;
         this.addr = addr;
         this.port = port;
@@ -27,8 +29,8 @@ public class ServerMetaData {
         this.addr = data[SERVER_ADDR];
         this.port = Integer.parseInt(data[SERVER_PORT]);
         if(data.length > 3) {
-            this.bHash = data[BEGIN_HASH];
-            this.eHash = data[END_HASH];
+            this.bHash = new BigInteger(data[BEGIN_HASH]);
+            this.eHash = new BigInteger(data[END_HASH]);
         }
     }
 
@@ -44,12 +46,12 @@ public class ServerMetaData {
         this.addr = addr;
     }
 
-    public void setBeginHash(String s) {
+    public void setBeginHash(BigInteger s) {
         this.bHash = s;
     }
 
-    public void setEndHash(String s) {
-        this.eHash = s;
+    public void setEndHash(BigInteger e) {
+        this.eHash = e;
     }
     
     public String getServerName() {
@@ -62,6 +64,14 @@ public class ServerMetaData {
     
     public int getServerPort() {
     	return this.port;
+    }
+    
+    public BigInteger getBeginHash() {
+    	return this.bHash;
+    }
+    
+    public BigInteger getEndHash() {
+    	return this.eHash;
     }
 
 }

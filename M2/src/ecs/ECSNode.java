@@ -1,11 +1,13 @@
 package ecs;
 
+import java.math.BigInteger;
+
 import common.*;
 
 public class ECSNode implements IECSNode{
     private ServerMetaData meta;
     
-    public ECSNode(String name, String addr, int port, String bHash, String eHash) {
+    public ECSNode(String name, String addr, int port, BigInteger bHash, BigInteger eHash) {
         this.meta = new ServerMetaData(name, addr, port, bHash, eHash);
     }
 
@@ -43,8 +45,8 @@ public class ECSNode implements IECSNode{
     /**
      * @return  array of two strings representing the low and high range of the hashes that the given node is responsible for
      */
-    public String[] getNodeHashRange() {
-        String [] hashRange = {this.meta.bHash, this.meta.eHash};
+    public BigInteger[] getNodeHashRange() {
+    	BigInteger [] hashRange = {this.meta.bHash, this.meta.eHash};
         return hashRange;    
     }
 
@@ -71,21 +73,22 @@ public class ECSNode implements IECSNode{
     /**
      * @return  array of two strings representing the low and high range of the hashes that the given node is responsible for
      */
-    public void setNodeBeginHash(String bHash) {
+    public void setNodeBeginHash(BigInteger bHash) {
         if(this.meta == null) {
             System.out.println("this.meta not initialized!");
         }
-        this.meta.bHash = bHash;
+        this.meta.setBeginHash(bHash);
     }
 
     /**
      * @return  array of two strings representing the low and high range of the hashes that the given node is responsible for
      */
-    public void setNodeEndHash(String eHash) {
-        this.meta.eHash = eHash;
+    public void setNodeEndHash(BigInteger eHash) {
+        this.meta.setEndHash(eHash);
     }
     
     public void printMeta() {
     	System.out.println("Server Name: " + meta.getServerName() + " ServerAddr: " + meta.getServerAddr() + " ServerPort: " + meta.getServerPort());
+    	System.out.println("Server bHash: " + meta.getBeginHash().toString() + " eHash: " + meta.getEndHash().toString());
     }
 }
