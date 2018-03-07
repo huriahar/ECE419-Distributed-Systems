@@ -63,9 +63,10 @@ public class KVServer implements IKVServer, Runnable {
      * @param zkPort        port where zookeeper is running
      */
     public KVServer(String name, String zkHostname, int zkPort) {
-        this.metadata = new ServerMetaData(name, UNSET_ADDR, zkPort, new BigInteger(KVConstants.MIN_HASH), new BigInteger(KVConstants.MIN_HASH));
+        this.metadata = new ServerMetaData(name, UNSET_ADDR, zkPort, KVConstants.MIN_HASH, KVConstants.MIN_HASH);
         this.serverFilePath = "SERVER_" + Integer.toString(metadata.port);
         this.cache = KVCache.createKVCache(DEFAULT_CACHE_SIZE, DEFAULT_CACHE_STRATEGY);
+        this.metaDataFile = Paths.get("metaDataECS.config");
     }
 
     public int getPort(){
@@ -445,13 +446,10 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public boolean isResponsible(String key) {
-        return true;
-        /*
-        String encodedKey = md5.encode(key);
+        BigInteger encodedKey = md5.encode(key);
         return ((encodedKey.compareTo(metadata.bHash) >= 0  && encodedKey.compareTo(metadata.eHash) < 0) ||
                (encodedKey.compareTo(metadata.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0) ||
                (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(metadata.eHash) < 0));
-        */
     }
 
     public String getMetaDataFromFile() {
@@ -464,7 +462,7 @@ public class KVServer implements IKVServer, Runnable {
             }
         } catch (IOException e) {
             marshalledData.append("METADATA_FETCH_ERROR");
-            logger.error("METADATA_FETCH_ERROR could not fetch meta data");
+            logger.error("METADATA_FETCH_ERROR could not fetch meta data: " + e);
         }
         return marshalledData.toString();
     }
@@ -482,10 +480,16 @@ public class KVServer implements IKVServer, Runnable {
         return null;
     }
 
-    public void updateMetaData() {
-        metadata = new ServerMetaData(getMetaDataByName(getHostname()));
+    public boolean updateMetaData() {
+        String meta = getMetaDataByName(getHostname());
+        if(meta == null) {
+            System.out.println("hereh!!!");
+            return false;
+        }
+        metadata = new ServerMetaData(meta);
         logger.info("Set KVServer (" + metadata.name + ", " + metadata.addr + ", " + metadata.port + ") " +
                     "\nStart hash to: " + metadata.bHash + "\nEnd hash to: " + metadata.eHash);
+        return true;
     }
 
     @Override

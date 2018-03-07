@@ -1,5 +1,7 @@
 package common;
 
+import java.math.BigInteger;
+
 public class KVConstants {
     // Message marshalling and parsing
     public static final String DELIM = "|";
@@ -13,6 +15,6 @@ public class KVConstants {
     public static final int SESSION_TIMEOUT = 5000;
 
     // Consistent Hashing
-    public static final String MIN_HASH = "0000000000000000000000000000000";
-    public static final String MAX_HASH = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+    public static final BigInteger MIN_HASH = new BigInteger("0000000000000000000000000000000", 16);
+    public static final BigInteger MAX_HASH = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16);
 } 

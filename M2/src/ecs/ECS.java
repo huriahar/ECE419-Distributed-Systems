@@ -92,13 +92,25 @@ public class ECS implements IECS {
         }
     }
 
+    private boolean inRingNetwork(IECSNode node) {
+        String name = node.getNodeName();
+        boolean found = false;
+        for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
+             
+            if (entry.getValue().getNodeName().equals(name)) {
+                found = true;
+                break;
+            }
+        }
+        return found;
+    }
+
     private void populateRingNetwork()
             throws IOException {
         ArrayList<String> lines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
         int numServers = lines.size();
         
         for (int i = 0; i < numServers ; ++i) {
-        	System.out.println(lines.get(i));
             IECSNode node = new ECSNode(lines.get(i));
             BigInteger serverHash = md5.encode(node.getNodeName() + KVConstants.DELIM +
                                            node.getNodeHost() + KVConstants.DELIM +
@@ -219,7 +231,6 @@ public class ECS implements IECS {
             } catch (IOException ex) {
                 logger.error("UPDATE_ERROR: Update for KVServer failed");
             }
-                
         }
     }
  
@@ -284,13 +295,17 @@ public class ECS implements IECS {
                         node = updateHash(serverHash, node);
                         node.printMeta();
                         //Add node to ringNetwork
-                        ringNetwork.put(serverHash, node);
-                        node.printMeta();
-                
+                        if(!inRingNetwork(node)) {
+                            //if already in ringNetwork, dont add it
+                            ringNetwork.put(serverHash, node);
+                        }
                         //Prepare writable content to write to metaDatafile    
                         //TODO double check that data per server is written separate lines 
-                        metaDataContent.add(node.getNodeName() + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM
-                                            + node.getNodeHashRange()[0] + KVConstants.DELIM + node.getNodeHashRange()[1]);      
+                        metaDataContent.add(node.getNodeName() + KVConstants.DELIM +
+                                            node.getNodeHost() + KVConstants.DELIM +
+                                            node.getNodePort() + KVConstants.DELIM +
+                                            node.getNodeHashRange()[0] + KVConstants.DELIM +
+                                            node.getNodeHashRange()[1]);      
 
                         //Add chosen node to collection
                         chosenNodes.add(node);
@@ -381,7 +396,7 @@ public class ECS implements IECS {
             success = false;
         }
 
-        logger.info("KVServer process initiated successfully");
+        logger.info("KVServer process launched successfully");
         return success;
     }
 
@@ -464,7 +479,11 @@ public class ECS implements IECS {
 
     public TextMessage sendNodeMessage(TextMessage message, IECSNode node) throws IOException {
         TextMessage response = new TextMessage("") ; 
-        connect(node);
+        try {
+            connect(node);
+        } catch (IOException e) {
+            logger.error("Failed to connect to server <" + node.getNodeHost() + ":" + node.getNodePort() + ">. KVServer launch script may have failed.");
+        }
         sendMessage(message);
         response = receiveMessage();
         disconnect(node);
