@@ -142,8 +142,8 @@ public class ECSClient implements IECSClient {
             case "addNode":
                 if(tokens.length == 3) {
                     try {
-                        int cacheSize = Integer.parseInt(tokens[1]);
                         String cacheStrategy = tokens[2];
+                        int cacheSize = Integer.parseInt(tokens[1]);
                         if (KVCache.isValidStrategy(cacheStrategy)) {
                             IECSNode newNode = addNode(cacheStrategy, cacheSize);
                             if (newNode != null) {
@@ -228,7 +228,7 @@ public class ECSClient implements IECSClient {
         sb.append("\t\t Stops the storage service (get/put requests) but process is running. \n");
         sb.append(PROMPT).append("shutdown");
         sb.append("\t\t Stop all the servers and shuts down process  \n");
-        sb.append(PROMPT).append("addNode <cacheSize> <cacheStrategy>");
+        sb.append(PROMPT).append("addNode <cacheStrategy> <cacheSize>");
         sb.append("\t\t Adds a new server of cacheSize with cacheStrategy \n");
         sb.append(PROMPT).append("removeNode <serverName1> <serverName2> ...");
         sb.append("\t\t Removes server with given names \n");

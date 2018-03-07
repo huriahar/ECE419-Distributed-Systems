@@ -216,11 +216,20 @@ public class ECS implements IECS {
        
     public boolean alertMetaDataUpdate() {
         boolean success = true;
-        TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_METADATA");
-        TextMessage response;
-        IECSNode node = new ECSNode();
+        TextMessage response, message;
+        IECSNode node = new ECSNode(), nextNode = new ECSNode();
+        printDebug("In alertMetaDataUpdate");
         for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
             node = entry.getValue();
+            nextNode = ringNetwork.higherEntry(entry.getKey()).getValue();
+            if(nextNode != null) {
+                printDebug("Node has a higher value");
+                message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_METADATA" + KVConstants.DELIM + nextNode.getNodeName() + KVConstants.DELIM + nextNode.getNodeHashRange()[0] + KVConstants.DELIM + nextNode.getNodeHashRange()[1]);
+            }
+            else {
+                printDebug("Node is the only one in ringNetwork");
+                message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_METADATA" + KVConstants.DELIM + node.getNodeName() + KVConstants.DELIM + node.getNodeHashRange()[0] + KVConstants.DELIM + node.getNodeHashRange()[1]);
+            }
             try {
                 response = sendNodeMessage(message, node);
                 if(response.getMsg().equals("UPDATE_SUCCESS")) {
@@ -302,10 +311,12 @@ public class ECS implements IECS {
                         System.out.println("updateHash " + serverHash.toString(16));
                         //Setup begin and end hashing for server 
                         node = updateHash(serverHash, node);
+                        printDebug("Before printing meta");
                         node.printMeta();
                         //Add node to ringNetwork
                         if(!inRingNetwork(node)) {
                             //if already in ringNetwork, dont add it
+                            printDebug("Adding node in ring");
                             ringNetwork.put(serverHash, node);
                         }
                         //Prepare writable content to write to metaDatafile    
@@ -322,6 +333,7 @@ public class ECS implements IECS {
                 }
             } 
             //Once all nodes are added, write to metaDataFile
+            printDebug("Updating metadata file");
             updateMetaData(metaDataContent);
         } catch (IOException io) {
             logger.error("Unable to write to metaDataFile"); 
