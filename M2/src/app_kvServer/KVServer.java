@@ -549,13 +549,18 @@ public class KVServer implements IKVServer, Runnable {
         StringBuilder toSend = new StringBuilder();
         try {
             Path serverPath = Paths.get(this.serverFilePath);
-            ArrayList<String> keyValuePairs = new ArrayList<>(Files.readAllLines(serverPath,
-                                                         StandardCharsets.UTF_8));
-            for(String line : keyValuePairs) {
-                String[] kvp = line.split("\\" + KVConstants.DELIM);
-                if(!isResponsible(kvp[0])) {
-                    toSend.append(line + KVConstants.NEWLINE_DELIM);
+            if(Files.exists(serverPath)) {
+                ArrayList<String> keyValuePairs = new ArrayList<>(Files.readAllLines(serverPath,
+                                                             StandardCharsets.UTF_8));
+                for(String line : keyValuePairs) {
+                    String[] kvp = line.split("\\" + KVConstants.DELIM);
+                    if(!isResponsible(kvp[0])) {
+                        toSend.append(line + KVConstants.NEWLINE_DELIM);
+                    }
                 }
+            }
+            else {
+                serverPath = Files.createFile(serverPath);
             }
         } catch (IOException e) {
             logger.error("ERROR while moving data from server to target server" + targetName);
