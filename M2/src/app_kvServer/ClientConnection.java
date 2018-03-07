@@ -185,14 +185,17 @@ public class ClientConnection implements Runnable {
                     sendMessage(new TextMessage("SHUTDOWN_SUCCESS"));
                     return;
                 case "UPDATE_METADATA":
-                    server.updateMetaData();
-                    //targetRange in msg[1], msg[2]
-                    String[] targetRange = Arrays.copyOfRange(msg, 1, 2);
-                    String targetName = msg[3];
-                    boolean success = server.moveData(targetRange, targetName);
+                    boolean success = server.updateMetaData();
+                    if(success) {
+                        //targetRange in msg[1], msg[2]
+                        String[] targetRange = Arrays.copyOfRange(msg, 1, 2);
+                        String targetName = msg[3];
+                        success = server.moveData(targetRange, targetName);
+                    }
                     if(success) {
                         sendMessage(new TextMessage("UPDATE_SUCCESS"));
                     } else {
+                        System.out.println("hereh!!!");
                         sendMessage(new TextMessage("UPDATE_FAILED"));
                     }
                     return;
