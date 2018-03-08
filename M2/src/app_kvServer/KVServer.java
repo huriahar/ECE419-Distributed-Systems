@@ -545,6 +545,7 @@ public class KVServer implements IKVServer, Runnable {
         if(targetName.equals(getHostname())) return true;
         lockWrite();
         StringBuilder toSend = new StringBuilder();
+        toSend.append("MOVE_KVPAIRS" + KVConstants.DELIM);
         try {
             Path serverPath = Paths.get(this.serverFilePath);
             if(Files.exists(serverPath)) {
