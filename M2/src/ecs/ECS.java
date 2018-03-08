@@ -410,10 +410,10 @@ public class ECS implements IECS {
         boolean success = true;
         Process proc;
         printDebug("Launching " + node.getNodeHost() + " and " + node.getNodePort() + " ...");
- 
+
         Runtime run = Runtime.getRuntime();
         try {
-            String launchCmd = "script.sh " + node.getNodeName() + " localhost " + Integer.toString(2181);
+            String[] launchCmd = {"m2ssh.sh", node.getNodeName(), node.getNodeHost(), Integer.toString(node.getNodePort())};
             proc = run.exec(launchCmd);
             // Also create a new znode for the node
             // Update data on znode about server config and join ZK_ROOT group
