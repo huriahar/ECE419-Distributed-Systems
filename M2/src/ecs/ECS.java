@@ -273,11 +273,20 @@ public class ECS implements IECS {
                 	//Add the server to the ringNetwork and update HashMap 
                     entry.setValue("TAKEN");
                     node = entry.getKey();
+
+                    if(launchKVServer(node, cacheStrategy, cacheSize)) {
+                        logger.info("SUCCESS. Launched KVServer :" + node.getNodeName());
+                    } 
+                    else {
+                        logger.error("ERROR. Unable to launch KVServer :" + node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());           
+                        return null;
+                    }
+                    
                     BigInteger serverHash = md5.encode(node.getNodeHost() + KVConstants.DELIM + node.getNodePort());
                     printDebug("Adding node: " + node.getNodeName());
-                    // Add the node to ZK
-                	ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
-                    ZKImpl.list(KVConstants.ZK_ROOT);
+                    //// Add the node to ZK
+                	//ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
+                    //ZKImpl.list(KVConstants.ZK_ROOT);
                 	//Update the hashing for all servers in the ring
                     node = updateHash(serverHash, node);
                     if(!inRingNetwork(node)) {
@@ -299,9 +308,6 @@ public class ECS implements IECS {
         }
         catch (IOException io) {
             logger.error("Unable to write to metaDataFile"); 
-        }
-        catch (KeeperException | InterruptedException e) {
-			logger.error("Unable to join group. Exception: " + e);
         }
         //Other errors ??
         return node; 
