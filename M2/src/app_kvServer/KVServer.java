@@ -439,8 +439,8 @@ public class KVServer implements IKVServer, Runnable {
     public boolean isResponsible(String key) {
         BigInteger encodedKey = md5.encode(key);
         return ((encodedKey.compareTo(metadata.bHash) >= 0  && encodedKey.compareTo(metadata.eHash) < 0) ||
-               (encodedKey.compareTo(metadata.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0) ||
-               (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(metadata.eHash) < 0));
+               (encodedKey.compareTo(metadata.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0 && metadata.eHash.compareTo(KVConstants.MIN_HASH) >= 0) || 
+               (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(metadata.eHash) < 0 && metadata.bHash.compareTo(KVConstants.MAX_HASH) < 0);
     }
 
     public String getMetaDataFromFile() {
@@ -545,6 +545,7 @@ public class KVServer implements IKVServer, Runnable {
         if(targetName.equals(getHostname())) return true;
         lockWrite();
         StringBuilder toSend = new StringBuilder();
+        toSend.append("MOVE_KVPAIRS" + KVConstants.DELIM);
         try {
             Path serverPath = Paths.get(this.serverFilePath);
             if(Files.exists(serverPath)) {

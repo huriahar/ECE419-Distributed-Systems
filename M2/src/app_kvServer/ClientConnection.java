@@ -91,7 +91,8 @@ public class ClientConnection implements Runnable {
                         }
                         continue;
                     }
-                    if (server.isStopped()){
+                    System.out.println("Is server stopped? "  + server.isStopped());
+                    if (server.isStopped()) {
                         sendMessage(new TextMessage("SERVER_STOPPED"));
                         logger.info("SERVER_STOPPED cannot handle client requests at the moment.");
                         continue;
@@ -108,6 +109,9 @@ public class ClientConnection implements Runnable {
                         if(!server.isReadLocked()) {
                             handleGetCmd(key);
                         }
+                    }
+                    else if(command.equals("MOVE_KVPAIRS")) {
+                         handleMoveKVPairs(key + value);
                     }
                     else {
                         logger.error("Received invalid message type from client.");
@@ -162,6 +166,18 @@ public class ClientConnection implements Runnable {
             result = false;
         }
         return result;
+    }
+
+    private void handleMoveKVPairs(String kvpairs) {
+        String[] KVPairs = kvpairs.split(KVConstants.NEWLINE_DELIM);
+        for(int i = 0; i < KVPairs.length ; i++) {
+            String[] kvpair = KVPairs[i].split("\\" + KVConstants.DELIM);
+            try {
+            server.putKV(kvpair[0], kvpair[1]);
+            } catch (Exception e) {
+                logger.error("failed to move KVpair ( " + kvpair[0] + ", " + kvpair[1] + ") to server " + server.getHostname());
+            }
+        }
     }
 
     private void handleECSCmd (String[] msg) {
