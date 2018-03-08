@@ -564,7 +564,7 @@ public class ECS implements IECS {
 
     public void disconnect() {
         logger.info("Closing ECS socket");
-
+        // TODO: Call each of the servers to close as well
         try {
             if(ECSSocket != null) {
                 ECSSocket.close();
