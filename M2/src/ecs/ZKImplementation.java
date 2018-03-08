@@ -37,7 +37,7 @@ public class ZKImplementation implements Watcher{
 	public void createGroup (String groupName)
 			throws KeeperException, InterruptedException {
 		String path = KVConstants.ZK_SEP + groupName;
-		String createdPath = zk.create(path,  null,  Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+		String createdPath = zk.create(path,  null,  Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 		logger.info("Created group " + createdPath);
 	}
 	
