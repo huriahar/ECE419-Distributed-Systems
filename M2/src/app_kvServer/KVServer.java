@@ -62,8 +62,9 @@ public class KVServer implements IKVServer, Runnable {
      * @param zkHostname    hostname where zookeeper is running
      * @param pPort        port where zookeeper is running
      */
-    public KVServer(String name, String hostAddr, String zkHostname, int port) {
-        this.metadata = new ServerMetaData(name, hostAddr, port, null, null);
+    public KVServer(String name, String zkHostname, int port) {
+        System.out.println("Here!!!");
+    	this.metadata = new ServerMetaData(name, zkHostname, port, null, null);
         this.serverFilePath = "SERVER_" + Integer.toString(port);
         this.cache = KVCache.createKVCache(DEFAULT_CACHE_SIZE, DEFAULT_CACHE_STRATEGY);
         this.metaDataFile = Paths.get("metaDataECS.config");
@@ -440,7 +441,7 @@ public class KVServer implements IKVServer, Runnable {
         BigInteger encodedKey = md5.encode(key);
         return ((encodedKey.compareTo(metadata.bHash) >= 0  && encodedKey.compareTo(metadata.eHash) < 0) ||
                (encodedKey.compareTo(metadata.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0 && metadata.eHash.compareTo(KVConstants.MIN_HASH) >= 0) || 
-               (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(metadata.eHash) < 0 && metadata.bHash.compareTo(KVConstants.MAX_HASH) < 0);
+               (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(metadata.eHash) < 0 && metadata.bHash.compareTo(KVConstants.MAX_HASH) < 0));
     }
 
     public String getMetaDataFromFile() {
@@ -458,8 +459,7 @@ public class KVServer implements IKVServer, Runnable {
         return marshalledData.toString();
     }
 
-    public String getMetaDataOfServer() {
-    	String hostName = getHostname();
+    public String getMetaDataOfServer(String hostName) {
     	ArrayList<String> metaDataLines = null;
 		try {
 			metaDataLines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
@@ -478,7 +478,7 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public boolean updateMetaData() {
-        String meta = getMetaDataOfServer();
+        String meta = getMetaDataOfServer(getHostname());
         if(meta == null) {
             System.out.println("Could not find meta data of server " + getHostname() + " " + getPort());
             return false;
@@ -567,7 +567,7 @@ public class KVServer implements IKVServer, Runnable {
         }
         
         //Send to receiving server
-        ServerMetaData targetMeta = new ServerMetaData(getMetaDataOfServer());
+        ServerMetaData targetMeta = new ServerMetaData(getMetaDataOfServer(targetName));
         KVStore sender = new KVStore(targetMeta.addr, targetMeta.port);
         sender.connect();
         sender.sendMessage(new TextMessage(toSend.toString()));
@@ -592,7 +592,7 @@ public class KVServer implements IKVServer, Runnable {
                 String name = args[0];
                 String addr = args[1];
                 int port = Integer.parseInt(args[2]);
-                new KVServer(name, addr, KVConstants.ZK_ROOT, port).run();
+                new KVServer(name, addr, port).run();
             }
         }
         catch (IOException e) {
