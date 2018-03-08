@@ -413,10 +413,15 @@ public class ECS implements IECS {
  
         Runtime run = Runtime.getRuntime();
         try {
-            String launchCmd = "script.sh " + node.getNodeName() + " " + node.getNodeHost() + " " + Integer.toString(node.getNodePort());
+            String launchCmd = "script.sh " + node.getNodeName() + " localhost " + Integer.toString(2181);
             proc = run.exec(launchCmd);
             // Also create a new znode for the node
+            // Update data on znode about server config and join ZK_ROOT group
             ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
+            String data = "SERVER_STOPPED" + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() +
+            		KVConstants.DELIM + Integer.toString(cacheSize) + KVConstants.DELIM + cacheStrategy;
+            String path = KVConstants.ZK_SEP + KVConstants.ZK_ROOT + KVConstants.ZK_SEP + node.getNodeName();
+            ZKImpl.updateData(path, data);
             Thread.sleep(KVConstants.LAUNCH_TIMEOUT);
 
         } catch (InterruptedException ex) {

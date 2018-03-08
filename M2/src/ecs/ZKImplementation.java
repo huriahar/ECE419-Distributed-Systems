@@ -1,6 +1,7 @@
 package ecs;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
@@ -12,6 +13,7 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.data.Stat;
 
 import common.*;
 
@@ -69,8 +71,19 @@ public class ZKImplementation implements Watcher{
 			throws KeeperException, InterruptedException {
 		String path = KVConstants.ZK_SEP + groupName + KVConstants.ZK_SEP + memberName;
 		// When a server joins the group, it is in SERVER_STOPPED state - save that in znode
-		String createdPath = zk.create(path, "SERVER_STOPPED".getBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+		String createdPath = zk.create(path, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
 		logger.info("Added node " + createdPath);
+	}
+	
+	public void updateData (String path, String data)
+			throws KeeperException, InterruptedException {
+		Stat stat = zk.exists(path, true);
+		zk.setData(path, data.getBytes(StandardCharsets.UTF_8), stat.getVersion());
+	}
+	
+	public String readData (String path)
+			throws KeeperException, InterruptedException {
+		return zk.getData(path, true, zk.exists(path, true)).toString();
 	}
 	
 	public void deleteGroup (String groupName)

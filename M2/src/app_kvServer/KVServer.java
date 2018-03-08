@@ -29,6 +29,7 @@ import logger.LogSetup;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.KeeperException;
 
 import common.md5;
 import common.KVConstants;
@@ -37,6 +38,7 @@ import common.messages.TextMessage;
 import cache.IKVCache.CacheStrategy;
 import cache.KVCache;
 import client.KVStore;
+import ecs.ZKImplementation;
 
 public class KVServer implements IKVServer, Runnable {
 
@@ -56,17 +58,30 @@ public class KVServer implements IKVServer, Runnable {
     private static final String UNSET_ADDR = null;
     private static final int DEFAULT_CACHE_SIZE = 5;
     private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
+    
+    private ZKImplementation zkImplServer;
     /**
      * Start KV Server with selected name
      * @param name            unique name of server
      * @param zkHostname    hostname where zookeeper is running
-     * @param pPort        port where zookeeper is running
+     * @param zkPort        port where zookeeper is running
      */
-    public KVServer(String name, String zkHostname, int port) {
-        System.out.println("Here!!!");
-    	this.metadata = new ServerMetaData(name, zkHostname, port, null, null);
-        this.serverFilePath = "SERVER_" + Integer.toString(port);
-        this.cache = KVCache.createKVCache(DEFAULT_CACHE_SIZE, DEFAULT_CACHE_STRATEGY);
+    public KVServer(String name, String zkHostname, int zkPort) {
+    	zkImplServer = new ZKImplementation();
+    	String data = null;
+    	try {
+			zkImplServer.zkConnect(zkHostname);
+			String path = KVConstants.ZK_SEP + KVConstants.ZK_ROOT + KVConstants.ZK_SEP + name;
+			data = zkImplServer.readData(path);			
+		} catch (IOException | InterruptedException e) {
+			logger.error("Unable to connect to zk and read data");
+		} catch (KeeperException e) {
+			logger.error("Unable to connect to zk and read data");
+		}
+    	String[] zNodeData = data.split("\\" + KVConstants.DELIM);
+    	this.metadata = new ServerMetaData(name, zNodeData[1], Integer.parseInt(zNodeData[2]), null, null);
+        this.serverFilePath = "SERVER_" + Integer.toString(zkPort);
+        this.cache = KVCache.createKVCache(Integer.parseInt(zNodeData[3]), zNodeData[4]);
         this.metaDataFile = Paths.get("metaDataECS.config");
     }
 
