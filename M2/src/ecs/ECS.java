@@ -58,7 +58,7 @@ public class ECS implements IECS {
                 this.metaDataFile = Files.createFile(Paths.get(metaFile));
             else {
                 this.metaDataFile = Paths.get(metaFile);
-                populateRingNetwork();
+//                populateRingNetwork();
             }
             populateAvailableNodes();
             ZKImpl.zkConnect("localhost");
@@ -104,21 +104,6 @@ public class ECS implements IECS {
             }
         }
         return found;
-    }
-
-    private void populateRingNetwork()
-            throws IOException {
-        ArrayList<String> lines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
-        int numServers = lines.size();
-        
-        for (int i = 0; i < numServers ; ++i) {
-            IECSNode node = new ECSNode(lines.get(i));
-            BigInteger serverHash = md5.encode(node.getNodeName() + KVConstants.DELIM +
-                                           node.getNodeHost() + KVConstants.DELIM +
-                                           node.getNodePort());
-            System.out.println("serverHash " + serverHash.toString());
-            this.ringNetwork.put(serverHash, node);
-        }
     }
 
     public int availableServers() {
@@ -697,4 +682,19 @@ public class ECS implements IECS {
 	}
 
 
+//    private void populateRingNetwork()
+//            throws IOException {
+//        ArrayList<String> lines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
+//        int numServers = lines.size();
+//        
+//        for (int i = 0; i < numServers ; ++i) {
+//            IECSNode node = new ECSNode(lines.get(i));
+//            BigInteger serverHash = md5.encode(node.getNodeName() + KVConstants.DELIM +
+//                                           node.getNodeHost() + KVConstants.DELIM +
+//                                           node.getNodePort());
+//            System.out.println("serverHash " + serverHash.toString());
+//            this.ringNetwork.put(serverHash, node);
+//        }
+//    }
+//
 }
