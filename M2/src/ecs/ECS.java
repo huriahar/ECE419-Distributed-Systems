@@ -217,15 +217,15 @@ public class ECS implements IECS {
         }               
     } 
     
-    // Update meta data fo each of the running servers
+    // Update meta data for each of the running servers
     public boolean alertMetaDataUpdate() {
         boolean success = true;
         TextMessage response, message;
-        IECSNode node = new ECSNode(), nextNode = new ECSNode();
+        IECSNode node = new ECSNode(), nextNode = new ECSNode(), firstNode = new ECSNode();
         printDebug("In alertMetaDataUpdate");
         for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
-            node = entry.getValue();
             BigInteger hash = entry.getKey();
+            node = entry.getValue();
             Map.Entry<BigInteger, IECSNode> nextEntry = ringNetwork.higherEntry(entry.getKey());
             if(nextEntry != null) {
                 nextNode = nextEntry.getValue();
@@ -233,16 +233,18 @@ public class ECS implements IECS {
                 message = new TextMessage("ECS" + KVConstants.DELIM +
                                         "UPDATE_METADATA" + KVConstants.DELIM +
                                         nextNode.getNodeName() + KVConstants.DELIM +
-                                        nextNode.getNodeHashRange()[0] + KVConstants.DELIM +
-                                        nextNode.getNodeHashRange()[1]);
+                                        nextNode.getNodeHashRange()[0].toString(16) + KVConstants.DELIM +
+                                        nextNode.getNodeHashRange()[1].toString(16));
             }
             else {
-                printDebug("Node is the only one in ringNetwork or nothing higher exists");
+                printDebug("Node is the only one in ringNetwork or next node wraps wround");
+                Map.Entry<BigInteger, IECSNode> firstEntry = ringNetwork.firstEntry();
+                firstNode = firstEntry.getValue();
                 message = new TextMessage("ECS" + KVConstants.DELIM +
                                         "UPDATE_METADATA" + KVConstants.DELIM +
-                                         node.getNodeName() + KVConstants.DELIM +
-                                         node.getNodeHashRange()[0] + KVConstants.DELIM +
-                                         node.getNodeHashRange()[1]);
+                                         firstNode.getNodeName() + KVConstants.DELIM +
+                                         firstNode.getNodeHashRange()[0].toString(16) + KVConstants.DELIM +
+                                         firstNode.getNodeHashRange()[1].toString(16));
             }
             try {
                 response = sendNodeMessage(message, node);
@@ -323,7 +325,6 @@ public class ECS implements IECS {
                         node = updateHash(serverHash, node);
                         // Add node to ringNetwork
                         ringNetwork.put(serverHash, node);
-                        printRing();
                         //Add chosen node to collection
                         chosenNodes.add(node);
                     }
@@ -335,23 +336,24 @@ public class ECS implements IECS {
             updateMetaData();   
             //the alert will be called once launching of the servers is done from ECSClient
         } catch (IOException io) {
-            logger.error("Unable to write to metaDataFile"); 
+            logger.error("Unable to write to metaDataFile");
         }
         
         return chosenNodes; 
     }
 
-    public Collection<IECSNode> setupNodesCacheConfig(int count, String cacheStrategy, int cacheSize) {
-        Collection<IECSNode> nodes = new ArrayList<IECSNode>();
+    public Collection<IECSNode> setupNodesCacheConfig(Collection<IECSNode> nodes, String cacheStrategy, int cacheSize) {
+        Collection<IECSNode> nodesResult = new ArrayList<IECSNode>();
         TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "SETUP_NODE" + KVConstants.DELIM + cacheStrategy + KVConstants.DELIM + cacheSize); 
         TextMessage response;
-        for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
-            IECSNode node = entry.getValue();
-            try {
-                response = sendNodeMessage(message, node);                      
-                if(response.getMsg().equals("SETUP_SUCCESS")) {
+        for(IECSNode node : nodes) {
+        	System.out.println("Here!!");
+        	try {
+        		response = sendNodeMessage(message, node);
+        		if(response.getMsg().equals("SETUP_SUCCESS")) {
+        			System.out.println("Here!!");
                     logger.info("SUCCESS: Setup for KVServer: " + node.getNodeName()); 
-                    nodes.add(node); 
+                    nodesResult.add(node); 
                 }
                 else if(response.getMsg().equals("SETUP_FAILED")) {
                     logger.error("ERROR: Failed in Setup for KVServer: " + node.getNodeName());
@@ -360,7 +362,7 @@ public class ECS implements IECS {
                 logger.error("ERROR: Failed in Setup for KVServer: " + node.getNodeName()); 
             } 
         }
-        return nodes;
+        return nodesResult;
     }
 
     public IECSNode updateHash(BigInteger nodeHash, IECSNode currNode) {
@@ -411,8 +413,10 @@ public class ECS implements IECS {
  
         Runtime run = Runtime.getRuntime();
         try {
-            String launchCmd = "script.sh " + node.getNodeHost() + " " + node.getNodePort();
+            String launchCmd = "script.sh " + node.getNodeName() + " " + node.getNodeHost() + " " + Integer.toString(node.getNodePort());
             proc = run.exec(launchCmd);
+            // Also create a new znode for the node
+            ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
             Thread.sleep(KVConstants.LAUNCH_TIMEOUT);
 
         } catch (InterruptedException ex) {
@@ -421,7 +425,9 @@ public class ECS implements IECS {
         } catch (IOException io) {
             logger.error("ERROR: KVServer IOException: " + io);
             success = false;
-        }
+        } catch (KeeperException e) {
+        	logger.error("ERROR: Unable to add node to ZK " + e);
+		}
 
         logger.info("KVServer process launched successfully");
         return success;
@@ -527,7 +533,8 @@ public class ECS implements IECS {
         return serverNode;
     }
 
-    public TextMessage sendNodeMessage(TextMessage message, IECSNode node) throws IOException {
+    public TextMessage sendNodeMessage(TextMessage message, IECSNode node)
+    			throws IOException {
         TextMessage response = new TextMessage("") ; 
         try {
             connectNode(node);
@@ -543,7 +550,8 @@ public class ECS implements IECS {
         return response;
     }
 
-    public void connectNode(IECSNode server) throws IOException {
+    public void connectNode(IECSNode server) 
+    		throws IOException {
         this.ECSSocket = new Socket(server.getNodeHost(), server.getNodePort());
         logger.info("ECS Connection to name: " + server.getNodeName() + " successful");
     }
@@ -651,19 +659,5 @@ public class ECS implements IECS {
 	public boolean shutdown() {
 		// TODO Auto-generated method stub
 		return false;
-	}
-
-	@Override
-	public Collection<IECSNode> addNodes(int count, String cacheStrategy,
-			int cacheSize) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Collection<IECSNode> setupNodes(int count, String cacheStrategy,
-			int cacheSize) {
-		// TODO Auto-generated method stub
-		return null;
 	}
 }

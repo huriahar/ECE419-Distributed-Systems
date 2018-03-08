@@ -60,21 +60,25 @@ public class KVServer implements IKVServer, Runnable {
      * Start KV Server with selected name
      * @param name            unique name of server
      * @param zkHostname    hostname where zookeeper is running
-     * @param zkPort        port where zookeeper is running
+     * @param pPort        port where zookeeper is running
      */
-    public KVServer(String name, String zkHostname, int zkPort) {
-        this.metadata = new ServerMetaData(name, UNSET_ADDR, zkPort, KVConstants.MIN_HASH, KVConstants.MIN_HASH);
-        this.serverFilePath = "SERVER_" + Integer.toString(metadata.port);
+    public KVServer(String name, String hostAddr, String zkHostname, int port) {
+        this.metadata = new ServerMetaData(name, hostAddr, port, null, null);
+        this.serverFilePath = "SERVER_" + Integer.toString(port);
         this.cache = KVCache.createKVCache(DEFAULT_CACHE_SIZE, DEFAULT_CACHE_STRATEGY);
         this.metaDataFile = Paths.get("metaDataECS.config");
     }
 
     public int getPort(){
-        return this.metadata.port;
+        return this.metadata.getServerPort();
     }
 
     public String getHostname(){
-        return this.metadata.name;
+        return this.metadata.getServerName();
+    }
+    
+    public String getHostAddr() {
+    	return this.metadata.getServerAddr();
     }
 
     public CacheStrategy getCacheStrategy(){
@@ -173,22 +177,11 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     private boolean initializeServer() {
-        //TODO a server should be initialized with zookeeper information now
         logger.info("Initialize server ...");
         try {
-            serverSocket = new ServerSocket(this.metadata.port);
+            serverSocket = new ServerSocket(metadata.getServerPort());
             logger.info("Server listening on port: " 
                     + serverSocket.getLocalPort());    
-            //set serverName
-            /*
-            try {
-                //TODO is this correct?
-                this.KVServerName = serverSocket.getInetAddress().getLocalHost().getHostAddress();
-            }
-            catch (UnknownHostException ex) {
-                logger.error("Unknown Host! Unable to get Hostname");
-            }
-            */
             return true;
         }
         catch (IOException e) {
@@ -465,28 +458,34 @@ public class KVServer implements IKVServer, Runnable {
         return marshalledData.toString();
     }
 
-    public String getMetaDataByName(String name) {
-        String[] metaDataLines = getMetaDataFromFile().split(KVConstants.NEWLINE_DELIM);
-        for(String line: metaDataLines) {
-            String[] data = line.split("\\" + KVConstants.DELIM);
-            //TODO serverIP and port and name??
-            if (data[ServerMetaData.SERVER_NAME].equals(name)) {
-                return String.join(KVConstants.DELIM, data);
-            }
-        }
-        logger.error("Error: could not find metadata for server \"" + name + "\"");
+    public String getMetaDataOfServer() {
+    	String hostName = getHostname();
+    	ArrayList<String> metaDataLines = null;
+		try {
+			metaDataLines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
+		}
+		catch (IOException e) {
+			logger.error("METADATA_FETCH_ERROR could not fetch meta data: " + e);
+		}
+    	for (int i = 0; i < metaDataLines.size(); ++i) {
+    		String[] metaData = metaDataLines.get(i).split("\\" + KVConstants.DELIM);
+    		if (metaData[ServerMetaData.SERVER_NAME].equals(hostName)) {
+    			return metaDataLines.get(i);
+    		}
+    	}
+        logger.error("Error: could not find metadata for server \"" + getHostname());
         return null;
     }
 
     public boolean updateMetaData() {
-        String meta = getMetaDataByName(getHostname());
+        String meta = getMetaDataOfServer();
         if(meta == null) {
-            System.out.println("hereh!!!");
+            System.out.println("Could not find meta data of server " + getHostname() + " " + getPort());
             return false;
         }
         metadata = new ServerMetaData(meta);
-        logger.info("Set KVServer (" + metadata.name + ", " + metadata.addr + ", " + metadata.port + ") " +
-                    "\nStart hash to: " + metadata.bHash + "\nEnd hash to: " + metadata.eHash);
+        logger.info("Set KVServer (" + metadata.getServerName() + ", " + metadata.getServerAddr() + ", " + metadata.getServerPort() + ") " +
+                    "\nStart hash to: " + metadata.getBeginHash().toString(16) + "\nEnd hash to: " + metadata.getEndHash().toString(16));
         return true;
     }
 
@@ -536,12 +535,13 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     @Override
-    public boolean moveData(String[] hashRange, String targetName) throws Exception {
+    public boolean moveData(String[] hashRange, String targetName) 
+    	throws Exception {
         // TODO Transfer a subset (range) of the KVServer's data to another KVServer (reallocation before
         // removing this server or adding a new KVServer to the ring); send a notification to the ECS,
         // if data transfer is completed.
         System.out.println("DEBUG: getHostname() = " + getHostname());
-        System.out.println("DEBUG: taretName() = " + targetName);
+        System.out.println("DEBUG: targetName() = " + targetName);
         if(targetName.equals(getHostname())) return true;
         lockWrite();
         StringBuilder toSend = new StringBuilder();
@@ -566,7 +566,7 @@ public class KVServer implements IKVServer, Runnable {
         }
         
         //Send to receiving server
-        ServerMetaData targetMeta = new ServerMetaData(getMetaDataByName(targetName));
+        ServerMetaData targetMeta = new ServerMetaData(getMetaDataOfServer());
         KVStore sender = new KVStore(targetMeta.addr, targetMeta.port);
         sender.connect();
         sender.sendMessage(new TextMessage(toSend.toString()));
@@ -583,14 +583,15 @@ public class KVServer implements IKVServer, Runnable {
     public static void main (String[] args) {
         try {
             new LogSetup("logs/server.log", Level.ALL);
-            if(args.length < 2 || args.length > 3) {
+            if(args.length != 3) {
                 System.out.println("Error! Invalid number of arguments!");
-                System.out.println("Usage: Server <name> <port>!");
+                System.out.println("Usage: Server <name> <addr> <port>!");
             }
             else {
                 String name = args[0];
-                int port = Integer.parseInt(args[1]);
-                new KVServer(name, "zoo", port).run();
+                String addr = args[1];
+                int port = Integer.parseInt(args[2]);
+                new KVServer(name, addr, KVConstants.ZK_ROOT, port).run();
             }
         }
         catch (IOException e) {

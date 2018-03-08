@@ -13,10 +13,6 @@ public interface IECS {
     
     public IECSNode addNode(String cacheStrategy, int cacheSize);
     
-    public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize);
-    
-    public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize);
-    
     public boolean awaitNodes(int count, int timeout) throws Exception;
     
     public boolean removeNodes(Collection<IECSNode> nodeNames);

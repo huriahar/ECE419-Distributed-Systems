@@ -16,6 +16,8 @@ import logger.LogSetup;
 import org.apache.log4j.Logger;
 import org.apache.log4j.Level;
 
+import common.KVConstants;
+
 import ecs.*;
 import cache.*;
 
@@ -33,7 +35,7 @@ public class ECSClient implements IECSClient {
     	Path ecsConfig = Paths.get(configFile);
     	// If file doesn't exist or does not point to a valid file
     	if (!Files.exists(ecsConfig)) {
-    		printError("ECS Config file does not exist!");
+    		printError("ECS Config file does not exist! " + ecsConfig);
             logger.error("ECS Config file does not exist!");
             System.exit(1);
     	}
@@ -335,9 +337,27 @@ public class ECSClient implements IECSClient {
 
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
+        Collection<IECSNode> nodes = setupNodes(count, cacheStrategy, cacheSize);
+        // It is not necessary to do something in awaitNodes
+        // As our code just waits for all nodes to try executing anyways...
+        // As long as the server is in the server stopped stage till it is started
+        // we are good
+        /*try {
+			awaitNodes(count, KVConstants.LAUNCH_TIMEOUT);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}*/
+        return nodes;
+        
+    }
+
+    @Override
+    public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
         boolean success = true;
-        Collection<IECSNode> nodes  = ecsInstance.initAddNodesToHashRing(count);
-        for(IECSNode entry: nodes) {
+    	// This is called before launching the servers - decides which nodes to add in hashRing, adds them
+    	Collection<IECSNode> nodes  = ecsInstance.initAddNodesToHashRing(count);
+    	for(IECSNode entry: nodes) {
             //for each node, launch server and set status as stopped
             if(ecsInstance.launchKVServer(entry, cacheStrategy, cacheSize)) {
                 logger.info("SUCCESS. Launched KVServer :" + entry.getNodeName());
@@ -348,16 +368,11 @@ public class ECSClient implements IECSClient {
         }
         success = ecsInstance.alertMetaDataUpdate();
         if(success)
-            setupNodes(count, cacheStrategy, cacheSize);
-        return nodes;
-        
-    }
-
-    @Override
-    public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
-        // TODO
-        //setup each node with the cache size and strategy
-        Collection<IECSNode> nodes = ecsInstance.setupNodesCacheConfig(count, cacheStrategy, cacheSize);
+        	nodes = ecsInstance.setupNodesCacheConfig(nodes, cacheStrategy, cacheSize);
+        else {
+        	logger.error("Unable to do meta data update for servers");
+        }
+        System.out.println(nodes.size());
         return nodes;    
     }
 
@@ -408,6 +423,7 @@ public class ECSClient implements IECSClient {
             }
             else {
                 String configFile = args[0];
+                System.out.println(System.getProperty("user.dir"));
                 ECSClient ECSClientApp = new ECSClient(configFile);
                 ECSClientApp.run();
             }
