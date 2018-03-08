@@ -1,7 +1,6 @@
 package ecs;
 
 import java.util.ArrayList;
-import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.Map;
 import java.util.HashMap;
@@ -32,7 +31,6 @@ import common.messages.TextMessage;
 public class ECS implements IECS {
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 128 * BUFFER_SIZE;
-    private static final int LAUNCH_TIMEOUT = 2000;
     public static final String metaFile = "metaDataECS.config";            
     
     private Path configFile;
@@ -54,12 +52,10 @@ public class ECS implements IECS {
         this.allAvailableServers = new HashMap<IECSNode, String>();
         this.ZKImpl = new ZKImplementation();
         try {
-            if(!Files.exists(Paths.get(metaFile)))
-                this.metaDataFile = Files.createFile(Paths.get(metaFile));
-            else {
-                this.metaDataFile = Paths.get(metaFile);
-                populateRingNetwork();
-            }
+        	if (Files.exists(Paths.get(metaFile))) {
+        		Files.delete(Paths.get(metaFile));
+        	}
+            this.metaDataFile = Files.createFile(Paths.get(metaFile));
             populateAvailableNodes();
             ZKImpl.zkConnect("localhost");
             ZKImpl.deleteGroup(KVConstants.ZK_ROOT);
@@ -80,7 +76,6 @@ public class ECS implements IECS {
         try {
             ArrayList<String> lines = new ArrayList<>(Files.readAllLines(this.configFile, StandardCharsets.UTF_8));
             int numServers = lines.size();
-            
             
             for (int i = 0; i < numServers ; ++i) {
                 IECSNode node = new ECSNode(lines.get(i), KVConstants.CONFIG_DELIM);
@@ -214,13 +209,13 @@ public class ECS implements IECS {
         ArrayList<String> metaDataContent = new ArrayList<String>();
         IECSNode node;
         for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
-            //Prepare writable content to write to metaDatafile    
+            // Prepare writable content to write to metaDatafile    
             node = entry.getValue();
             metaDataContent.add(node.getNodeName() + KVConstants.DELIM +
                             node.getNodeHost() + KVConstants.DELIM +
                             node.getNodePort() + KVConstants.DELIM +
-                            node.getNodeHashRange()[0] + KVConstants.DELIM +
-                            node.getNodeHashRange()[1]);      
+                            node.getNodeHashRange()[0].toString(16) + KVConstants.DELIM +
+                            node.getNodeHashRange()[1].toString(16));      
 
         }
 
@@ -232,7 +227,7 @@ public class ECS implements IECS {
         IECSNode node;        
         for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
             node = entry.getValue();
-            System.out.println(node.getNodeName() + " : " + node.getNodeHashRange()[0] + " : " + node.getNodeHashRange()[1]);
+            System.out.println(node.getNodeName() + " : " + node.getNodeHashRange()[0].toString(16) + " : " + node.getNodeHashRange()[1].toString(16));
             
         }               
     } 
@@ -338,16 +333,11 @@ public class ECS implements IECS {
                         IECSNode node = entry.getKey();
                         BigInteger serverHash = md5.encode(node.getNodeHost() + KVConstants.HASH_DELIM +
                                                    Integer.toString(node.getNodePort()));
-                        System.out.println("updateHash " + serverHash.toString(16));
                         //Setup begin and end hashing for server 
                         node = updateHash(serverHash, node);
-                        node.printMeta();
-                        //Add node to ringNetwork
-                        if(!inRingNetwork(node)) {
-                            //if already in ringNetwork, dont add it
-                            ringNetwork.put(serverHash, node);
-                            printRing();
-                        }
+                        // Add node to ringNetwork
+                        ringNetwork.put(serverHash, node);
+                        printRing();
                         //Add chosen node to collection
                         chosenNodes.add(node);
                     }

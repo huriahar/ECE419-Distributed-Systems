@@ -335,9 +335,6 @@ public class ECSClient implements IECSClient {
 
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
-        // TODO
-        //Setup the zookeeper 
-        //Add nodes to hashRing and set up the hashing 
         boolean success = true;
         Collection<IECSNode> nodes  = ecsInstance.initAddNodesToHashRing(count);
         for(IECSNode entry: nodes) {
