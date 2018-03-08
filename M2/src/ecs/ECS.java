@@ -302,7 +302,9 @@ public class ECS implements IECS {
                         //add node to hash Ring
                         ringNetwork.put(serverHash, node);
                     }
+                    break;
                 }
+
             }
             printRing();
             //Once all nodes are added, write to metaDataFile and alert nodes to update their metaData
