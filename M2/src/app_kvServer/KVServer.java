@@ -147,8 +147,6 @@ public class KVServer implements IKVServer, Runnable {
     @Override
     public void run(){
         running = initializeServer();
-        //TODO remove this!
-        start();
         if (serverSocket != null) {
             while(isRunning()){
                 try {
