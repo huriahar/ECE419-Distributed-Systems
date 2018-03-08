@@ -278,7 +278,6 @@ public class ECS implements IECS {
                     BigInteger serverHash = md5.encode(node.getNodeHost() + KVConstants.DELIM + node.getNodePort());
                     printDebug("Adding node: " + node.getNodeName());
                     // Add the node to ZK
-                    //TODO Can't add new node --> WHY?????
                 	ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
                     ZKImpl.list(KVConstants.ZK_ROOT);
                 	//Update the hashing for all servers in the ring
