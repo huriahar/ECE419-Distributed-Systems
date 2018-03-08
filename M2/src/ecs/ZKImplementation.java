@@ -1,6 +1,7 @@
 package ecs;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -83,7 +84,13 @@ public class ZKImplementation implements Watcher{
 	
 	public String readData (String path)
 			throws KeeperException, InterruptedException {
-		return zk.getData(path, true, zk.exists(path, true)).toString();
+		byte[] data = zk.getData(path, true, zk.exists(path, true));
+		try {
+			return new String(data, "UTF-8");
+		} catch (UnsupportedEncodingException e) {
+			logger.error("Unable to decode data " + e);
+		}
+		return null;
 	}
 	
 	public void deleteGroup (String groupName)
