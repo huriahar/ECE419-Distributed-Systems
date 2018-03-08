@@ -1,2 +1,2 @@
-ssh -n localhost nohup java -jar m2-server.jar $1 $2 ERROR &
+ssh -n localhost nohup java -jar ~/ece419/ECE419-Distributed-Systems/M2/m2-server.jar $1 $2 ERROR &
 

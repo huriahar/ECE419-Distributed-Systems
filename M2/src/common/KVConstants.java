@@ -13,6 +13,7 @@ public class KVConstants {
     public static final String GET_CMD = "GET";
     public static final String ZK_ROOT = "zoo";
     public static final int SESSION_TIMEOUT = 5000;
+    public static final int LAUNCH_TIMEOUT = 2000;
 
     // Consistent Hashing
     public static final BigInteger MIN_HASH = new BigInteger("0000000000000000000000000000000", 16);

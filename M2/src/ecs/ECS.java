@@ -216,7 +216,8 @@ public class ECS implements IECS {
             
         }               
     } 
-       
+    
+    // Update meta data fo each of the running servers
     public boolean alertMetaDataUpdate() {
         boolean success = true;
         TextMessage response, message;
@@ -286,7 +287,6 @@ public class ECS implements IECS {
                 }
 
             }
-            printRing();
             //Once all nodes are added, write to metaDataFile and alert nodes to update their metaData
             updateMetaData();
             success = alertMetaDataUpdate();
@@ -406,28 +406,25 @@ public class ECS implements IECS {
     }
 
     public boolean launchKVServer(IECSNode node, String cacheStrategy, int cacheSize) {
-        //TODO SSH stuff initializing with server's own name and port
-        //TEMP COMMENTED OUT UNTIL SSH  W/ PASSWORD IS FIGURED OUT
         boolean success = true;
         Process proc;
-        printDebug("Launching " + node.getNodeName() + " and " + node.getNodePort() + " ...");
+        printDebug("Launching " + node.getNodeHost() + " and " + node.getNodePort() + " ...");
  
         Runtime run = Runtime.getRuntime();
-//        try {
-//            String launchCmd = "script.sh " + node.getNodeName() + " " + node.getNodePort();
-//            printDebug("Launch command is: " + launchCmd);
-//            proc = run.exec(launchCmd);
-//            Thread.sleep(LAUNCH_TIMEOUT);
-//
-//        } catch (InterruptedException ex) {
-//            logger.error("ERROR: KVServer Thread unable to sleep");
-//            success = false;
-//        } catch (IOException io) {
-//            logger.error("ERROR: KVServer IOException: " + io);
-//            success = false;
-//        }
-//
-//        logger.info("KVServer process launched successfully");
+        try {
+            String launchCmd = "script.sh " + node.getNodeHost() + " " + node.getNodePort();
+            proc = run.exec(launchCmd);
+            Thread.sleep(KVConstants.LAUNCH_TIMEOUT);
+
+        } catch (InterruptedException ex) {
+            logger.error("ERROR: KVServer Thread unable to sleep");
+            success = false;
+        } catch (IOException io) {
+            logger.error("ERROR: KVServer IOException: " + io);
+            success = false;
+        }
+
+        logger.info("KVServer process launched successfully");
         return success;
     }
 
@@ -670,21 +667,4 @@ public class ECS implements IECS {
 		// TODO Auto-generated method stub
 		return null;
 	}
-
-
-//    private void populateRingNetwork()
-//            throws IOException {
-//        ArrayList<String> lines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
-//        int numServers = lines.size();
-//        
-//        for (int i = 0; i < numServers ; ++i) {
-//            IECSNode node = new ECSNode(lines.get(i));
-//            BigInteger serverHash = md5.encode(node.getNodeName() + KVConstants.DELIM +
-//                                           node.getNodeHost() + KVConstants.DELIM +
-//                                           node.getNodePort());
-//            System.out.println("serverHash " + serverHash.toString());
-//            this.ringNetwork.put(serverHash, node);
-//        }
-//    }
-//
 }
