@@ -101,21 +101,6 @@ public class ECS implements IECS {
         return found;
     }
 
-    private void populateRingNetwork()
-            throws IOException {
-        ArrayList<String> lines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
-        int numServers = lines.size();
-        
-        for (int i = 0; i < numServers ; ++i) {
-            IECSNode node = new ECSNode(lines.get(i));
-            BigInteger serverHash = md5.encode(node.getNodeName() + KVConstants.DELIM +
-                                           node.getNodeHost() + KVConstants.DELIM +
-                                           node.getNodePort());
-            System.out.println("serverHash " + serverHash.toString());
-            this.ringNetwork.put(serverHash, node);
-        }
-    }
-
     public int availableServers() {
         return allAvailableServers.size();
     }
@@ -297,7 +282,9 @@ public class ECS implements IECS {
                         //add node to hash Ring
                         ringNetwork.put(serverHash, node);
                     }
+                    break;
                 }
+
             }
             printRing();
             //Once all nodes are added, write to metaDataFile and alert nodes to update their metaData
@@ -685,4 +672,19 @@ public class ECS implements IECS {
 	}
 
 
+//    private void populateRingNetwork()
+//            throws IOException {
+//        ArrayList<String> lines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
+//        int numServers = lines.size();
+//        
+//        for (int i = 0; i < numServers ; ++i) {
+//            IECSNode node = new ECSNode(lines.get(i));
+//            BigInteger serverHash = md5.encode(node.getNodeName() + KVConstants.DELIM +
+//                                           node.getNodeHost() + KVConstants.DELIM +
+//                                           node.getNodePort());
+//            System.out.println("serverHash " + serverHash.toString());
+//            this.ringNetwork.put(serverHash, node);
+//        }
+//    }
+//
 }
