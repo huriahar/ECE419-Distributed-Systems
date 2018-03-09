@@ -16,6 +16,6 @@ public class KVConstants {
     public static final int LAUNCH_TIMEOUT = 2000;
 
     // Consistent Hashing
-    public static final BigInteger MIN_HASH = new BigInteger("0000000000000000000000000000000", 16);
-    public static final BigInteger MAX_HASH = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16);
+    public static final BigInteger MIN_HASH = new BigInteger("00000000000000000000000000000000", 16);
+    public static final BigInteger MAX_HASH = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16);
 } 

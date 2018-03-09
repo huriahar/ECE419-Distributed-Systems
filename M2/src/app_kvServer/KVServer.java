@@ -54,6 +54,7 @@ public class KVServer implements IKVServer, Runnable {
     private boolean running = false;
     private boolean writeLocked = true;     //start in a stopped state
     private boolean readLocked = true;      //start in a stopped state
+    private boolean moveAll = false;
     //Default values
     private static final String UNSET_ADDR = null;
     private static final int DEFAULT_CACHE_SIZE = 5;
@@ -74,9 +75,9 @@ public class KVServer implements IKVServer, Runnable {
 			String path = KVConstants.ZK_SEP + KVConstants.ZK_ROOT + KVConstants.ZK_SEP + name;
 			data = zkImplServer.readData(path);			
 		} catch (IOException | InterruptedException e) {
-			logger.error("Unable to connect to zk and read data");
+			logger.error("Unable to connect to zk and read data: " + e);
 		} catch (KeeperException e) {
-			logger.error("Unable to connect to zk and read data");
+			logger.error("Unable to connect to zk and read data: " + e);
 		}
     	String[] zNodeData = data.split("\\" + KVConstants.DELIM);
     	this.metadata = new ServerMetaData(name, zNodeData[1], Integer.parseInt(zNodeData[2]), null, null);
@@ -109,6 +110,10 @@ public class KVServer implements IKVServer, Runnable {
         this.cache = new KVCache(size, strategy);
     }
 
+    public void setMoveAll(boolean move) {
+        this.moveAll = move;
+    }
+
     public boolean inStorage(String key) {
         if (inCache(key)) return true;
         String value = "";
@@ -128,7 +133,6 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public String getKV(String key) throws Exception{
-        if(!isResponsible(key)) return "";
         //TODO what if asked for a KVpair that is not on disk
         String value = this.cache.getValue(key);
         if(value.equals("")){
@@ -143,7 +147,6 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public void putKV(String key, String value) throws Exception{
-        if(!isResponsible(key) || isWriteLocked()) return;
         this.cache.insert(key, value);
         this.cache.print();
         storeKV(key, value);
@@ -223,7 +226,7 @@ public class KVServer implements IKVServer, Runnable {
     @Override
     public void close(){
         // TODO: Wait for all threads, save any remainder stuff in cache to memory
-        running = false;
+        logger.debug("calling close....");
         try {
             serverSocket.close();
         }
@@ -299,6 +302,7 @@ public class KVServer implements IKVServer, Runnable {
 
     @Override
     public void deleteKV(String key) throws Exception {
+        logger.debug("Deleting key " + key);
         this.cache.delete(key);
         storeKV(key, "");
     }
@@ -454,9 +458,20 @@ public class KVServer implements IKVServer, Runnable {
 
     public boolean isResponsible(String key) {
         BigInteger encodedKey = md5.encode(key);
-        return ((encodedKey.compareTo(metadata.bHash) >= 0  && encodedKey.compareTo(metadata.eHash) < 0) ||
-               (encodedKey.compareTo(metadata.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0 && metadata.eHash.compareTo(KVConstants.MIN_HASH) >= 0) || 
-               (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(metadata.eHash) < 0 && metadata.bHash.compareTo(KVConstants.MAX_HASH) < 0));
+        System.out.println("DEBUG: key " + encodedKey + " bHash " + metadata.bHash + " eHash " + metadata.eHash);
+        System.out.println("DEBUG: minHash " + KVConstants.MIN_HASH + " maxHash " + KVConstants.MAX_HASH);
+        boolean ret = false, ret2 = false, ret3 = false;
+        if( (metadata.bHash).compareTo(metadata.eHash) < 0 ) {
+            ret = (encodedKey.compareTo(metadata.bHash) >= 0  && encodedKey.compareTo(metadata.eHash) < 0);
+            System.out.println("DEBUG: isResp? " + ret);
+            return ret;
+        } else {
+            ret2 = (encodedKey.compareTo(metadata.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0);
+            ret3 = (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(metadata.eHash) < 0);
+            System.out.println("DEBUG: isResp? " + ret2);
+            System.out.println("DEBUG: isResp? " + ret3);
+            return (ret2 || ret3);
+        }
     }
 
     public String getMetaDataFromFile() {
@@ -484,6 +499,7 @@ public class KVServer implements IKVServer, Runnable {
 		}
     	for (int i = 0; i < metaDataLines.size(); ++i) {
     		String[] metaData = metaDataLines.get(i).split("\\" + KVConstants.DELIM);
+            logger.debug("looking for " + hostName + "'s meta data: " + metaDataLines.get(i));
     		if (metaData[ServerMetaData.SERVER_NAME].equals(hostName)) {
     			return metaDataLines.get(i);
     		}
@@ -493,6 +509,7 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public boolean updateMetaData() {
+        logger.debug("updating meta data.... ");
         String meta = getMetaDataOfServer(getHostname());
         if(meta == null) {
             System.out.println("Could not find meta data of server " + getHostname() + " " + getPort());
@@ -561,6 +578,7 @@ public class KVServer implements IKVServer, Runnable {
         lockWrite();
         StringBuilder toSend = new StringBuilder();
         toSend.append("MOVE_KVPAIRS" + KVConstants.DELIM);
+        boolean found = false;
         try {
             Path serverPath = Paths.get(this.serverFilePath);
             if(Files.exists(serverPath)) {
@@ -568,8 +586,11 @@ public class KVServer implements IKVServer, Runnable {
                                                              StandardCharsets.UTF_8));
                 for(String line : keyValuePairs) {
                     String[] kvp = line.split("\\" + KVConstants.DELIM);
-                    if(!isResponsible(kvp[0])) {
+                    if(this.moveAll || !isResponsible(kvp[0])) {
+                        logger.debug(getHostname() + " not responsible for key " + kvp[0]);
+                        found = true;
                         toSend.append(line + KVConstants.NEWLINE_DELIM);
+                        deleteKV(kvp[0]);
                     }
                 }
             }
@@ -580,13 +601,14 @@ public class KVServer implements IKVServer, Runnable {
             logger.error("ERROR while moving data from server to target server" + targetName);
             return false;
         }
-        
-        //Send to receiving server
-        ServerMetaData targetMeta = new ServerMetaData(getMetaDataOfServer(targetName));
-        KVStore sender = new KVStore(targetMeta.addr, targetMeta.port);
-        sender.connect();
-        sender.sendMessage(new TextMessage(toSend.toString()));
-        sender.disconnect();
+        if(found) {
+            //Send to receiving server
+            ServerMetaData targetMeta = new ServerMetaData(getMetaDataOfServer(targetName));
+            KVStore sender = new KVStore(targetMeta.addr, targetMeta.port);
+            sender.connect();
+            sender.sendMessage(new TextMessage(toSend.toString()));
+            sender.disconnect();
+        }
         unlockWrite();
         return true;
     }

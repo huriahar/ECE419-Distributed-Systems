@@ -68,9 +68,6 @@ public class KVStore implements KVCommInterface {
 
     @Override
     public synchronized void disconnect() {
-        // TODO Auto-generated method stub
-        logger.info("Trying to close connection ...");
-        
         try {
             tearDownConnection();
             for (IKVClient listener : listeners) {
@@ -169,10 +166,10 @@ public class KVStore implements KVCommInterface {
         String[] tokens = (reply.getMsg()).split("\\" + KVConstants.DELIM);
         String getStatus = tokens[0];
         
-        if (tokens.length < 2) {
-            return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
-        }
-        else if (getStatus.equals("GET_SUCCESS")) {
+//        if (tokens.length < 2) {
+//            return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
+//        }
+        if (getStatus.equals("GET_SUCCESS")) {
             // Success! Combine the remaining tokens to get value
             // Done as value can contain DELIM
             List<String> valueParts = new LinkedList<>();
@@ -191,32 +188,43 @@ public class KVStore implements KVCommInterface {
         }
     }
 
+    private void debugPrint(String m) {
+        System.out.println("DEBUG KVSTORE: " + m);
+    }
+
     private KVReplyMessage retryRequest(String key, String value, String request)
             throws Exception {
         // step 1 - Update ServerMetaData
         String status = (value == null) ? "DELETE_ERROR" : "PUT_ERROR";
         status = (request.equals(KVConstants.GET_CMD)) ? "GET_ERROR" : status;
 
+        logger.debug("RETRY REQUEST! " + status);
         sendMessage(new TextMessage("GET_METADATA"));
         TextMessage reply = receiveMessage();
+        logger.debug("RETRY REQUEST! " + reply.getMsg());
         if(reply.getMsg().equals("METADATA_FETCH_ERROR")) {
             return new KVReplyMessage(key, value, status);
         }
         else {
+            logger.info("Received metadata update from server <" + this.serverAddr + ", " + this.serverPort + ">");  
             // Update ServerMetaData
             updateMetaData(reply.getMsg());
             
             // Find responsible server
+            logger.info("Looking for responsible server...");
             BigInteger serverHash = getResponsibleServer(key);
             if (serverHash == null) {
                 return new KVReplyMessage(key, value, status);
             }
-            
+            ServerMetaData responsibleServer = this.ringNetwork.get(serverHash);
+            if(responsibleServer.port == this.serverPort)
+                throw new RuntimeException("Server is responsible, so it shouldn't have to do this");
+            logger.info("Responsible server is <" + responsibleServer.name + "," + responsibleServer.port + ">");
             // Disconnect from current server and reconnect
             // to the correct server
             disconnect();
-            this.serverAddr = this.ringNetwork.get(serverHash).addr;
-            this.serverPort = this.ringNetwork.get(serverHash).port;
+            this.serverAddr = responsibleServer.addr;
+            this.serverPort = responsibleServer.port;
             connect();
             
             return (request.equals(KVConstants.PUT_CMD)) ? put(key, value) : get(key);
@@ -226,10 +234,8 @@ public class KVStore implements KVCommInterface {
     private void updateMetaData(String marshalledData) {
         this.ringNetwork = new TreeMap<BigInteger, ServerMetaData>();
         String[] dataEntries = marshalledData.split(KVConstants.NEWLINE_DELIM);
-
         for(int i = 0; i < dataEntries.length ; i++) {
             String[] line = dataEntries[i].split("\\" + KVConstants.DELIM);
-
             ServerMetaData meta = new ServerMetaData(dataEntries[i]);
             BigInteger serverHash = md5.encode(meta.name + KVConstants.DELIM +
                                            meta.addr + KVConstants.DELIM +

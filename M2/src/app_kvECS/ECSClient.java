@@ -366,7 +366,7 @@ public class ECSClient implements IECSClient {
                 logger.error("ERROR. Unable to launch KVServer :" + entry.getNodeName() + " Host: " + entry.getNodeHost()+ " Port: " + entry.getNodePort());           
             }
         }
-        success = ecsInstance.alertMetaDataUpdate();
+        success = ecsInstance.alertMetaDataUpdate(false);
         if(success)
         	nodes = ecsInstance.setupNodesCacheConfig(nodes, cacheStrategy, cacheSize);
         else {

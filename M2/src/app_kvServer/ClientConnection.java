@@ -62,24 +62,50 @@ public class ClientConnection implements Runnable {
             
             while (isOpen) {
                 try {
+                    logger.debug("step 1");
                     TextMessage msgReceived = receiveMessage();
+                    logger.debug("step 2");
                     // Unmarshalling of received message
                     String[] msgContent = msgReceived.getMsg().split("\\" + KVConstants.DELIM);
                     String command = msgContent[0];
+                    logger.debug("step 3");
                     // Key cannot contain DELIM, but value can
                     // So combine all strings from msgContent[2] till end to get value
                     List<String> valueParts = new LinkedList<>();
                     for (int i = 2; i < msgContent.length; ++i) {
                         valueParts.add(msgContent[i]);
                     }
+                    logger.debug("step 4");
                     String value = String.join(KVConstants.DELIM, valueParts);
-                    String key = msgContent[1];
+                    System.out.println("DEBUG: " + msgReceived.getMsg());
+                    String key = null;
+                    if(msgContent.length > 1){
+                        key = msgContent[1];
+                    }
 
+                    logger.debug("step 5");
                     if (command.equals("ECS")) {
                         String[] ecsCmd = Arrays.copyOfRange(msgContent, 1, msgContent.length);
                         handleECSCmd(ecsCmd);
                         continue;
                     }
+                    else if(command.equals("MOVE_KVPAIRS")) {
+                        if(key != null) {
+                            handleMoveKVPairs(key + KVConstants.DELIM + value);
+                        }
+                    }
+                    logger.debug("step 6");
+                    //Just a guard
+                    if(key == null) {
+                        continue;
+                    }
+                    System.out.println("Is server stopped? "  + server.isStopped());
+                    if (server.isStopped()) {
+                        sendMessage(new TextMessage("SERVER_STOPPED"));
+                        logger.info("SERVER_STOPPED cannot handle client requests at the moment.");
+                        continue;
+                    }
+                    System.out.println("Is server responsible? "  + server.isResponsible(key));
                     // Check if server is responsible for this key
                     if (!server.isResponsible(key)){
                         sendMessage(new TextMessage("SERVER_NOT_RESPONSIBLE"));
@@ -89,12 +115,6 @@ public class ClientConnection implements Runnable {
                         } else {
                             logger.info("ERROR!!! EXPECTED TO RECEIVE GET_METADATA MSG!!");
                         }
-                        continue;
-                    }
-                    System.out.println("Is server stopped? "  + server.isStopped());
-                    if (server.isStopped()) {
-                        sendMessage(new TextMessage("SERVER_STOPPED"));
-                        logger.info("SERVER_STOPPED cannot handle client requests at the moment.");
                         continue;
                     }
                     if (command.equals("PUT")) {
@@ -109,9 +129,6 @@ public class ClientConnection implements Runnable {
                         if(!server.isReadLocked()) {
                             handleGetCmd(key);
                         }
-                    }
-                    else if(command.equals("MOVE_KVPAIRS")) {
-                         handleMoveKVPairs(key + value);
                     }
                     else {
                         logger.error("Received invalid message type from client.");
@@ -169,11 +186,14 @@ public class ClientConnection implements Runnable {
     }
 
     private void handleMoveKVPairs(String kvpairs) {
+        if(kvpairs == null) return;
+        logger.debug(kvpairs);
         String[] KVPairs = kvpairs.split(KVConstants.NEWLINE_DELIM);
         for(int i = 0; i < KVPairs.length ; i++) {
             String[] kvpair = KVPairs[i].split("\\" + KVConstants.DELIM);
+            logger.debug("MOVING KVPAIR " + kvpair[0] + kvpair[1]);
             try {
-            server.putKV(kvpair[0], kvpair[1]);
+                server.putKV(kvpair[0], kvpair[1]);
             } catch (Exception e) {
                 logger.error("failed to move KVpair ( " + kvpair[0] + ", " + kvpair[1] + ") to server " + server.getHostname());
             }
@@ -200,6 +220,8 @@ public class ClientConnection implements Runnable {
                     server.shutdown();
                     sendMessage(new TextMessage("SHUTDOWN_SUCCESS"));
                     return;
+                case "MOVE_ALL_KVPAIRS":
+                    server.setMoveAll(true);
                 case "UPDATE_METADATA":
                     boolean success = server.updateMetaData();
                     if(success) {
@@ -211,11 +233,10 @@ public class ClientConnection implements Runnable {
                     }
                     if(success) {
                         sendMessage(new TextMessage("UPDATE_SUCCESS"));
-                        System.out.println("Updated Success!!!");
                     } else {
-                        System.out.println("hereh!!!");
                         sendMessage(new TextMessage("UPDATE_FAILED"));
                     }
+                    server.setMoveAll(false);
                     return;
                 default:
                     logger.error("Unknown ECS cmd!");
