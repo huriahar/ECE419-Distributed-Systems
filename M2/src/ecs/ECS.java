@@ -214,7 +214,7 @@ public class ECS implements IECS {
                             node.getNodeHashRange()[1].toString(16));      
 
         }
-
+        printRing();
         Files.write(metaDataFile, metaDataContent, StandardCharsets.UTF_8);
         return;
     }
@@ -223,7 +223,7 @@ public class ECS implements IECS {
         IECSNode node;        
         for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
             node = entry.getValue();
-            System.out.println(node.getNodeName() + " : " + node.getNodeHashRange()[0].toString(16) + " : " + node.getNodeHashRange()[1].toString(16));
+            System.out.println(node.getNodeName() + " : " + node.getNodeHashRange()[0] + " : " + node.getNodeHashRange()[1]);
             
         }               
     } 
@@ -301,7 +301,7 @@ public class ECS implements IECS {
                         return null;
                     }
                     
-                    serverHash = md5.encode(currNode.getNodeHost() + KVConstants.DELIM + currNode.getNodePort());
+                    serverHash = md5.encode(currNode.getNodeHost() + KVConstants.HASH_DELIM + currNode.getNodePort());
                     printDebug("Adding currNode: " + currNode.getNodeName());
                     //// Add the currNode to ZK
                 	//ZKImpl.joinGroup(KVConstants.ZK_ROOT, currNode.getNodeName());
