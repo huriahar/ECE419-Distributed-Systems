@@ -7,6 +7,7 @@ import java.math.BigInteger;
 import java.net.Socket;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.LinkedList;
 import java.util.List;
@@ -19,7 +20,7 @@ import java.io.IOException;
 import org.apache.log4j.Logger;
 
 import common.*;
-import common.messages.*;
+import common.messages.*; 
 import app_kvClient.*;
 
 public class KVStore implements KVCommInterface {
@@ -40,7 +41,6 @@ public class KVStore implements KVCommInterface {
     private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
     private static final int MAX_KEY_LENGTH = 20; 
     private static final int MAX_VALUE_LENGTH = 122880; //120KB
-    private static final String INVALID_SERVER = "";
 
     /**
      * Initialize KVStore with address and port of KVServer
@@ -50,8 +50,72 @@ public class KVStore implements KVCommInterface {
     public KVStore(String address, int port) {
         this.serverAddr = address;
         this.serverPort = port;
-        setRunning(true);
+        this.ringNetwork = new TreeMap<BigInteger, ServerMetaData>();
+        // Add the server address and port to the hash ring
+        BigInteger serverHash = md5.encode(address + KVConstants.HASH_DELIM +
+                Integer.toString(port));
+        System.out.println("serverHash " + serverHash.toString(16));
+
+        ServerMetaData serverNode = new ServerMetaData(null, address, port, null, null);
+		// Setup begin and end hashing for server
+		serverNode = updateMetaData(serverHash, serverNode);
+		serverNode.printMeta();
+		ringNetwork.put(serverHash, serverNode);
     }
+
+	public ServerMetaData updateMetaData(BigInteger nodeHash, ServerMetaData currNode) {
+		
+		assert currNode != null;
+
+        ServerMetaData nextNode = new ServerMetaData();
+
+        // Only one in network, so start and end are yours
+        if(ringNetwork.isEmpty()) {
+            currNode.setBeginHash(nodeHash);
+            currNode.setEndHash(nodeHash);
+            return currNode;
+        }
+        else if(ringNetwork.containsKey(nodeHash)) {
+            logger.error("ERROR KVServer already in ringNetwork");
+            return null;
+        }
+        
+        // the current hash is the highest value
+        if(ringNetwork.higherKey(nodeHash) == null) {
+            nextNode = ringNetwork.firstEntry().getValue();
+        }
+        else {
+        	//currNode is at beginning or in between
+            nextNode = ringNetwork.higherEntry(nodeHash).getValue();
+        }
+        // nextNode authority only goes as far currently added node
+        currNode.setBeginHash(nextNode.getHashRange()[0]);
+        currNode.setEndHash(nodeHash);
+        nextNode.setBeginHash(nodeHash);
+        //Update the ringNetwork with the changed hash of the next one as well
+        ringNetwork.put(nextNode.getHashRange()[1], nextNode);
+        return currNode; 
+    }
+	
+	public void connectToResponsibleServer(String key) {
+		BigInteger responsibleServerKey = getResponsibleServer(key);
+		ServerMetaData responsibleServerMeta = ringNetwork.get(responsibleServerKey);
+		
+		if ((responsibleServerMeta.getServerAddr() == this.serverAddr) && (responsibleServerMeta.getServerPort() == this.serverPort)) {
+			// Do nothing. Already connected to the correct server
+			return;
+		}
+		else {
+			disconnect();
+			this.serverAddr = responsibleServerMeta.getServerAddr();
+			this.serverPort = responsibleServerMeta.getServerPort();
+			try {
+				connect();
+			} catch (IOException e) {
+				logger.error("Unable to connect to " + serverAddr + " at " + serverPort);
+			}
+		}
+	}
 
     @Override
     public void connect() 
@@ -60,6 +124,7 @@ public class KVStore implements KVCommInterface {
         this.listeners = new HashSet<IKVClient>();
         this.output = clientSocket.getOutputStream();
         this.input = clientSocket.getInputStream();
+        setRunning(true);
 
         // Receive the connection ack message
         TextMessage reply = receiveMessage();
@@ -124,8 +189,12 @@ public class KVStore implements KVCommInterface {
         if (!errorCheck(key, value)) {
             return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
         }
+        
+        // Step2 - Figure out which server is responsible based on the information 
+        // that KVStore has and connect to it
+        connectToResponsibleServer(key);
 
-        // step 2 - send a PUT request to the server
+        // step 3 - send a PUT request to the server
         // Marshall the sending message
         String msg = KVConstants.PUT_CMD + KVConstants.DELIM + key;
         if (value != null && !value.equals("")) {
@@ -141,6 +210,7 @@ public class KVStore implements KVCommInterface {
         // step 4 - retry put if possible
         switch(kvreply.getStatus()){
             //TODO if server is stopped, do you return PUT/GET failed or SERVER_STOPPED?
+        	// This means that my metaData on servers is incorrect - so handle that
             case SERVER_NOT_RESPONSIBLE:
                 kvreply = retryRequest(key, value, KVConstants.PUT_CMD);
             default:
@@ -198,34 +268,14 @@ public class KVStore implements KVCommInterface {
         String status = (value == null) ? "DELETE_ERROR" : "PUT_ERROR";
         status = (request.equals(KVConstants.GET_CMD)) ? "GET_ERROR" : status;
 
-        logger.debug("RETRY REQUEST! " + status);
         sendMessage(new TextMessage("GET_METADATA"));
         TextMessage reply = receiveMessage();
-        logger.debug("RETRY REQUEST! " + reply.getMsg());
         if(reply.getMsg().equals("METADATA_FETCH_ERROR")) {
             return new KVReplyMessage(key, value, status);
         }
         else {
-            logger.info("Received metadata update from server <" + this.serverAddr + ", " + this.serverPort + ">");  
             // Update ServerMetaData
             updateMetaData(reply.getMsg());
-            
-            // Find responsible server
-            logger.info("Looking for responsible server...");
-            BigInteger serverHash = getResponsibleServer(key);
-            if (serverHash == null) {
-                return new KVReplyMessage(key, value, status);
-            }
-            ServerMetaData responsibleServer = this.ringNetwork.get(serverHash);
-            if(responsibleServer.port == this.serverPort)
-                throw new RuntimeException("Server is responsible, so it shouldn't have to do this");
-            logger.info("Responsible server is <" + responsibleServer.name + "," + responsibleServer.port + ">");
-            // Disconnect from current server and reconnect
-            // to the correct server
-            disconnect();
-            this.serverAddr = responsibleServer.addr;
-            this.serverPort = responsibleServer.port;
-            connect();
             
             return (request.equals(KVConstants.PUT_CMD)) ? put(key, value) : get(key);
         }
@@ -234,14 +284,21 @@ public class KVStore implements KVCommInterface {
     private void updateMetaData(String marshalledData) {
         this.ringNetwork = new TreeMap<BigInteger, ServerMetaData>();
         String[] dataEntries = marshalledData.split(KVConstants.NEWLINE_DELIM);
-        for(int i = 0; i < dataEntries.length ; i++) {
-            String[] line = dataEntries[i].split("\\" + KVConstants.DELIM);
+        for(int i = 0; i < dataEntries.length ; ++i) {
             ServerMetaData meta = new ServerMetaData(dataEntries[i]);
-            BigInteger serverHash = md5.encode(meta.name + KVConstants.DELIM +
-                                           meta.addr + KVConstants.DELIM +
-                                           meta.port);
+            BigInteger serverHash = md5.encode(meta.getServerAddr() + KVConstants.HASH_DELIM + meta.getServerPort());
 
             this.ringNetwork.put(serverHash, meta);
+        }
+        printRing();
+    }
+    
+    public void printRing() {
+        ServerMetaData node;
+        for(Map.Entry<BigInteger, ServerMetaData> entry : ringNetwork.entrySet()) {
+            node = entry.getValue();
+            System.out.println("Key: " + entry.getKey().toString(16));
+            System.out.println(node.getServerAddr() + " : " + node.getServerPort() + " : " + node.getHashRange()[0].toString(16) + " : " + node.getHashRange()[1].toString(16));
         }
     }
 

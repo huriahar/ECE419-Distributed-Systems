@@ -110,7 +110,7 @@ public class KVClient implements IKVClient {
                             }
                             else if (status == KVMessage.StatusType.PUT_UPDATE) {
                                 System.out.println(PROMPT + "PUT_UPDATE! Successfully updated key value on server");
-                                logger.error(reply.getStatusString() + " with <key, value>: <" +
+                                logger.info(reply.getStatusString() + " with <key, value>: <" +
                                     reply.getKey() + ", " + reply.getValue() + ">");
                             }
                             else if (status == KVMessage.StatusType.PUT_SUCCESS) {

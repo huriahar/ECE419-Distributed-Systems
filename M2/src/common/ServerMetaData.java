@@ -37,6 +37,10 @@ public class ServerMetaData {
         	this.eHash = null;
         }
     }
+    
+    public ServerMetaData() {
+    	
+    }
 
     public ServerMetaData(String dataStr) {
         this(dataStr, "\\" + KVConstants.DELIM);
@@ -77,6 +81,16 @@ public class ServerMetaData {
     public BigInteger getEndHash() {
     	return this.eHash;
     }
-
+    
+    public BigInteger[] getHashRange() {
+    	BigInteger[] hashRange = {this.bHash, this.eHash};
+    	return hashRange;
+    }
+    
+    public void printMeta() {
+    	System.out.println("Server Name: " + getServerName() + " ServerAddr: " + getServerAddr() + " ServerPort: " + getServerPort());
+    	if ((getBeginHash() != null) && (getEndHash() != null))
+    		System.out.println("Server bHash: " + getBeginHash().toString(16) + " eHash: " + getEndHash().toString(16));
+    }
 }
 

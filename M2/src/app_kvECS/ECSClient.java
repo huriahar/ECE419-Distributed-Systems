@@ -78,7 +78,6 @@ public class ECSClient implements IECSClient {
                         int numNodes = Integer.parseInt(tokens[1]);
                         String cacheStrategy = tokens[2];
                         int cacheSize = Integer.parseInt(tokens[3]);
-                        System.out.println(numNodes + " " + cacheSize + " " + cacheStrategy);
 
                         if(numNodes <= ecsInstance.availableServers()) {
                             if (KVCache.isValidStrategy(cacheStrategy)) {

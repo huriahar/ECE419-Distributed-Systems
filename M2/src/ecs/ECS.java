@@ -339,7 +339,6 @@ public class ECS implements IECS {
             }
              
             //Once all nodes are added, write to metaDataFile
-            printDebug("Updating metadata file");
             updateMetaData();   
             //the alert will be called once launching of the servers is done from ECSClient
         } catch (IOException io) {
@@ -354,11 +353,9 @@ public class ECS implements IECS {
         TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "SETUP_NODE" + KVConstants.DELIM + cacheStrategy + KVConstants.DELIM + cacheSize); 
         TextMessage response;
         for(IECSNode node : nodes) {
-        	System.out.println("Here!!");
         	try {
         		response = sendNodeMessage(message, node);
         		if(response.getMsg().equals("SETUP_SUCCESS")) {
-        			System.out.println("Here!!");
                     logger.info("SUCCESS: Setup for KVServer: " + node.getNodeName()); 
                     nodesResult.add(node); 
                 }
@@ -380,7 +377,6 @@ public class ECS implements IECS {
 
         // Only one in network, so start and end are yours
         if(ringNetwork.isEmpty()) {
-            printDebug("Ring empty so adding 1 node");
             currNode.setNodeBeginHash(nodeHash);
             currNode.setNodeEndHash(nodeHash);
             return currNode;
@@ -392,7 +388,6 @@ public class ECS implements IECS {
         
         // the current hash is the highest value
         if(ringNetwork.higherKey(nodeHash) == null) {
-        	printDebug("CurrNode is highest hash");
             prevNode = ringNetwork.firstEntry().getValue();
             // prevNode authority only goes as far currently added node
             currNode.setNodeBeginHash(prevNode.getNodeHashRange()[0]);                   
