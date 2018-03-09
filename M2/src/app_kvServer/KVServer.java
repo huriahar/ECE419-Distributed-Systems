@@ -236,15 +236,17 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public String onDisk(String key) throws IOException {
-
+        logger.debug("in on Disk.....");
         String value = "";
         String key_val, get_value;
         String filePath  = this.serverFilePath;
         BufferedReader br = null;
         String KVPair;
         try {
+            logger.debug("before creating file.....");
             File file = new File(filePath);
             
+            logger.debug("before acquiring lock.....");
             FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
             FileLock lock = channel.lock();            
 
@@ -254,17 +256,23 @@ public class KVServer implements IKVServer, Runnable {
             } catch (OverlappingFileLockException e) {
                  //System.out.println("Overlapping File Lock Error: " + e.getMessage());
             }
+            logger.debug("after acquiring lock.....");
 
             if(!file.exists()) {
                 System.out.println("File not found");
             }
             else{
+                logger.debug("file exists.....");
                 
                 FileReader fr = new FileReader(file);
                 br = new BufferedReader(fr);
                 KVPair = br.readLine();
     
                 while(KVPair != null) {
+                    if(KVPair.trim().length() == 0) {
+                        KVPair = br.readLine();
+                        continue;
+                    }
                     String[] msgContent = KVPair.split("\\" + KVConstants.DELIM);
                     key_val = msgContent[0];
                     List<String> valueParts = new LinkedList<>();
@@ -280,9 +288,11 @@ public class KVServer implements IKVServer, Runnable {
                     KVPair = br.readLine();
                 }
             }
+            logger.debug("after search.....");
 
             lock.release();
             channel.close();
+            logger.debug("after releasing lock.....");
 
         } catch (IOException ex) { 
                 System.out.println("Unable to open file. ERROR: " + ex);
@@ -309,9 +319,7 @@ public class KVServer implements IKVServer, Runnable {
 
 
     public void storeKV(String key, String value) throws IOException {
-
-        //TODO : Cache it in KVServer
-
+        logger.debug("in storeKV");
         String filePath  = this.serverFilePath;
         BufferedWriter wr  = null;
         PrintWriter pw = null;
@@ -331,9 +339,10 @@ public class KVServer implements IKVServer, Runnable {
                 
                 //simply append it to the end
                 try {
+                    logger.debug("about to create file");
                     File file = new File(filePath);
                 
-            
+                    logger.debug("about to acquire lock");
                     FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
                     FileLock lock = channel.lock();            
     
@@ -344,16 +353,19 @@ public class KVServer implements IKVServer, Runnable {
                          //System.out.println("Overlapping File Lock Error: " + e.getMessage());
                     }
 
+                    logger.debug("acquired lock");
                     if (!file.exists()) {
                         file.createNewFile();
                     }
                 
+                    logger.debug("about to write KV to file");
                     FileWriter fw = new FileWriter(file, true);
                     wr = new BufferedWriter(fw);
                     pw = new PrintWriter(wr);
                     String KVPair = key + "|" + value ;    
                     pw.println(KVPair);
 
+                    logger.debug("after write KV to file");
                     lock.release();
                     channel.close();
 
@@ -365,12 +377,14 @@ public class KVServer implements IKVServer, Runnable {
                 finally
                 {
                     try{
-                        if(wr!=null)
+                        logger.debug("closing the file");
+                        if(wr!=null) {
                             wr.close();
+                        }
                 
-                    }   catch(Exception ex){
-                            System.out.println("Error in closing the BufferedWriter"+ex);
-                     }
+                    } catch(Exception ex){
+                        System.out.println("Error in closing the BufferedWriter"+ex);
+                    }
                 }
             }
         }
@@ -579,18 +593,25 @@ public class KVServer implements IKVServer, Runnable {
         StringBuilder toSend = new StringBuilder();
         toSend.append("MOVE_KVPAIRS" + KVConstants.DELIM);
         boolean found = false;
+        boolean success = true;
         try {
             Path serverPath = Paths.get(this.serverFilePath);
             if(Files.exists(serverPath)) {
                 ArrayList<String> keyValuePairs = new ArrayList<>(Files.readAllLines(serverPath,
                                                              StandardCharsets.UTF_8));
                 for(String line : keyValuePairs) {
+                    //TODO this is because some white spaces get inserted in the file
+                    //this if statement is a temporary workaround for that
+                    if (line.trim().length() == 0) continue; 
                     String[] kvp = line.split("\\" + KVConstants.DELIM);
                     if(this.moveAll || !isResponsible(kvp[0])) {
                         logger.debug(getHostname() + " not responsible for key " + kvp[0]);
                         found = true;
                         toSend.append(line + KVConstants.NEWLINE_DELIM);
                         deleteKV(kvp[0]);
+                    }
+                    else {
+                        logger.debug(getHostname() + " responsible for key " + kvp[0]);
                     }
                 }
             }
@@ -607,10 +628,14 @@ public class KVServer implements IKVServer, Runnable {
             KVStore sender = new KVStore(targetMeta.addr, targetMeta.port);
             sender.connect();
             sender.sendMessage(new TextMessage(toSend.toString()));
+            TextMessage reply = sender.receiveMessage();
             sender.disconnect();
+            success = (reply.getMsg().equals("MOVE_SUCCESS"));
+        } else {
+            logger.debug("No data to move from " + getHostname());
         }
         unlockWrite();
-        return true;
+        return success;
     }
 
     /**

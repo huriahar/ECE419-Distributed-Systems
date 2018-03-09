@@ -96,6 +96,7 @@ public class ZKImplementation implements Watcher{
 	public void deleteGroup (String groupName)
 			throws KeeperException, InterruptedException {
 		String path = KVConstants.ZK_SEP + groupName;
+        System.out.println("in deleteGroup ZK");
 		try {
 			List<String> children = zk.getChildren(path, false);
 			for (String child : children) {
@@ -105,6 +106,8 @@ public class ZKImplementation implements Watcher{
 		}
 		catch (KeeperException.NoNodeException e) {
 			logger.error("Unable to delete path " + path);
+            System.out.println("in deleteGroup ZK: failed");
 		}
+        System.out.println("in deleteGroup ZK: end");
 	}
 }

@@ -82,7 +82,7 @@ public class ClientConnection implements Runnable {
                     if(msgContent.length > 1){
                         key = msgContent[1];
                     }
-
+                    boolean success = true;
                     logger.debug("step 5");
                     if (command.equals("ECS")) {
                         String[] ecsCmd = Arrays.copyOfRange(msgContent, 1, msgContent.length);
@@ -90,8 +90,13 @@ public class ClientConnection implements Runnable {
                         continue;
                     }
                     else if(command.equals("MOVE_KVPAIRS")) {
+                        // Receiving KVPairs from another server
                         if(key != null) {
-                            handleMoveKVPairs(key + KVConstants.DELIM + value);
+                            success = handleMoveKVPairs(key + KVConstants.DELIM + value);
+                            String res = success ? "MOVE_SUCCESS" : "MOVE_FAILED";
+                            sendMessage(new TextMessage(res));
+                            logger.info(res);
+                            continue;
                         }
                     }
                     logger.debug("step 6");
@@ -185,8 +190,8 @@ public class ClientConnection implements Runnable {
         return result;
     }
 
-    private void handleMoveKVPairs(String kvpairs) {
-        if(kvpairs == null) return;
+    private boolean handleMoveKVPairs(String kvpairs) {
+        if(kvpairs == null) return true;
         logger.debug(kvpairs);
         String[] KVPairs = kvpairs.split(KVConstants.NEWLINE_DELIM);
         for(int i = 0; i < KVPairs.length ; i++) {
@@ -195,12 +200,15 @@ public class ClientConnection implements Runnable {
             try {
                 server.putKV(kvpair[0], kvpair[1]);
             } catch (Exception e) {
-                logger.error("failed to move KVpair ( " + kvpair[0] + ", " + kvpair[1] + ") to server " + server.getHostname());
+                logger.error("failed to move KVpair (" + kvpair[0] + ", " + kvpair[1] + ") to server " + server.getHostname());
+                return false;
             }
         }
+        return true;
     }
 
     private void handleECSCmd (String[] msg) {
+        boolean success;
         try {
             switch(msg[0]) {
                 case "SETUP_NODE":
@@ -222,21 +230,26 @@ public class ClientConnection implements Runnable {
                     return;
                 case "MOVE_ALL_KVPAIRS":
                     server.setMoveAll(true);
-                case "UPDATE_METADATA":
-                    boolean success = server.updateMetaData();
+                case "MOVE_KVPAIRS":
+                    //targetRange in msg[1], msg[2]
+                    System.out.println("Updated metadata. Now moving data");
+                    String[] targetRange = Arrays.copyOfRange(msg, 2, 2);
+                    String targetName = msg[1];
+                    success = server.moveData(targetRange, targetName);
                     if(success) {
-                        //targetRange in msg[1], msg[2]
-                        System.out.println("Updated metadata. Now moving data");
-                        String[] targetRange = Arrays.copyOfRange(msg, 2, 2);
-                        String targetName = msg[1];
-                        success = server.moveData(targetRange, targetName);
+                        sendMessage(new TextMessage("MOVE_SUCCESS"));
+                    } else {
+                        sendMessage(new TextMessage("MOVE_FAILED"));
                     }
+                    server.setMoveAll(false);
+                    return;
+                case "UPDATE_METADATA":
+                    success = server.updateMetaData();
                     if(success) {
                         sendMessage(new TextMessage("UPDATE_SUCCESS"));
                     } else {
                         sendMessage(new TextMessage("UPDATE_FAILED"));
                     }
-                    server.setMoveAll(false);
                     return;
                 default:
                     logger.error("Unknown ECS cmd!");

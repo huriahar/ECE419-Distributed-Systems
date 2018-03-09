@@ -264,6 +264,7 @@ public class KVStore implements KVCommInterface {
 
     private KVReplyMessage retryRequest(String key, String value, String request)
             throws Exception {
+        logger.debug("retrying " + request + " for kvp (" + key + ", " + value + ")");
         // step 1 - Update ServerMetaData
         String status = (value == null) ? "DELETE_ERROR" : "PUT_ERROR";
         status = (request.equals(KVConstants.GET_CMD)) ? "GET_ERROR" : status;
@@ -351,7 +352,7 @@ public class KVStore implements KVCommInterface {
         logger.info("Send message:\t '" + msg.getMsg() + "'");
     }
 
-    private TextMessage receiveMessage()
+    public TextMessage receiveMessage()
             throws IOException {
         int index = 0;
         byte[] msgBytes = null, tmp = null;

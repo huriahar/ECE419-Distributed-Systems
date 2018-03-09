@@ -145,6 +145,17 @@ public class ECS implements IECS {
         return success;
     }
 
+    public boolean shutDownOneNode(IECSNode node) {
+        try {
+            stop(node);
+            shutDownNode(node);
+            allAvailableServers.put(node, "AVAILABLE");
+        } catch(IOException io) {
+            logger.error("ERROR: Unable to shutdown node");
+            return false;    
+        }
+        return true;
+    }
 
     public boolean shutDownNode(IECSNode node) throws IOException {
         //Send Shutdown to node passed in  
@@ -189,7 +200,7 @@ public class ECS implements IECS {
 
     }
 
-    public void updateMetaData() throws IOException {
+    public void updateMetaDataFile() throws IOException {
 
         ArrayList<String> metaDataContent = new ArrayList<String>();
         IECSNode node;
@@ -216,14 +227,124 @@ public class ECS implements IECS {
             
         }               
     } 
-    
+   
+    public boolean sendMetaDataUpdate(IECSNode rNode) {
+        boolean success = true;
+        TextMessage response, message;
+        printDebug("In sendMetaDataUpdate");
+        // Step 1
+        // Ask the rNode to update it's local metadata range
+        // TODO needs no target
+        message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_METADATA");
+        try {
+            response = sendNodeMessage(message, rNode);
+            if(response.getMsg().equals("UPDATE_SUCCESS")) {
+                logger.info("SUCCESS: MetaData updated for KVServer: " + rNode.getNodeName());
+            }
+            else if(response.getMsg().equals("UPDATE_FAILED")) {
+                logger.error("ERROR: MetaData not updated for KVServer: " + rNode.getNodeName());
+                success = false;
+            }
+        } catch (IOException ex) {
+            success = false;
+            logger.error("UPDATE_ERROR: Update for KVServer failed");
+        }
+        return success;
+    }
+
+    public boolean sendMoveKVPairs(IECSNode srcNode, IECSNode dstNode, boolean moveAll) {
+        boolean success = true;
+        TextMessage response, message;
+        printDebug("In sendMetaDataUpdate");
+        String cmd = moveAll ? "MOVE_ALL_KVPAIRS" : "MOVE_KVPAIRS";
+        // Step 2
+        // Ask the removed node to move all its KVPairs to its successor
+        // The msg format is MOVE_ALL_KVPAIRS|targetName|targetHashBegin|targetHashEnd
+        message = new TextMessage("ECS" + KVConstants.DELIM +
+                                cmd + KVConstants.DELIM +
+                                dstNode.getNodeName() + KVConstants.DELIM +
+                                dstNode.getNodeHashRange()[0].toString(16) + KVConstants.DELIM +
+                                dstNode.getNodeHashRange()[1].toString(16));
+        try {
+            response = sendNodeMessage(message, srcNode);
+            if(response.getMsg().equals("MOVE_SUCCESS")) {
+                logger.info("SUCCESS: MetaData updated for KVServer: " + srcNode.getNodeName());
+            }
+            else if(response.getMsg().equals("MOVE_FAILED")) {
+                logger.error("ERROR: MetaData not updated for KVServer: " + srcNode.getNodeName());
+                success = false;
+            }
+        } catch (IOException ex) {
+            success = false;
+            logger.error("UPDATE_ERROR: Update for KVServer failed");
+        }
+        return success;
+    }
+ 
+    public IECSNode addNode(String cacheStrategy, int cacheSize) {
+        //Select node from available, update hashing, add to hashRing and alert all servers to upate metaData 
+        IECSNode currNode = new ECSNode(), nextNode = new ECSNode();     
+        BigInteger serverHash = new BigInteger("0", 16);
+        boolean success = true;
+        try { 
+            for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
+                if(entry.getValue().equals("AVAILABLE")) {
+                	//Add the server to the ringNetwork and update HashMap 
+                    entry.setValue("TAKEN");
+                    currNode = entry.getKey();
+
+                    if(launchKVServer(currNode, cacheStrategy, cacheSize)) {
+                        logger.info("SUCCESS. Launched KVServer :" + currNode.getNodeName());
+                    } 
+                    else {
+                        logger.error("ERROR. Unable to launch KVServer :" + currNode.getNodeName() + " Host: " + currNode.getNodeHost()+ " Port: " + currNode.getNodePort());           
+                        return null;
+                    }
+                    
+                    serverHash = md5.encode(currNode.getNodeHost() + KVConstants.DELIM + currNode.getNodePort());
+                    printDebug("Adding currNode: " + currNode.getNodeName());
+                    //// Add the currNode to ZK
+                	//ZKImpl.joinGroup(KVConstants.ZK_ROOT, currNode.getNodeName());
+                    //ZKImpl.list(KVConstants.ZK_ROOT);
+                	//Update the hashing for all servers in the ring
+                    currNode = updateHash(serverHash, currNode);
+                    break;
+                }
+
+            }
+            //Once all currNodes are added, write to metaDataFile and alert nodes to update their metaData
+            updateMetaDataFile();
+            // Update meta data for the node AFTER the added node
+            // Move KVpairs from nextNode to addedNode
+            nextNode = findNextNode(serverHash);
+            if(nextNode == null) {
+                logger.error("Could not find next node while adding a new node!!");
+                return null;
+            }
+            success = sendMetaDataUpdate(currNode);
+            success = success & sendMetaDataUpdate(nextNode);
+            success = success & sendMoveKVPairs(nextNode, currNode, false);
+            if(!success) {
+                logger.error("Unable to update metaData in Servers");
+                printDebug("Unable to update metaData in Servers");
+            }
+
+        }
+        catch (IOException io) {
+            logger.error("Unable to write to metaDataFile"); 
+        }
+        //Other errors ??
+        return currNode; 
+    }
+
     // Update meta data for each of the running servers
-    public boolean alertMetaDataUpdate(boolean moveAll) {
+    public boolean alertMetaDataUpdate() {
+        printDebug("In alertMetaDataUpdate");
         boolean success = true;
         TextMessage response, message;
         IECSNode node = new ECSNode(), nextNode = new ECSNode(), firstNode = new ECSNode();
         printDebug("In alertMetaDataUpdate");
-        String command = moveAll ? "MOVE_ALL_KVPAIRS" : "UPDATE_METADATA";
+        String command = "UPDATE_METADATA";
         for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
             BigInteger hash = entry.getKey();
             node = entry.getValue();
@@ -231,21 +352,13 @@ public class ECS implements IECS {
             if(nextEntry != null) {
                 nextNode = nextEntry.getValue();
                 printDebug("Node has a higher value");
-                message = new TextMessage("ECS" + KVConstants.DELIM +
-                                        command + KVConstants.DELIM +
-                                        nextNode.getNodeName() + KVConstants.DELIM +
-                                        nextNode.getNodeHashRange()[0].toString(16) + KVConstants.DELIM +
-                                        nextNode.getNodeHashRange()[1].toString(16));
+                message = new TextMessage("ECS" + KVConstants.DELIM + command); 
             }
             else {
                 printDebug("Node is the only one in ringNetwork or next node wraps wround");
                 Map.Entry<BigInteger, IECSNode> firstEntry = ringNetwork.firstEntry();
                 firstNode = firstEntry.getValue();
-                message = new TextMessage("ECS" + KVConstants.DELIM +
-                                         command + KVConstants.DELIM +
-                                         firstNode.getNodeName() + KVConstants.DELIM +
-                                         firstNode.getNodeHashRange()[0].toString(16) + KVConstants.DELIM +
-                                         firstNode.getNodeHashRange()[1].toString(16));
+                message = new TextMessage("ECS" + KVConstants.DELIM + command);
             }
             try {
                 response = sendNodeMessage(message, node);
@@ -263,56 +376,7 @@ public class ECS implements IECS {
         }
         return success;
     }
- 
-    public IECSNode addNode(String cacheStrategy, int cacheSize) {
-        //Select node from available, update hashing, add to hashRing and alert all servers to upate metaData 
-        IECSNode node = new ECSNode();     
-        boolean success = true;
-        try { 
-            for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
-                if(entry.getValue().equals("AVAILABLE")) {
-                	//Add the server to the ringNetwork and update HashMap 
-                    entry.setValue("TAKEN");
-                    node = entry.getKey();
 
-                    if(launchKVServer(node, cacheStrategy, cacheSize)) {
-                        logger.info("SUCCESS. Launched KVServer :" + node.getNodeName());
-                    } 
-                    else {
-                        logger.error("ERROR. Unable to launch KVServer :" + node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());           
-                        return null;
-                    }
-                    
-                    BigInteger serverHash = md5.encode(node.getNodeHost() + KVConstants.DELIM + node.getNodePort());
-                    printDebug("Adding node: " + node.getNodeName());
-                    //// Add the node to ZK
-                	//ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
-                    //ZKImpl.list(KVConstants.ZK_ROOT);
-                	//Update the hashing for all servers in the ring
-                    node = updateHash(serverHash, node);
-                    if(!inRingNetwork(node)) {
-                        //add node to hash Ring
-                        ringNetwork.put(serverHash, node);
-                    }
-                    break;
-                }
-
-            }
-            //Once all nodes are added, write to metaDataFile and alert nodes to update their metaData
-            updateMetaData();
-            success = alertMetaDataUpdate(false);
-            if(!success) {
-                logger.error("Unable to update metaData in Servers");
-                printDebug("Unable to update metaData in Servers");
-            }
-
-        }
-        catch (IOException io) {
-            logger.error("Unable to write to metaDataFile"); 
-        }
-        //Other errors ??
-        return node; 
-    }
 
     public Collection<IECSNode> initAddNodesToHashRing(int numNodes) {
         Collection<IECSNode> chosenNodes = new ArrayList<IECSNode>();     
@@ -323,6 +387,7 @@ public class ECS implements IECS {
             for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
                 if(counter < numNodes) {
                     if(entry.getValue().equals("AVAILABLE")) {
+                        logger.debug("found an avalable server " + entry.getKey().getNodeName());
                         counter++;
                         entry.setValue("TAKEN");
                         IECSNode node = entry.getKey();
@@ -330,8 +395,6 @@ public class ECS implements IECS {
                                                    Integer.toString(node.getNodePort()));
                         //Setup begin and end hashing for server 
                         node = updateHash(serverHash, node);
-                        // Add node to ringNetwork
-                        ringNetwork.put(serverHash, node);
                         //Add chosen node to collection
                         chosenNodes.add(node);
                     }
@@ -339,7 +402,7 @@ public class ECS implements IECS {
             }
              
             //Once all nodes are added, write to metaDataFile
-            updateMetaData();   
+            updateMetaDataFile();   
             //the alert will be called once launching of the servers is done from ECSClient
         } catch (IOException io) {
             logger.error("Unable to write to metaDataFile");
@@ -379,32 +442,25 @@ public class ECS implements IECS {
         if(ringNetwork.isEmpty()) {
             currNode.setNodeBeginHash(nodeHash);
             currNode.setNodeEndHash(nodeHash);
+            ringNetwork.put(currNode.getNodeHashRange()[1], currNode);
             return currNode;
         }
         else if(ringNetwork.containsKey(nodeHash)) {
             logger.error("ERROR KVServer already in ringNetwork");
             return null;
         }
-        
-        // the current hash is the highest value
-        if(ringNetwork.higherKey(nodeHash) == null) {
-            prevNode = ringNetwork.firstEntry().getValue();
-            // prevNode authority only goes as far currently added node
-            currNode.setNodeBeginHash(prevNode.getNodeHashRange()[0]);                   
-            currNode.setNodeEndHash(nodeHash); 
-            prevNode.setNodeBeginHash(nodeHash);
-            //Update the ringNetwork with the changed hash of the previous one as well
-            ringNetwork.put(prevNode.getNodeHashRange()[1], prevNode);
+        nextNode = findNextNode(nodeHash);
+        if(nextNode == null) {
+            logger.error("nextNode is null wth");
+            return null;
         }
-        else { 
-        	//currNode is at beginning or in between
-            printDebug("Server somewhere in between or at beginning");
-            nextNode = ringNetwork.higherEntry(nodeHash).getValue();
-            currNode.setNodeBeginHash(nextNode.getNodeHashRange()[0]);  
-            currNode.setNodeEndHash(nodeHash);
-            nextNode.setNodeBeginHash(nodeHash);
-            ringNetwork.put(nextNode.getNodeHashRange()[1], nextNode);
-        }
+        currNode.setNodeBeginHash(nextNode.getNodeHashRange()[0]);
+        currNode.setNodeEndHash(nodeHash);
+        nextNode.setNodeBeginHash(nodeHash);
+        //update ringNetwork
+        ringNetwork.put(nextNode.getNodeHashRange()[1], nextNode);
+        ringNetwork.put(currNode.getNodeHashRange()[1], currNode);
+        printRing();
         return currNode; 
     }
 
@@ -462,37 +518,47 @@ public class ECS implements IECS {
             while( iter.hasNext()) {
                 Map.Entry<BigInteger, IECSNode> entry = iter.next();
                 if(server.getNodeName().equals(entry.getValue().getNodeName())) {
-                    printDebug("node found");
+
+                    printDebug("node found: " + entry.getValue().getNodeName());
                     //Found the node we want to remove
                     currNodeHash = entry.getKey();
                     currNode = entry.getValue();
                     nextNode = findNextNode(currNodeHash);
-                    if(nextNode.getNodeHashRange()[1] == currNodeHash)
-                        onlyOneNode = true;
                     if(nextNode == null) {
-                        logger.error("ERROR: Removing node error");
-                        success = false;
+                        logger.error("ERROR: There should be at least one node in the network!! found none!");
+                        return false;
                     }
+                    onlyOneNode = (nextNode.getNodeHashRange()[1] == currNodeHash);
                     nextNode.setNodeBeginHash(currNode.getNodeHashRange()[0]);
-                    try { 
-                        updateMetaData();
-                        success = alertMetaDataUpdate(iter.hasNext());
+                    printDebug("Number of elements in ring before removal: " + ringNetwork.size());
+                    try {
+                        //Need to remove node from network before updating all the metadata
+                        iter.remove();
+                        //Update the changed hashRange to the ring
+                        if(!onlyOneNode) {
+                            ringNetwork.put(nextNode.getNodeHashRange()[1], nextNode);
+                        }
+                        else {
+                            //TODO keep track of the name of the last node dying so we can start
+                            // with it initially
+                            //TODO whenever the ring is empty start up the node whose name is in the file
+                            ;
+                        }
+
+                        printDebug("Number of elements in ring after removal: " + ringNetwork.size());
+                        updateMetaDataFile();
+                        // Update meta data for the node AFTER the removed node
+                        // Move KVpairs from removedNode to nextNode
+                        success = sendMetaDataUpdate(nextNode);
+                        success = success & sendMoveKVPairs(currNode, nextNode, true);
+                        success = success & removeZKNode(currNode);
+                        //success = alertMetaDataRemoval(currNode, nextNode);
+                    
                     } catch (IOException io) {
                         logger.error("ERROR: Unable to update metaData with nodes removed");
                         success = false;
                     }
-                    try {
-                        stop(currNode);
-                        shutDownNode(currNode);
-                        //Update the changed hashRange to the ring
-                        if(!onlyOneNode)
-                            ringNetwork.put(nextNode.getNodeHashRange()[1], nextNode);
-                        allAvailableServers.put(currNode, "AVAILABLE");
-//                      ringNetwork.remove(currNodeHash);
-                        iter.remove();
-                    } catch(IOException io) {
-                        logger.error("ERROR: Unable to shutdown node");
-                    }
+                    success = success & shutDownOneNode(currNode);
                 }
                 
             }
@@ -503,12 +569,31 @@ public class ECS implements IECS {
         return success;
     }
 
+    public boolean removeZKNode(IECSNode node) {
+        logger.debug("in removeZKNode!");
+        try {
+            logger.debug("in removeZKNode2!");
+            String path = KVConstants.ZK_ROOT + KVConstants.ZK_SEP + node.getNodeName();
+            ZKImpl.deleteGroup(path);
+            logger.debug("in removeZKNode3!");
+            //TODO is this for ZK or the launch script??
+            //Thread.sleep(KVConstants.LAUNCH_TIMEOUT);
+        } catch (InterruptedException e) {
+        	logger.error("ERROR: Unable to remove znode from ZK for server" + node.getNodeName() + ": " + e);
+            return false;
+        } catch (KeeperException e) {
+        	logger.error("ERROR: Unable to remove znode from ZK for server" + node.getNodeName() + ": " + e);
+            return false;
+		}
+        return true;
+    }
+
     public IECSNode findNextNode(BigInteger currHash) {
         IECSNode nextNode = new ECSNode();
         //We only want to return null if ring is empty or node not in ring
-        if(ringNetwork.size() < 1 || !ringNetwork.containsKey(currHash))
+        if(ringNetwork.size() < 1) {
             nextNode = null;
-        else {
+        } else {
             if(ringNetwork.higherKey(currHash) == null) {
                 nextNode = ringNetwork.firstEntry().getValue();
             }

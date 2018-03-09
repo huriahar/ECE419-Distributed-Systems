@@ -78,6 +78,7 @@ public class ECSClient implements IECSClient {
                         int numNodes = Integer.parseInt(tokens[1]);
                         String cacheStrategy = tokens[2];
                         int cacheSize = Integer.parseInt(tokens[3]);
+                        System.out.println(numNodes + " " + cacheSize + " " + cacheStrategy);
 
                         if(numNodes <= ecsInstance.availableServers()) {
                             if (KVCache.isValidStrategy(cacheStrategy)) {
@@ -353,7 +354,7 @@ public class ECSClient implements IECSClient {
 
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
-        boolean success = true;
+        boolean success = false;
     	// This is called before launching the servers - decides which nodes to add in hashRing, adds them
     	Collection<IECSNode> nodes  = ecsInstance.initAddNodesToHashRing(count);
     	for(IECSNode entry: nodes) {
@@ -364,8 +365,10 @@ public class ECSClient implements IECSClient {
             else {
                 logger.error("ERROR. Unable to launch KVServer :" + entry.getNodeName() + " Host: " + entry.getNodeHost()+ " Port: " + entry.getNodePort());           
             }
+            logger.error("entry name is " + entry.getNodeName());
         }
-        success = ecsInstance.alertMetaDataUpdate(false);
+        logger.error("about to alertMetaDataUpdate");
+        success = ecsInstance.alertMetaDataUpdate();
         if(success)
         	nodes = ecsInstance.setupNodesCacheConfig(nodes, cacheStrategy, cacheSize);
         else {
