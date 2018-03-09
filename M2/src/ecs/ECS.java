@@ -218,11 +218,12 @@ public class ECS implements IECS {
     } 
     
     // Update meta data for each of the running servers
-    public boolean alertMetaDataUpdate() {
+    public boolean alertMetaDataUpdate(boolean moveAll) {
         boolean success = true;
         TextMessage response, message;
         IECSNode node = new ECSNode(), nextNode = new ECSNode(), firstNode = new ECSNode();
         printDebug("In alertMetaDataUpdate");
+        String command = moveAll ? "MOVE_ALL_KVPAIRS" : "UPDATE_METADATA";
         for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
             BigInteger hash = entry.getKey();
             node = entry.getValue();
@@ -231,7 +232,7 @@ public class ECS implements IECS {
                 nextNode = nextEntry.getValue();
                 printDebug("Node has a higher value");
                 message = new TextMessage("ECS" + KVConstants.DELIM +
-                                        "UPDATE_METADATA" + KVConstants.DELIM +
+                                        command + KVConstants.DELIM +
                                         nextNode.getNodeName() + KVConstants.DELIM +
                                         nextNode.getNodeHashRange()[0].toString(16) + KVConstants.DELIM +
                                         nextNode.getNodeHashRange()[1].toString(16));
@@ -241,7 +242,7 @@ public class ECS implements IECS {
                 Map.Entry<BigInteger, IECSNode> firstEntry = ringNetwork.firstEntry();
                 firstNode = firstEntry.getValue();
                 message = new TextMessage("ECS" + KVConstants.DELIM +
-                                        "UPDATE_METADATA" + KVConstants.DELIM +
+                                         command + KVConstants.DELIM +
                                          firstNode.getNodeName() + KVConstants.DELIM +
                                          firstNode.getNodeHashRange()[0].toString(16) + KVConstants.DELIM +
                                          firstNode.getNodeHashRange()[1].toString(16));
@@ -299,7 +300,7 @@ public class ECS implements IECS {
             }
             //Once all nodes are added, write to metaDataFile and alert nodes to update their metaData
             updateMetaData();
-            success = alertMetaDataUpdate();
+            success = alertMetaDataUpdate(false);
             if(!success) {
                 logger.error("Unable to update metaData in Servers");
                 printDebug("Unable to update metaData in Servers");
@@ -478,6 +479,13 @@ public class ECS implements IECS {
                         success = false;
                     }
                     nextNode.setNodeBeginHash(currNode.getNodeHashRange()[0]);
+                    try { 
+                        updateMetaData();
+                        success = alertMetaDataUpdate(iter.hasNext());
+                    } catch (IOException io) {
+                        logger.error("ERROR: Unable to update metaData with nodes removed");
+                        success = false;
+                    }
                     try {
                         stop(currNode);
                         shutDownNode(currNode);
@@ -494,15 +502,8 @@ public class ECS implements IECS {
                 
             }
         }
+        printRing();
        
-        try { 
-            printRing();
-            updateMetaData();
-            success = alertMetaDataUpdate();
-        } catch (IOException io) {
-            logger.error("ERROR: Unable to update metaData with nodes removed");
-            success = false;
-        }
 
         return success;
     }

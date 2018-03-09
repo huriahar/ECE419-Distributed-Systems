@@ -142,6 +142,10 @@ public class KVClient implements IKVClient {
                         }
                     }
                     else {
+                        logger.error("clientStore = null? " + (clientStore == null));
+                        if(clientStore != null) {
+                            logger.error("server running? " + (clientStore.isRunning()));
+                        }
                         printError("Put Failed. Not connected");
                         logger.error("Put Failed. Not connected");
                     }
@@ -335,7 +339,7 @@ public class KVClient implements IKVClient {
      */
     public static void main(String[] args) {
         try {
-            new LogSetup("logs/client.log", Level.OFF);
+            new LogSetup("logs/client.log", Level.ALL);
             KVClient clientApp = new KVClient();
             clientApp.run();
         } catch (IOException e) {
