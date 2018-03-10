@@ -32,7 +32,7 @@ public class ECS implements IECS {
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 128 * BUFFER_SIZE;
     public static final String metaFile = "metaDataECS.config";            
-    
+    public static final String lastRemovedFile = "lastRemoved.txt";    
     private Path configFile;
     private Path metaDataFile;
     private Socket ECSSocket;
@@ -542,15 +542,26 @@ public class ECS implements IECS {
                             //TODO keep track of the name of the last node dying so we can start
                             // with it initially
                             //TODO whenever the ring is empty start up the node whose name is in the file
-                            ;
+                            try {
+                                String lastNode = currNode.getNodeName() + KVConstants.DELIM +
+                                                  currNode.getNodeHost() + KVConstants.DELIM +
+                                                  currNode.getNodePort();
+                                Path file = Paths.get(this.lastRemovedFile);
+                                Files.write(file, lastNode.getBytes());
+                            } catch (Exception e) {
+                                logger.error("could not write last removed node to lastRemovedFile");
+                                logger.error(e);
+                            }
                         }
 
                         printDebug("Number of elements in ring after removal: " + ringNetwork.size());
                         updateMetaDataFile();
                         // Update meta data for the node AFTER the removed node
                         // Move KVpairs from removedNode to nextNode
-                        success = sendMetaDataUpdate(nextNode);
-                        success = success & sendMoveKVPairs(currNode, nextNode, true);
+                        if(!onlyOneNode) {
+                            success = sendMetaDataUpdate(nextNode);
+                            success = success & sendMoveKVPairs(currNode, nextNode, true);
+                        }
                         success = success & removeZKNode(currNode);
                         //success = alertMetaDataRemoval(currNode, nextNode);
                     
@@ -749,7 +760,15 @@ public class ECS implements IECS {
 
 	@Override
 	public boolean shutdown() {
-		// TODO Auto-generated method stub
-		return false;
+        //clear the Hash Ring and the set of available nodes
+        ringNetwork.clear();
+        allAvailableServers.clear();
+        try {
+            deleteMetaDataFile();
+        } catch (IOException ex) {
+            logger.error("ERROR: Unable to delete ECS MetaData File");
+            return false;            
+        }
+		return true;
 	}
 }

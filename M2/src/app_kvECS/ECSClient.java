@@ -320,13 +320,11 @@ public class ECSClient implements IECSClient {
 
     @Override
     public boolean shutdown() {
-        // TODO
         boolean success = true;
-        if(!ecsInstance.ECSShutDown())
-            success = false;
-
+        success = ecsInstance.removeNodes(nodesLaunched);
+        if(success) nodesLaunched.clear();
+        success = success & ecsInstance.shutdown();
         return success;
-
     }
 
     @Override
