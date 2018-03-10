@@ -50,6 +50,7 @@ public class KVServer implements IKVServer, Runnable {
     private ServerMetaData metadata;
     private Path metaDataFile;
     private String serverFilePath;
+    private String zkPath;
     //State
     private boolean running = false;
     private boolean writeLocked = true;     //start in a stopped state
@@ -72,8 +73,8 @@ public class KVServer implements IKVServer, Runnable {
     	String data = null;
     	try {
 			zkImplServer.zkConnect(zkHostname);
-			String path = KVConstants.ZK_SEP + KVConstants.ZK_ROOT + KVConstants.ZK_SEP + name;
-			data = zkImplServer.readData(path);			
+			this.zkPath = KVConstants.ZK_SEP + KVConstants.ZK_ROOT + KVConstants.ZK_SEP + name;
+			data = zkImplServer.readData(this.zkPath);			
 		} catch (IOException | InterruptedException e) {
 			logger.error("Unable to connect to zk and read data: " + e);
 		} catch (KeeperException e) {
@@ -82,9 +83,20 @@ public class KVServer implements IKVServer, Runnable {
     	String[] zNodeData = data.split("\\" + KVConstants.DELIM);
     	this.metadata = new ServerMetaData(name, zNodeData[1], Integer.parseInt(zNodeData[2]), null, null);
         this.serverFilePath = "SERVER_" + Integer.toString(zkPort);
-        this.cache = KVCache.createKVCache(Integer.parseInt(zNodeData[3]), zNodeData[4]);
+        this.cache = KVCache.createKVCache(0, "FIFO");
         this.metaDataFile = Paths.get("metaDataECS.config");
-    }
+        /////////////////////// 
+        //Update ZK node status
+        /////////////////////// 
+        data = "SERVER_LAUNCHED" + KVConstants.DELIM + this.metadata.addr + KVConstants.DELIM + this.metadata.port;
+        try {
+            zkImplServer.updateData(this.zkPath, data);
+        } catch (KeeperException e) {
+        	logger.error("ERROR: Unable to update ZK " + e);
+        } catch (InterruptedException e) {
+        	logger.error("ERROR: ZK Interrupted" + e);
+        }
+     }
 
     public int getPort(){
         return this.metadata.getServerPort();
@@ -107,7 +119,7 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public void setupCache(int size, String strategy) {
-        this.cache = new KVCache(size, strategy);
+        this.cache = KVCache.createKVCache(size, strategy);
     }
 
     public void setMoveAll(boolean move) {
@@ -143,13 +155,13 @@ public class KVServer implements IKVServer, Runnable {
                 this.cache.insert(key, value);
             } 
         }
-        this.cache.print();
+        //this.cache.print();
         return value;
     }
 
     public void putKV(String key, String value) throws Exception{
         this.cache.insert(key, value);
-        this.cache.print();
+        //this.cache.print();
         storeKV(key, value);
     }
 
@@ -227,7 +239,6 @@ public class KVServer implements IKVServer, Runnable {
     @Override
     public void close(){
         // TODO: Wait for all threads, save any remainder stuff in cache to memory
-        logger.debug("calling close....");
         try {
             serverSocket.close();
         }
@@ -237,17 +248,13 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public String onDisk(String key) throws IOException {
-        logger.debug("in on Disk.....");
         String value = "";
         String key_val, get_value;
         String filePath  = this.serverFilePath;
         BufferedReader br = null;
         String KVPair;
         try {
-            logger.debug("before creating file.....");
             File file = new File(filePath);
-            
-            logger.debug("before acquiring lock.....");
             FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
             FileLock lock = channel.lock();            
 
@@ -257,13 +264,11 @@ public class KVServer implements IKVServer, Runnable {
             } catch (OverlappingFileLockException e) {
                  //System.out.println("Overlapping File Lock Error: " + e.getMessage());
             }
-            logger.debug("after acquiring lock.....");
 
             if(!file.exists()) {
                 System.out.println("File not found");
             }
             else{
-                logger.debug("file exists.....");
                 
                 FileReader fr = new FileReader(file);
                 br = new BufferedReader(fr);
@@ -281,20 +286,16 @@ public class KVServer implements IKVServer, Runnable {
                         valueParts.add(msgContent[i]);
                     }
                     get_value = String.join(KVConstants.DELIM, valueParts);
-                    logger.debug("key_val is: " + key_val + " and value: " + get_value);
                     if(key_val.equals(key)) {
                         value = get_value;
-                        logger.debug("Found key is: " + key + " and value: " + value);
                         break;     
                     }
                     KVPair = br.readLine();
                 }
             }
-            logger.debug("after search.....");
 
             lock.release();
             channel.close();
-            logger.debug("after releasing lock.....");
 
         } catch (IOException ex) { 
                 System.out.println("Unable to open file. ERROR: " + ex);
@@ -314,14 +315,12 @@ public class KVServer implements IKVServer, Runnable {
 
     @Override
     public void deleteKV(String key) throws Exception {
-        logger.debug("Deleting key " + key);
         this.cache.delete(key);
         storeKV(key, "");
     }
 
 
     public void storeKV(String key, String value) throws IOException {
-        logger.debug("in storeKV");
         String filePath  = this.serverFilePath;
         BufferedWriter wr  = null;
         PrintWriter pw = null;
@@ -341,10 +340,8 @@ public class KVServer implements IKVServer, Runnable {
                 
                 //simply append it to the end
                 try {
-                    logger.debug("about to create file");
                     File file = new File(filePath);
                 
-                    logger.debug("about to acquire lock");
                     FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
                     FileLock lock = channel.lock();            
     
@@ -355,19 +352,16 @@ public class KVServer implements IKVServer, Runnable {
                          //System.out.println("Overlapping File Lock Error: " + e.getMessage());
                     }
 
-                    logger.debug("acquired lock");
                     if (!file.exists()) {
                         file.createNewFile();
                     }
                 
-                    logger.debug("about to write KV to file");
                     FileWriter fw = new FileWriter(file, true);
                     wr = new BufferedWriter(fw);
                     pw = new PrintWriter(wr);
                     String KVPair = key + "|" + value ;    
                     pw.println(KVPair);
 
-                    logger.debug("after write KV to file");
                     lock.release();
                     channel.close();
 
@@ -379,7 +373,6 @@ public class KVServer implements IKVServer, Runnable {
                 finally
                 {
                     try{
-                        logger.debug("closing the file");
                         if(wr!=null) {
                             wr.close();
                         }
@@ -515,7 +508,6 @@ public class KVServer implements IKVServer, Runnable {
 		}
     	for (int i = 0; i < metaDataLines.size(); ++i) {
     		String[] metaData = metaDataLines.get(i).split("\\" + KVConstants.DELIM);
-            logger.debug("looking for " + hostName + "'s meta data: " + metaDataLines.get(i));
     		if (metaData[ServerMetaData.SERVER_NAME].equals(hostName)) {
     			return metaDataLines.get(i);
     		}
@@ -525,7 +517,6 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public boolean updateMetaData() {
-        logger.debug("updating meta data.... ");
         String meta = getMetaDataOfServer(getHostname());
         if(meta == null) {
             System.out.println("Could not find meta data of server " + getHostname() + " " + getPort());
@@ -542,6 +533,14 @@ public class KVServer implements IKVServer, Runnable {
         // TODO Starts the KVServer, all client requests and all ECS requests are processed.
         writeLocked = false;
         readLocked = false;
+        String data = "SERVER_STARTED" + KVConstants.DELIM + this.metadata.addr + KVConstants.DELIM + this.metadata.port;
+        try {
+            zkImplServer.updateData(this.zkPath, data);
+        } catch (KeeperException e) {
+        	logger.error("ERROR: Unable to update ZK " + e);
+        } catch (InterruptedException e) {
+        	logger.error("ERROR: ZK Interrupted" + e);
+        }
     }
 
     @Override
@@ -549,6 +548,17 @@ public class KVServer implements IKVServer, Runnable {
         // TODO Stops the KVServer, all client requests are rejected and only ECS requests are processed
         writeLocked = true;
         readLocked = true;
+        String data = "SERVER_STOPPED" + KVConstants.DELIM + this.metadata.addr + KVConstants.DELIM + this.metadata.port;
+        try {
+            data = zkImplServer.readData(this.zkPath);			
+            zkImplServer.updateData(this.zkPath, data);
+        } catch (KeeperException e) {
+        	logger.error("ERROR: Unable to update ZK " + e);
+        } catch (InterruptedException e) {
+        	logger.error("ERROR: ZK Interrupted" + e);
+        } catch (Exception e) {
+        	logger.error("ERROR: ZK Exception" + e);
+        }
     }
 
     @Override
@@ -557,6 +567,14 @@ public class KVServer implements IKVServer, Runnable {
         writeLocked = true;
         readLocked = true;
         running = false;
+        String data = "SERVER_SHUTDOWN" + KVConstants.DELIM + this.metadata.addr + KVConstants.DELIM + this.metadata.port;
+        try {
+            zkImplServer.updateData(this.zkPath, data);
+        } catch (KeeperException e) {
+        	logger.error("ERROR: Unable to update ZK " + e);
+        } catch (InterruptedException e) {
+        	logger.error("ERROR: ZK Interrupted" + e);
+        }
         this.close();
     }
 

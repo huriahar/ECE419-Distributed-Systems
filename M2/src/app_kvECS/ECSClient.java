@@ -30,6 +30,7 @@ public class ECSClient implements IECSClient {
 
     private Collection<IECSNode> nodesLaunched;
     private boolean stop = false;
+    private int timeout = KVConstants.LAUNCH_TIMEOUT;
 
     public ECSClient (String configFile) {
     	Path ecsConfig = Paths.get(configFile);
@@ -128,16 +129,13 @@ public class ECSClient implements IECSClient {
                 break;
 
             case "shutdown":
-                if(stop()) {
-                    if(!shutdown()) {
-                        printError(PROMPT + "Unable to exit ECS process");
-                        logger.error("shutDown failed");
-                    }
+                if(!shutdown()) {
+                    printError(PROMPT + "Unable to exit ECS process");
+                    logger.error("shutDown failed");
                 }
-                else {
-                    printError(PROMPT + "Stop failed");
-                    logger.error("Stop failed");
-                }
+                stop = true;
+                disconnect();
+                System.out.println(PROMPT + "Application exit!");
                 break;
 
             // addNode cacheSize cacheStrategy
@@ -353,16 +351,13 @@ public class ECSClient implements IECSClient {
             nodes.add(addNode(cacheStrategy, cacheSize));
             count--;
         }
-        // It is not necessary to do something in awaitNodes
-        // As our code just waits for all nodes to try executing anyways...
-        // As long as the server is in the server stopped stage till it is started
-        // we are good
-        /*try {
+        this.nodesLaunched = nodes;
+        //Await nodes queries ZK nodes for a status update
+        try {
 			awaitNodes(count, KVConstants.LAUNCH_TIMEOUT);
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}*/
+		}
         return nodes;
     }
 
@@ -395,10 +390,32 @@ public class ECSClient implements IECSClient {
         return nodes.iterator().next();    
     }
 
+
+    /**
+     * Wait for all nodes to report status or until timeout expires
+     * @param count     number of nodes to wait for
+     * @param timeout   the timeout in milliseconds
+     * @return  true if all nodes reported successfully, false otherwise
+     */
     @Override
     public boolean awaitNodes(int count, int timeout) throws Exception {
         // TODO
-        return false;
+        String path = null, status = null;
+        int counter = 0;
+        long endTimeMillis = System.currentTimeMillis() + timeout;
+        for(IECSNode entry : nodesLaunched) {
+            path = ecsInstance.getZKPath(entry.getNodeName());
+            if(path != null) {
+                status = ecsInstance.checkZKStatus(path,endTimeMillis); 
+                if(System.currentTimeMillis() > endTimeMillis) {
+                    return false;
+                }   
+                if(status.equals("SERVER_LAUNCHED")) {
+                    counter++;                
+                }
+            }
+        }
+        return (counter == count);
     }
 
     @Override

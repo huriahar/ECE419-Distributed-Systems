@@ -21,7 +21,9 @@ public class KVCacheLRU extends KVCache {
     @Override
     public synchronized void insert(String key, String value){
         if(value.equals("")) return;
-
+        if(this.getCacheSize() == 0) {
+            return;
+        }
         // check if it already exists
         if (kvp_map.containsKey(key)) {
             //update the key's position in the FIFO
