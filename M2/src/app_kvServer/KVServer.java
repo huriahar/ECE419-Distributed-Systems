@@ -138,9 +138,10 @@ public class KVServer implements IKVServer, Runnable {
         if(value.equals("")){
             // 1- retrieve from disk    
             value = getValueFromDisk(key);            
-            
-            // 2 - insert in cache
-            this.cache.insert(key, value);
+            if(!value.equals("")) {
+                // 2 - insert in cache
+                this.cache.insert(key, value);
+            } 
         }
         this.cache.print();
         return value;
@@ -280,9 +281,10 @@ public class KVServer implements IKVServer, Runnable {
                         valueParts.add(msgContent[i]);
                     }
                     get_value = String.join(KVConstants.DELIM, valueParts);
-                    
+                    logger.debug("key_val is: " + key_val + " and value: " + get_value);
                     if(key_val.equals(key)) {
                         value = get_value;
+                        logger.debug("Found key is: " + key + " and value: " + value);
                         break;     
                     }
                     KVPair = br.readLine();

@@ -311,8 +311,13 @@ public class ClientConnection implements Runnable {
             //Done in KVServer;
             try {
                 String value = server.getKV(key);
-                result = "GET_SUCCESS" + KVConstants.DELIM + value;
-                logger.info("Successfully fetched the value " + value + " for the key " + key + " on server");
+                result = (value.equals(""))? "GET_ERROR": ("GET_SUCCESS" + KVConstants.DELIM + value);
+                if(result.equals("GET_ERROR")) {
+                    logger.info("GET_ERROR: Unable to fetch the value for the key " + key + " on server");
+                }
+                else {
+                    logger.info("Successfully fetched the value " + value + " for the key " + key + " on server");
+                }
             }
             catch (Exception ex) {
                 result = "GET_ERROR";
