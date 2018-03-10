@@ -742,6 +742,7 @@ public class ECS implements IECS {
             }
             
             /* read next char from stream */
+            
             read = (byte) input.read();
         }
         

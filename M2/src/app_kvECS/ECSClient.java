@@ -288,7 +288,6 @@ public class ECSClient implements IECSClient {
     }
 
     public boolean start() {
-        // TODO
         boolean success = true; 
         for (IECSNode node : nodesLaunched) {
             if (!ecsInstance.start(node)) {
@@ -302,7 +301,6 @@ public class ECSClient implements IECSClient {
 
     @Override
     public boolean stop() {
-        // TODO
         boolean success = true;
 
         for (IECSNode node : nodesLaunched) {
@@ -327,7 +325,6 @@ public class ECSClient implements IECSClient {
 
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
-        // TODO
         if(ecsInstance.ringNetworkSize() == 0) {
             return setupFirstNode(cacheStrategy, cacheSize);
         }
@@ -399,7 +396,6 @@ public class ECSClient implements IECSClient {
      */
     @Override
     public boolean awaitNodes(int count, int timeout) throws Exception {
-        // TODO
         String path = null, status = null;
         int counter = 0;
         long endTimeMillis = System.currentTimeMillis() + timeout;
@@ -420,7 +416,6 @@ public class ECSClient implements IECSClient {
 
     @Override
     public boolean removeNodes(Collection<String> nodeNames) {
-        // TODO
         Collection<IECSNode> nodesToRemove = new ArrayList<IECSNode>();
         boolean success = true;
         for(String name : nodeNames) {
@@ -440,13 +435,11 @@ public class ECSClient implements IECSClient {
 
     @Override
     public Map<String, IECSNode> getNodes() {
-        // TODO
         return ecsInstance.getNodes();
     }
 
     @Override
     public IECSNode getNodeByKey(String Key) {
-        // TODO
         return ecsInstance.getNodeByKey(Key);
     }
 

@@ -530,7 +530,6 @@ public class KVServer implements IKVServer, Runnable {
 
     @Override
     public void start() {
-        // TODO Starts the KVServer, all client requests and all ECS requests are processed.
         writeLocked = false;
         readLocked = false;
         String data = "SERVER_STARTED" + KVConstants.DELIM + this.metadata.addr + KVConstants.DELIM + this.metadata.port;
@@ -545,7 +544,6 @@ public class KVServer implements IKVServer, Runnable {
 
     @Override
     public void stop() {
-        // TODO Stops the KVServer, all client requests are rejected and only ECS requests are processed
         writeLocked = true;
         readLocked = true;
         String data = "SERVER_STOPPED" + KVConstants.DELIM + this.metadata.addr + KVConstants.DELIM + this.metadata.port;
@@ -563,7 +561,6 @@ public class KVServer implements IKVServer, Runnable {
 
     @Override
     public void shutdown() {
-        // TODO Exits the KVServer application.
         writeLocked = true;
         readLocked = true;
         running = false;
@@ -614,6 +611,7 @@ public class KVServer implements IKVServer, Runnable {
         toSend.append("MOVE_KVPAIRS" + KVConstants.DELIM);
         boolean found = false;
         boolean success = true;
+        ArrayList<String> toDelete = new ArrayList<>(); 
         try {
             Path serverPath = Paths.get(this.serverFilePath);
             if(Files.exists(serverPath)) {
@@ -628,7 +626,7 @@ public class KVServer implements IKVServer, Runnable {
                         logger.debug(getHostname() + " not responsible for key " + kvp[0]);
                         found = true;
                         toSend.append(line + KVConstants.NEWLINE_DELIM);
-                        deleteKV(kvp[0]);
+                        toDelete.add(kvp[0]);
                     }
                     else {
                         logger.debug(getHostname() + " responsible for key " + kvp[0]);
@@ -651,6 +649,12 @@ public class KVServer implements IKVServer, Runnable {
             TextMessage reply = sender.receiveMessage();
             sender.disconnect();
             success = (reply.getMsg().equals("MOVE_SUCCESS"));
+            if(success) {
+                for(String key: toDelete) {
+                    deleteKV(key);
+                }
+
+            }
         } else {
             logger.debug("No data to move from " + getHostname());
         }
