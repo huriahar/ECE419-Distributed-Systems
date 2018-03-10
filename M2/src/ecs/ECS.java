@@ -12,6 +12,7 @@ import java.lang.InterruptedException;
 
 import java.io.OutputStream;
 import java.io.InputStream;
+import java.io.File;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -43,6 +44,7 @@ public class ECS implements IECS {
     private static Logger logger = Logger.getRootLogger();
     private OutputStream output; 
     private InputStream input;
+    private String lastRemovedName = null;
     
     private ZKImplementation ZKImpl;
 
@@ -377,16 +379,84 @@ public class ECS implements IECS {
         return success;
     }
 
+    public boolean redistributeKVPairs() {
+        IECSNode node = new ECSNode(), prevNode = new ECSNode();
+        BigInteger nodeHash = new BigInteger("0", 16);
+        BigInteger prevNodeHash = new BigInteger("0", 16);
+        boolean found = false;
+        // First find the server that has all the data on the ringNetwork aka lastRemoved
+        if(lastRemovedName != null) {
+            for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
+                nodeHash = entry.getKey();
+                node = entry.getValue();
+                if(node.getNodeName().equals(this.lastRemovedName)) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if(!found) {
+            logger.info("Could not find the server on the ringNetwork that owns all the data.");
+            logger.debug("None of the servers have any data or the system failed to keep track of the lastRemoved node the last time around");
+            //not finding the lastRemovedFile is not an error, hence return true
+            return true;
+        }
+        int count = ringNetwork.size() - 1;
+        boolean success = true;
+        // Now redistribute KVPairs in an anti-clockwise order
+        // Each server sends all keys its not responsible for to the server before it
+        // after ringNetwork.size() - 1 rounds, each server should have only the data
+        // it is responsible for
+        while(count > 0) {
+            prevNodeHash = findPrevKey(nodeHash);
+            prevNode = ringNetwork.get(prevNodeHash);
+            success = success & sendMoveKVPairs(node, prevNode, false);
+            node = prevNode;
+            count--;
+        }
+        return success;
+    }
 
-    public Collection<IECSNode> initAddNodesToHashRing(int numNodes) {
+    private String getLastRemoved() {
+        try {
+            File f = new File(this.lastRemovedFile);
+            if(f.exists()) {
+                ArrayList<String> lines = new ArrayList<>(Files.readAllLines(f.toPath(), StandardCharsets.UTF_8));
+                return lines.get(0);
+            }
+        } catch (IOException io) {
+            logger.error("Unable to open config file: " + io);
+        }
+        return null;
+    }
+
+    private boolean isServerSuitable(String nodeName, String status, boolean first) {
+        boolean success = true;
+        if(first) {
+            // if lastRemovedName is null, we couldn't find a lastRemovedFile or couldn't
+            // open it, in which case we want to accept the first available server
+            success = (lastRemovedName == null || nodeName.equals(lastRemovedName));
+        }
+        return success & status.equals("AVAILABLE");
+    }
+
+    public Collection<IECSNode> initAddNodesToHashRing(int numNodes, boolean first) {
         Collection<IECSNode> chosenNodes = new ArrayList<IECSNode>();     
         int counter = 0;
+        if(first) {
+            lastRemovedName = getLastRemoved();
+            if(lastRemovedName != null){
+                lastRemovedName = lastRemovedName.split("\\" + KVConstants.DELIM)[0];
+            }
+        }
     
         try { 
             // Initialize own hashRing
             for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
                 if(counter < numNodes) {
-                    if(entry.getValue().equals("AVAILABLE")) {
+                    String nodeName = entry.getKey().getNodeName();
+                    String status = entry.getValue();
+                    if(isServerSuitable(nodeName, status, first)) {
                         logger.debug("found an avalable server " + entry.getKey().getNodeName());
                         counter++;
                         entry.setValue("TAKEN");
@@ -597,6 +667,19 @@ public class ECS implements IECS {
             return false;
 		}
         return true;
+    }
+
+    public BigInteger findPrevKey(BigInteger currHash) {
+        if(ringNetwork.size() < 1) {
+            return new BigInteger("0", 16);
+        } else {
+            if(ringNetwork.lowerKey(currHash) == null) {
+                return ringNetwork.lastKey();
+            }
+            else {
+                return ringNetwork.lowerKey(currHash);
+            }
+        }
     }
 
     public IECSNode findNextNode(BigInteger currHash) {

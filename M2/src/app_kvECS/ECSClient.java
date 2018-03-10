@@ -335,7 +335,19 @@ public class ECSClient implements IECSClient {
 
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
-        Collection<IECSNode> nodes = setupNodes(count, cacheStrategy, cacheSize);
+        return setupNodes(count, cacheStrategy, cacheSize);
+    }
+
+    @Override
+    public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
+        //First init and launch the server that has all the data - aka the lastRemoved
+        Collection<IECSNode> nodesFirst = setupNodesImpl(1, cacheStrategy, cacheSize, true);
+        //Then init and launch the remaining count - 1servers if there are any
+        Collection<IECSNode> nodes = new ArrayList<IECSNode>();
+        if(count > 1) {
+            nodes = setupNodesImpl(count - 1, cacheStrategy, cacheSize, false);
+        }
+        nodes.add(nodesFirst.iterator().next());
         // It is not necessary to do something in awaitNodes
         // As our code just waits for all nodes to try executing anyways...
         // As long as the server is in the server stopped stage till it is started
@@ -347,14 +359,12 @@ public class ECSClient implements IECSClient {
 			e.printStackTrace();
 		}*/
         return nodes;
-        
     }
 
-    @Override
-    public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
+    public Collection<IECSNode> setupNodesImpl(int count, String cacheStrategy, int cacheSize, boolean first) {
         boolean success = false;
     	// This is called before launching the servers - decides which nodes to add in hashRing, adds them
-    	Collection<IECSNode> nodes  = ecsInstance.initAddNodesToHashRing(count);
+    	Collection<IECSNode> nodes  = ecsInstance.initAddNodesToHashRing(count, first);
     	for(IECSNode entry: nodes) {
             //for each node, launch server and set status as stopped
             if(ecsInstance.launchKVServer(entry, cacheStrategy, cacheSize)) {
@@ -369,10 +379,17 @@ public class ECSClient implements IECSClient {
         success = ecsInstance.alertMetaDataUpdate();
         if(success)
         	nodes = ecsInstance.setupNodesCacheConfig(nodes, cacheStrategy, cacheSize);
+            if(!first) {
+                //if there is more than 1 server in the network, redistribute KVPairs
+                //based on responsiblity
+                success = ecsInstance.redistributeKVPairs();
+                if(!success) {
+                    logger.error("Could not redistribute all KVPairs to responsible servers.");
+                }
+            }
         else {
         	logger.error("Unable to do meta data update for servers");
         }
-        System.out.println(nodes.size());
         return nodes;    
     }
 
