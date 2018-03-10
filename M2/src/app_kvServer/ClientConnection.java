@@ -62,28 +62,22 @@ public class ClientConnection implements Runnable {
             
             while (isOpen) {
                 try {
-                    logger.debug("step 1");
                     TextMessage msgReceived = receiveMessage();
-                    logger.debug("step 2");
                     // Unmarshalling of received message
                     String[] msgContent = msgReceived.getMsg().split("\\" + KVConstants.DELIM);
                     String command = msgContent[0];
-                    logger.debug("step 3");
                     // Key cannot contain DELIM, but value can
                     // So combine all strings from msgContent[2] till end to get value
                     List<String> valueParts = new LinkedList<>();
                     for (int i = 2; i < msgContent.length; ++i) {
                         valueParts.add(msgContent[i]);
                     }
-                    logger.debug("step 4");
                     String value = String.join(KVConstants.DELIM, valueParts);
-                    System.out.println("DEBUG: " + msgReceived.getMsg());
                     String key = null;
                     if(msgContent.length > 1){
                         key = msgContent[1];
                     }
 
-                    logger.debug("step 5");
                     if (command.equals("ECS")) {
                         String[] ecsCmd = Arrays.copyOfRange(msgContent, 1, msgContent.length);
                         handleECSCmd(ecsCmd);
