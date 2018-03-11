@@ -251,7 +251,7 @@ public class ECSClient implements IECSClient {
                 + "ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF");
     }
 
-    private String setLevel(String levelString) {
+    public String setLevel(String levelString) {
         
         if(levelString.equals(Level.ALL.toString())) {
             logger.setLevel(Level.ALL);
@@ -279,7 +279,7 @@ public class ECSClient implements IECSClient {
         }
     }
 
-    private void disconnect() {
+    public void disconnect() {
         ecsInstance.disconnect();    
     }
 
@@ -325,6 +325,7 @@ public class ECSClient implements IECSClient {
 
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
+        if(ecsInstance.availableServersCount() == 0) return null;
         if(ecsInstance.ringNetworkSize() == 0) {
             return setupFirstNode(cacheStrategy, cacheSize);
         }
@@ -333,6 +334,7 @@ public class ECSClient implements IECSClient {
 
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
+        if(count > ecsInstance.availableServersCount()) return null;
         return setupNodes(count, cacheStrategy, cacheSize);
     }
 
@@ -431,6 +433,10 @@ public class ECSClient implements IECSClient {
             success = false;
             
         return success;
+    }
+
+    public void addToLaunchedNodes(IECSNode node) {
+        nodesLaunched.add(node);
     }
 
     @Override

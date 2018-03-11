@@ -108,6 +108,16 @@ public class ECS implements IECS {
         return this.ringNetwork.size();
     }
 
+    public int availableServersCount() {
+        int count = 0;
+        for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
+            if(entry.getValue().equals("AVAILABLE")) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public int availableServers() {
         return allAvailableServers.size();
     }
