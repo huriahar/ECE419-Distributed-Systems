@@ -32,10 +32,11 @@ public class PerformanceTesting extends TestCase {
     
     private ECSClient ecsClient;
     Collection<IECSNode> nodes;
-    private String keyFilePath = System.getProperty("user.dir") + "maildir/blair-l/sent_items";
+    private String keyFilePath = System.getProperty("user.dir") + "/maildir/blair-l/sent_items";
 
     
 	public void setUp() {
+        System.out.println("Initializing tests");
         ecsClient = new ECSClient("testECS.config", "localhost");
         ecsClient.setLevel("INFO");
         try {
@@ -46,10 +47,11 @@ public class PerformanceTesting extends TestCase {
 	}
 
 	public void tearDown() {
+        System.out.println("Tearing down tests");
         ecsClient.shutdown();
         ecsClient.disconnect();
         try{
-           TimeUnit.SECONDS.sleep(30);
+           TimeUnit.SECONDS.sleep(10);
         } catch (InterruptedException io){
             System.out.println("Delay caused an exception");
         }
@@ -307,7 +309,22 @@ public class PerformanceTesting extends TestCase {
 
     // ------------------------------ tests start here -----------------------------------------//
     
+
     @Test
+    public void  testInitialization() {
+       try{
+            System.out.println("********** In 1 Test **************");
+            
+            nodes = ecsClient.addNodes(1, "LRU", 5);
+            assertTrue(ecsClient.start()); 
+            //assertTrue(ecsClient.shutdown());
+            assertTrue(ecsClient.stop());
+        } catch (Exception io) {
+            throw new RuntimeException(io);
+        }
+    } 
+
+/*    @Test
     public void testOneClientOneServer() {
        try{
            clientOneServer(1); 
@@ -472,5 +489,5 @@ public class PerformanceTesting extends TestCase {
             throw new RuntimeException(io);
         }
     } 
-    
+    */
 }
