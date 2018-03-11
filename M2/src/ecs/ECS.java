@@ -40,13 +40,15 @@ public class ECS implements IECS {
     private Socket ECSSocket;
 
     private TreeMap<BigInteger, IECSNode> ringNetwork;
-    // IECSNode and status {"Available", "Taken"} - TODO: Convert to an ENUM
     private HashMap<IECSNode, String> allAvailableServers;
     private static Logger logger = Logger.getRootLogger();
     private OutputStream output; 
     private InputStream input;
     private String lastRemovedName = null;
     private String ugmachine;
+    //For the autotester
+    private String zkHostname;
+    private int zkPort;    
     
     private ZKImplementation ZKImpl;
 
@@ -85,6 +87,11 @@ public class ECS implements IECS {
 		}     
     }
     
+    public void setZKInfo(String zkHostname, int zkPort) {
+        this.zkHostname = zkHostname;
+        this.zkPort = zkPort;
+    }
+
     private void populateAvailableNodes() {
         try {
             ArrayList<String> lines = new ArrayList<>(Files.readAllLines(this.configFile, StandardCharsets.UTF_8));
@@ -245,7 +252,7 @@ public class ECS implements IECS {
         IECSNode node;        
         for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
             node = entry.getValue();
-            System.out.println(node.getNodeName() + " : " + node.getNodeHashRange()[0] + " : " + node.getNodeHashRange()[1]);
+            logger.debug(node.getNodeName() + " : " + node.getNodeHashRange()[0] + " : " + node.getNodeHashRange()[1]);
             
         }               
     } 
@@ -343,8 +350,12 @@ public class ECS implements IECS {
                 return null;
             }
             success = sendMetaDataUpdate(currNode);
-            success = success & sendMetaDataUpdate(nextNode);
-            success = success & sendMoveKVPairs(nextNode, currNode, false);
+            if(nextNode != currNode) {
+                success = success & sendMetaDataUpdate(nextNode);
+                success = success & sendMoveKVPairs(nextNode, currNode, false);
+            } else {
+                logger.debug("nextNode is the same as currNode");
+            }
             if(!success) {
                 logger.error("Unable to update metaData in Servers");
             }
@@ -576,7 +587,7 @@ public class ECS implements IECS {
     }
 
     public void printDebug(String dbgmsg) {
-        System.out.println("DEBUG! " + dbgmsg);
+        logger.debug("DEBUG! " + dbgmsg);
     }
 
     public boolean removeNodes(Collection<IECSNode> nodes) {

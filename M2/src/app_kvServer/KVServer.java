@@ -262,11 +262,11 @@ public class KVServer implements IKVServer, Runnable {
                 lock = channel.tryLock();
 
             } catch (OverlappingFileLockException e) {
-                 //System.out.println("Overlapping File Lock Error: " + e.getMessage());
+                 //logger.error("Overlapping File Lock Error: " + e.getMessage());
             }
 
             if(!file.exists()) {
-                System.out.println("File not found");
+                logger.error("File not found");
             }
             else{
                 
@@ -298,7 +298,7 @@ public class KVServer implements IKVServer, Runnable {
             channel.close();
 
         } catch (IOException ex) { 
-                System.out.println("Unable to open file. ERROR: " + ex);
+                logger.error("Unable to open file. ERROR: " + ex);
         
         } finally {
             try{
@@ -306,7 +306,7 @@ public class KVServer implements IKVServer, Runnable {
                     br.close();
         
             }   catch(Exception ex){
-                    System.out.println("Error in closing the BufferedReader"+ex);
+                    logger.error("Error in closing the BufferedReader"+ex);
             }
         }
 
@@ -349,7 +349,7 @@ public class KVServer implements IKVServer, Runnable {
                         lock = channel.tryLock();
 
                     } catch (OverlappingFileLockException e) {
-                         //System.out.println("Overlapping File Lock Error: " + e.getMessage());
+                         //logger.error("Overlapping File Lock Error: " + e.getMessage());
                     }
 
                     if (!file.exists()) {
@@ -378,7 +378,7 @@ public class KVServer implements IKVServer, Runnable {
                         }
                 
                     } catch(Exception ex){
-                        System.out.println("Error in closing the BufferedWriter"+ex);
+                        logger.error("Error in closing the BufferedWriter"+ex);
                     }
                 }
             }
@@ -406,11 +406,11 @@ public class KVServer implements IKVServer, Runnable {
                 lock = channel.tryLock();
 
             } catch (OverlappingFileLockException e) {
-                 //System.out.println("Overlapping File Lock Error: " + e.getMessage());
+                 //logger.error("Overlapping File Lock Error: " + e.getMessage());
             }
             
             if(!file.exists()) {
-                System.out.println("File not found");
+                logger.error("File not found");
             }
             else{
             
@@ -452,7 +452,7 @@ public class KVServer implements IKVServer, Runnable {
             channel.close();
 
         } catch (IOException ex) { 
-                System.out.println("Unable to open file. ERROR: " + ex);
+                logger.error("Unable to open file. ERROR: " + ex);
         }
 
     }
@@ -467,18 +467,18 @@ public class KVServer implements IKVServer, Runnable {
 
     public boolean isResponsible(String key) {
         BigInteger encodedKey = md5.encode(key);
-        System.out.println("DEBUG: key " + encodedKey + " bHash " + metadata.bHash + " eHash " + metadata.eHash);
-        System.out.println("DEBUG: minHash " + KVConstants.MIN_HASH + " maxHash " + KVConstants.MAX_HASH);
+        logger.debug("DEBUG: key " + encodedKey + " bHash " + metadata.bHash + " eHash " + metadata.eHash);
+        logger.debug("DEBUG: minHash " + KVConstants.MIN_HASH + " maxHash " + KVConstants.MAX_HASH);
         boolean ret = false, ret2 = false, ret3 = false;
         if( (metadata.bHash).compareTo(metadata.eHash) < 0 ) {
             ret = (encodedKey.compareTo(metadata.bHash) >= 0  && encodedKey.compareTo(metadata.eHash) < 0);
-            System.out.println("DEBUG: isResp? " + ret);
+            logger.debug("DEBUG: isResp? " + ret);
             return ret;
         } else {
             ret2 = (encodedKey.compareTo(metadata.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0);
             ret3 = (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(metadata.eHash) < 0);
-            System.out.println("DEBUG: isResp? " + ret2);
-            System.out.println("DEBUG: isResp? " + ret3);
+            logger.debug("DEBUG: isResp? " + ret2);
+            logger.debug("DEBUG: isResp? " + ret3);
             return (ret2 || ret3);
         }
     }
@@ -519,7 +519,7 @@ public class KVServer implements IKVServer, Runnable {
     public boolean updateMetaData() {
         String meta = getMetaDataOfServer(getHostname());
         if(meta == null) {
-            System.out.println("Could not find meta data of server " + getHostname() + " " + getPort());
+            logger.error("Could not find meta data of server " + getHostname() + " " + getPort());
             return false;
         }
         metadata = new ServerMetaData(meta);
@@ -603,8 +603,8 @@ public class KVServer implements IKVServer, Runnable {
         // TODO Transfer a subset (range) of the KVServer's data to another KVServer (reallocation before
         // removing this server or adding a new KVServer to the ring); send a notification to the ECS,
         // if data transfer is completed.
-        System.out.println("DEBUG: getHostname() = " + getHostname());
-        System.out.println("DEBUG: targetName() = " + targetName);
+        logger.debug("DEBUG: getHostname() = " + getHostname());
+        logger.debug("DEBUG: targetName() = " + targetName);
         if(targetName.equals(getHostname())) return true;
         lockWrite();
         StringBuilder toSend = new StringBuilder();

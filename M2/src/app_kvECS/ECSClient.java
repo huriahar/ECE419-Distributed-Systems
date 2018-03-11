@@ -32,6 +32,11 @@ public class ECSClient implements IECSClient {
     private boolean stop = false;
     private int timeout = KVConstants.LAUNCH_TIMEOUT;
 
+    public ECSClient(String zkHostname, int zkPort) {
+        this("ecs.config", "localhost");
+        this.ecsInstance.setZKInfo(zkHostname, zkPort);
+    }
+
     public ECSClient (String configFile, String ugmachine) {
     	Path ecsConfig = Paths.get(configFile);
         this.nodesLaunched = new ArrayList<IECSNode>();
@@ -372,6 +377,11 @@ public class ECSClient implements IECSClient {
         IECSNode node = null;
         if(ecsInstance.ringNetworkSize() == 0) {
             node = setupFirstNode(cacheStrategy, cacheSize);
+            //If we couldn't find the lastRemoved... use any available
+            //server
+            if(ecsInstance.ringNetworkSize() == 0) {
+                node = ecsInstance.addNode(cacheStrategy, cacheSize);
+            }
         }
         else {
             node = ecsInstance.addNode(cacheStrategy, cacheSize);
@@ -411,7 +421,8 @@ public class ECSClient implements IECSClient {
         //TODO this loop only iterates once... always... remove loop
     	Collection<IECSNode> nodes  = ecsInstance.initAddNodesToHashRing();
         if(nodes.size() == 0) {
-            logger.error("failed to init first node in ringNetwork!");
+            logger.debug("Could not find lastRemoved in the list of available servers!");
+            logger.debug("Will look for any available server..");
             return null;
         }
     	for(IECSNode entry: nodes) {
