@@ -606,6 +606,7 @@ public class KVServer implements IKVServer, Runnable {
         logger.debug("DEBUG: getHostname() = " + getHostname());
         logger.debug("DEBUG: targetName() = " + targetName);
         if(targetName.equals(getHostname())) return true;
+        boolean unlock = (!this.isStopped());
         lockWrite();
         StringBuilder toSend = new StringBuilder();
         toSend.append("MOVE_KVPAIRS" + KVConstants.DELIM);
@@ -658,7 +659,9 @@ public class KVServer implements IKVServer, Runnable {
         } else {
             logger.debug("No data to move from " + getHostname());
         }
-        unlockWrite();
+        if(unlock) {
+            unlockWrite();
+        }
         return success;
     }
 

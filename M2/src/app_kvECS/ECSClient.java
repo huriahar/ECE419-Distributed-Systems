@@ -85,8 +85,6 @@ public class ECSClient implements IECSClient {
                         int numNodes = Integer.parseInt(tokens[1]);
                         String cacheStrategy = tokens[2];
                         int cacheSize = Integer.parseInt(tokens[3]);
-                        System.out.println(numNodes + " " + cacheSize + " " + cacheStrategy);
-
                         if(numNodes <= ecsInstance.availableServers()) {
                             if (KVCache.isValidStrategy(cacheStrategy)) {
                                 nodesLaunched = addNodes(numNodes, cacheStrategy, cacheSize);
@@ -377,9 +375,11 @@ public class ECSClient implements IECSClient {
         IECSNode node = null;
         if(ecsInstance.ringNetworkSize() == 0) {
             node = setupFirstNode(cacheStrategy, cacheSize);
+            System.out.println("setupFirstNode after");
             //If we couldn't find the lastRemoved... use any available
             //server
             if(ecsInstance.ringNetworkSize() == 0) {
+                System.out.println("setupFirstNode after, trying to add node");
                 node = ecsInstance.addNode(cacheStrategy, cacheSize);
             }
         }
@@ -388,6 +388,8 @@ public class ECSClient implements IECSClient {
         }
         if(node != null) {
             this.nodesLaunched.add(node);
+        } else {
+        System.out.println("node is null");
         }
         return node;
     }
@@ -401,13 +403,16 @@ public class ECSClient implements IECSClient {
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
         Collection<IECSNode> nodes = new ArrayList<IECSNode>();
-        while(count > 0) {
+        int counter = 0;
+        while(counter < count) {
             nodes.add(addNode(cacheStrategy, cacheSize));
-            count--;
+            counter++;
         }
         //Await nodes queries ZK nodes for a status update
         try {
-			awaitNodes(count, KVConstants.LAUNCH_TIMEOUT);
+			if(!awaitNodes(count, KVConstants.LAUNCH_TIMEOUT)) {
+                logger.error("awaitNodes times out! servers are not responsive");
+            }
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -419,28 +424,27 @@ public class ECSClient implements IECSClient {
         boolean success = false;
     	// This is called before launching the servers - decides which nodes to add in hashRing, adds them
         //TODO this loop only iterates once... always... remove loop
-    	Collection<IECSNode> nodes  = ecsInstance.initAddNodesToHashRing();
-        if(nodes.size() == 0) {
+    	IECSNode node = ecsInstance.initAddNodesToHashRing();
+        if(node == null) {
             logger.debug("Could not find lastRemoved in the list of available servers!");
             logger.debug("Will look for any available server..");
             return null;
         }
-    	for(IECSNode entry: nodes) {
-            //for each node, launch server and set status as stopped
-            if(ecsInstance.launchKVServer(entry, cacheStrategy, cacheSize)) {
-                logger.info("SUCCESS. Launched KVServer :" + entry.getNodeName());
-            } 
-            else {
-                logger.error("ERROR. Unable to launch KVServer :" + entry.getNodeName() + " Host: " + entry.getNodeHost()+ " Port: " + entry.getNodePort());           
-            }
-        }
-        success = ecsInstance.alertMetaDataUpdate();
-        if(success)
-        	nodes = ecsInstance.setupNodesCacheConfig(nodes, cacheStrategy, cacheSize);
+        //for each node, launch server and set status as stopped
+        if(ecsInstance.launchKVServer(node, cacheStrategy, cacheSize)) {
+            logger.info("SUCCESS. Launched KVServer :" + node.getNodeName());
+        } 
         else {
+            logger.error("ERROR. Unable to launch KVServer :" + node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());           
+        }
+        //Update meta data and setup cache config for node
+        success = ecsInstance.sendMetaDataUpdate(node);
+        success = success & ecsInstance.setupNodesCacheConfigOneNode(node, cacheStrategy, cacheSize);
+        if(!success) {
         	logger.error("Unable to do meta data update for servers");
         }
-        return nodes.iterator().next();    
+        System.out.println("at the end of setupFirstNode");
+        return node;
     }
 
 
@@ -454,17 +458,17 @@ public class ECSClient implements IECSClient {
     public boolean awaitNodes(int count, int timeout) throws Exception {
         String path = null, status = null;
         int counter = 0;
-        long endTimeMillis = System.currentTimeMillis() + timeout;
+        long endTimeMillis = System.currentTimeMillis() + timeout*4;
         for(IECSNode entry : nodesLaunched) {
             path = ecsInstance.getZKPath(entry.getNodeName());
             if(path != null) {
                 status = ecsInstance.checkZKStatus(path,endTimeMillis); 
-                if(System.currentTimeMillis() > endTimeMillis) {
-                    return false;
-                }   
                 if(status.equals("SERVER_LAUNCHED")) {
                     counter++;                
                 }
+                if(System.currentTimeMillis() > endTimeMillis) {
+                    return false;
+                }   
             }
         }
         return (counter == count);

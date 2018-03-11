@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.io.IOException;
 import java.lang.InterruptedException;
 import java.net.SocketTimeoutException;
+import java.net.SocketException;
 
 import java.io.OutputStream;
 import java.io.InputStream;
@@ -30,6 +31,8 @@ import org.apache.zookeeper.KeeperException;
 import common.*;
 import common.messages.TextMessage;
 
+import java.util.concurrent.TimeUnit;
+
 public class ECS implements IECS {
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 128 * BUFFER_SIZE;
@@ -40,6 +43,7 @@ public class ECS implements IECS {
     private Socket ECSSocket;
 
     private TreeMap<BigInteger, IECSNode> ringNetwork;
+    // IECSNode and status {"Available", "Taken"} - TODO: Convert to an ENUM
     private HashMap<IECSNode, String> allAvailableServers;
     private static Logger logger = Logger.getRootLogger();
     private OutputStream output; 
@@ -192,6 +196,7 @@ public class ECS implements IECS {
                 node.getNodePort() + ">"); 
             } else {
                 logger.error("START ERROR for KVServer: " + node.getNodeName());
+                success = false;
             }
         } catch(IOException io) {
             logger.error("START ERROR for KVServer: " + node.getNodeName() + ". Error: " + io);
@@ -278,7 +283,7 @@ public class ECS implements IECS {
             }
         } catch (IOException ex) {
             success = false;
-            logger.error("UPDATE_ERROR: Update for KVServer failed");
+            logger.error("UPDATE_ERROR: Update for KVServer failed: " + ex);
         }
         return success;
     }
@@ -301,17 +306,29 @@ public class ECS implements IECS {
                 logger.info("SUCCESS: MetaData updated for KVServer: " + srcNode.getNodeName());
             }
             else if(response.getMsg().equals("MOVE_FAILED")) {
-                logger.error("ERROR: MetaData not updated for KVServer: " + srcNode.getNodeName());
+                logger.error("ERROR: MetaData not moved for KVServer: " + srcNode.getNodeName());
                 success = false;
             } else {
-                logger.error("ERROR: MetaData not updated for KVServer: " + srcNode.getNodeName());
+                logger.error("ERROR: MetaData not moved for KVServer: " + srcNode.getNodeName());
                 success = false;
             }
         } catch (IOException ex) {
             success = false;
-            logger.error("UPDATE_ERROR: Update for KVServer failed");
+            logger.error("UPDATE_ERROR: Update for KVServer failed: " + ex);
         }
         return success;
+    }
+
+    public IECSNode findAvailableServer() {
+        for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
+            if(entry.getValue().equals("AVAILABLE")) {
+                //Add the server to the ringNetwork and update HashMap 
+                entry.setValue("TAKEN");
+                IECSNode currNode = entry.getKey();
+                return currNode;
+            }
+        }
+        return null;
     }
  
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
@@ -320,27 +337,20 @@ public class ECS implements IECS {
         BigInteger serverHash = new BigInteger("0", 16);
         boolean success = true;
         try { 
-            for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
-                if(entry.getValue().equals("AVAILABLE")) {
-                	//Add the server to the ringNetwork and update HashMap 
-                    entry.setValue("TAKEN");
-                    currNode = entry.getKey();
-
-                    if(launchKVServer(currNode, cacheStrategy, cacheSize)) {
-                        logger.info("SUCCESS. Launched KVServer :" + currNode.getNodeName());
-                    } 
-                    else {
-                        logger.error("ERROR. Unable to launch KVServer :" + currNode.getNodeName() + " Host: " + currNode.getNodeHost()+ " Port: " + currNode.getNodePort());           
-                        return null;
-                    }
-                    
-                    serverHash = md5.encode(currNode.getNodeHost() + KVConstants.HASH_DELIM + currNode.getNodePort());
-                    currNode = updateHash(serverHash, currNode);
-                    break;
-                }
-
+            // Find an available server
+            currNode = findAvailableServer();
+            // Launch the server
+            if(launchKVServer(currNode, cacheStrategy, cacheSize)) {
+                logger.info("SUCCESS. Launched KVServer :" + currNode.getNodeName());
+            } 
+            else {
+                logger.error("ERROR. Unable to launch KVServer :" + currNode.getNodeName() + " Host: " + currNode.getNodeHost()+ " Port: " + currNode.getNodePort());           
+                return null;
             }
-            //Once all currNodes are added, write to metaDataFile and alert nodes to update their metaData
+            // Update hashes of current and next server on the ring network
+            serverHash = md5.encode(currNode.getNodeHost() + KVConstants.HASH_DELIM + currNode.getNodePort());
+            currNode = updateHash(serverHash, currNode);
+            // Now update the metadata file, write to metaDataFile and alert nodes to update their metaData
             updateMetaDataFile();
             // Update meta data for the node AFTER the added node
             // Move KVpairs from nextNode to addedNode
@@ -349,7 +359,9 @@ public class ECS implements IECS {
                 logger.error("Could not find next node while adding a new node!!");
                 return null;
             }
+            // Send metadata update and setup cache config
             success = sendMetaDataUpdate(currNode);
+            success = success & setupNodesCacheConfigOneNode(currNode, cacheStrategy, cacheSize);
             if(nextNode != currNode) {
                 success = success & sendMetaDataUpdate(nextNode);
                 success = success & sendMoveKVPairs(nextNode, currNode, false);
@@ -357,7 +369,7 @@ public class ECS implements IECS {
                 logger.debug("nextNode is the same as currNode");
             }
             if(!success) {
-                logger.error("Unable to update metaData in Servers");
+                logger.error("in addNode: unable to update metaData in Servers");
             }
 
         }
@@ -366,45 +378,6 @@ public class ECS implements IECS {
         }
         //Other errors ??
         return currNode; 
-    }
-
-    // Update meta data for each of the running servers
-    public boolean alertMetaDataUpdate() {
-        boolean success = true;
-        TextMessage response, message;
-        IECSNode node = new ECSNode(), nextNode = new ECSNode(), firstNode = new ECSNode();
-        String command = "UPDATE_METADATA";
-        for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
-            BigInteger hash = entry.getKey();
-            node = entry.getValue();
-            Map.Entry<BigInteger, IECSNode> nextEntry = ringNetwork.higherEntry(entry.getKey());
-            if(nextEntry != null) {
-                nextNode = nextEntry.getValue();
-                message = new TextMessage("ECS" + KVConstants.DELIM + command); 
-            }
-            else {
-                Map.Entry<BigInteger, IECSNode> firstEntry = ringNetwork.firstEntry();
-                firstNode = firstEntry.getValue();
-                message = new TextMessage("ECS" + KVConstants.DELIM + command);
-            }
-            try {
-                response = sendNodeMessage(message, node);
-                if(response.getMsg().equals("UPDATE_SUCCESS")) {
-                    logger.info("SUCCESS: MetaData updated for KVServer: " + node.getNodeName());
-                }
-                else if(response.getMsg().equals("UPDATE_FAILED")) {
-                    logger.error("ERROR: MetaData not updated for KVServer: " + node.getNodeName());
-                    success = false;
-                } else {
-                    logger.error("ERROR: MetaData not updated for KVServer: " + node.getNodeName());
-                    success = false;
-                }
-            } catch (IOException ex) {
-                success = false;
-                logger.error("UPDATE_ERROR: Update for KVServer failed");
-            }
-        }
-        return success;
     }
 
     private String getLastRemoved() {
@@ -429,9 +402,9 @@ public class ECS implements IECS {
         return success & status.equals("AVAILABLE");
     }
 
-    public Collection<IECSNode> initAddNodesToHashRing() {
+    public IECSNode initAddNodesToHashRing() {
         //This function is ONLY used for the first node added to the system/ringNetwork
-        Collection<IECSNode> chosenNodes = new ArrayList<IECSNode>();     
+        IECSNode chosenNode = null;     
         int counter = 0, numNodes = 1;
         lastRemovedName = getLastRemoved();
         if(lastRemovedName != null){
@@ -455,7 +428,8 @@ public class ECS implements IECS {
                         //Setup begin and end hashing for server 
                         node = updateHash(serverHash, node);
                         //Add chosen node to collection
-                        chosenNodes.add(node);
+                        chosenNode = node;
+                        break;
                     }
                 }
             }
@@ -467,7 +441,30 @@ public class ECS implements IECS {
             logger.error("Unable to write to metaDataFile");
         }
         
-        return chosenNodes; 
+        return chosenNode; 
+    }
+
+    public boolean setupNodesCacheConfigOneNode(IECSNode node, String cacheStrategy, int cacheSize) {
+        TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "SETUP_NODE" + KVConstants.DELIM + cacheStrategy + KVConstants.DELIM + cacheSize); 
+        TextMessage response;
+        boolean success = true;
+        try {
+            response = sendNodeMessage(message, node);
+            if(response.getMsg().equals("SETUP_SUCCESS")) {
+                logger.info("SUCCESS: Setup for KVServer: " + node.getNodeName()); 
+            }
+            else if(response.getMsg().equals("SETUP_FAILED")) {
+                logger.error("ERROR: Failed in Setup for KVServer: " + node.getNodeName());
+                success = false;
+            } else {
+                logger.error("ERROR: Failed in Setup for KVServer: " + node.getNodeName());
+                success = false;
+            }
+        } catch(IOException ex) {
+            logger.error("ERROR: Failed in Setup for KVServer: " + node.getNodeName()); 
+            success = false;
+        } 
+        return success;
     }
 
     public Collection<IECSNode> setupNodesCacheConfig(Collection<IECSNode> nodes, String cacheStrategy, int cacheSize) {
@@ -723,19 +720,32 @@ public class ECS implements IECS {
 
     public TextMessage sendNodeMessage(TextMessage message, IECSNode node)
     			throws IOException {
-        TextMessage response = new TextMessage("") ; 
+        TextMessage response = new TextMessage(""); 
         try {
             connectNode(node);
         } catch (IOException e) {
-            logger.error("Failed to connect to server <" + node.getNodeHost() + ":" + node.getNodePort() + ">. KVServer launch script may have failed.");
-            logger.error(e);
-            return response;
+            try{
+                TimeUnit.SECONDS.sleep(2);
+                connectNode(node);
+            } catch (IOException ex) {
+                logger.error("Failed to connect to server <" + node.getNodeHost() + ":" + node.getNodePort() + ">. KVServer launch script may have failed.");
+                logger.error(ex);
+                return response;
+            } catch (InterruptedException ex) {
+                logger.error("Failed to connect to server <" + node.getNodeHost() + ":" + node.getNodePort() + ">. KVServer launch script may have failed.");
+                logger.error(ex);
+                return response;
+            }
         }
         sendMessage(message);
         //Receives a connection confirmation message is right
-        response = receiveMessage();
-        //Receive the response regarding the message sent
-        response = receiveMessage();
+        try {
+            response = receiveMessage();
+            //Receive the response regarding the message sent
+            response = receiveMessage();
+        } catch (SocketException e) {
+            logger.error("Timeout while waiting for server's response! " + e);
+        }
         disconnect();
         return response;
     }
@@ -743,6 +753,7 @@ public class ECS implements IECS {
     public void connectNode(IECSNode server) 
     		throws IOException {
         this.ECSSocket = new Socket(server.getNodeHost(), server.getNodePort());
+        this.ECSSocket.setSoTimeout(KVConstants.LAUNCH_TIMEOUT);
         logger.info("ECS Connection to name: " + server.getNodeName() + " successful");
     }
 
@@ -786,6 +797,7 @@ public class ECS implements IECS {
         /* read first char from stream */
         input = this.ECSSocket.getInputStream();
         byte read = (byte) input.read();    
+
         boolean reading = true;
 
         while(read != 10 && read != -1 && reading) {/* CR, LF, error */

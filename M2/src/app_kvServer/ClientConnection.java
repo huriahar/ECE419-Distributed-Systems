@@ -102,6 +102,7 @@ public class ClientConnection implements Runnable {
                     logger.debug("step 6");
                     //Just a guard
                     if(key == null) {
+                        logger.debug("key is null");
                         continue;
                     }
                     System.out.println("Is server stopped? "  + server.isStopped());
@@ -133,6 +134,10 @@ public class ClientConnection implements Runnable {
                     else if (command.equals("GET")) {
                         if(!server.isReadLocked()) {
                             handleGetCmd(key);
+                        } else {
+                            sendMessage(new TextMessage("SERVER_STOPPED"));
+                            logger.info("SERVER_READ_LOCKED cannot handle client requests at the moment.");
+                            continue;
                         }
                     }
                     else {
