@@ -211,6 +211,14 @@ public class ClientConnection implements Runnable {
         boolean success;
         try {
             switch(msg[0]) {
+                case "WRITE_UNLOCK":
+                    server.unlockWrite();
+                    sendMessage(new TextMessage("UNLOCK_SUCCESS"));
+                    return;
+                case "WRITE_LOCK":
+                    server.lockWrite();
+                    sendMessage(new TextMessage("LOCK_SUCCESS"));
+                    return;
                 case "SETUP_NODE":
                     int cacheSize = Integer.parseInt(msg[2]);
                     server.setupCache(cacheSize, msg[1]);

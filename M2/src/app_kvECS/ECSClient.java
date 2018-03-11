@@ -34,6 +34,7 @@ public class ECSClient implements IECSClient {
 
     public ECSClient (String configFile) {
     	Path ecsConfig = Paths.get(configFile);
+        this.nodesLaunched = new ArrayList<IECSNode>();
     	// If file doesn't exist or does not point to a valid file
     	if (!Files.exists(ecsConfig)) {
     		printError("ECS Config file does not exist! " + ecsConfig);
@@ -113,7 +114,30 @@ public class ECSClient implements IECSClient {
                     printHelp();
                 }
                 break;
-            
+            case "unlock":
+                if(tokens.length == 2) {
+                    if(!unlock(tokens[1])) {
+                        printError(PROMPT + "Write unlock " + tokens[1] + " failed.");
+                        logger.error("Write unlock failed");
+                    }
+                }
+                else {
+                    printError(PROMPT + "Invalid number of arguments");
+                    printHelp();
+                }
+                break;
+            case "lock":
+                if(tokens.length == 2) {
+                    if(!lock(tokens[1])) {
+                        printError(PROMPT + "Write lock " + tokens[1] + " failed.");
+                        logger.error("Write lock failed");
+                    }
+                }
+                else {
+                    printError(PROMPT + "Invalid number of arguments");
+                    printHelp();
+                }
+                break;
             case "start":
                 if(!start()) {
                     printError(PROMPT + "Start failed");
@@ -146,10 +170,7 @@ public class ECSClient implements IECSClient {
                         int cacheSize = Integer.parseInt(tokens[2]);
                         if (KVCache.isValidStrategy(cacheStrategy)) {
                             IECSNode newNode = addNode(cacheStrategy, cacheSize);
-                            if (newNode != null) {
-                                nodesLaunched.add(newNode);
-                            }
-                            else {
+                            if (newNode == null) {
                                 printError(PROMPT + "Unable to find any remaining unlaunched nodes supplied in config file");
                                 logger.error("Unable to find any remaining unlaunched nodes supplied in config file");
                             }
@@ -225,9 +246,13 @@ public class ECSClient implements IECSClient {
         sb.append(PROMPT).append("start");
         sb.append("\t 1) Starts storage service on all launched server instances \n");
         sb.append(PROMPT).append("stop");
-        sb.append("\t\t Stops the storage service (get/put requests) but process is running. \n");
+        sb.append("\t\t Stops the storage service (get/put requests) but process is running.\n");
+        sb.append(PROMPT).append("lock <nodeName>");
+        sb.append("\t\t Write locks the storage service (locks put requests) but gets are acceptable.\n");
+        sb.append(PROMPT).append("unlock <nodeName>");
+        sb.append("\t\t Write unlocks the storage service (unlocks put requests).\n");
         sb.append(PROMPT).append("shutdown");
-        sb.append("\t\t Stop all the servers and shuts down process  \n");
+        sb.append("\t\t Stop all the servers and shuts down process\n");
         sb.append(PROMPT).append("addNode <cacheStrategy> <cacheSize>");
         sb.append("\t\t Adds a new server of cacheSize with cacheStrategy \n");
         sb.append(PROMPT).append("removeNode <serverName1> <serverName2> ...");
@@ -287,6 +312,24 @@ public class ECSClient implements IECSClient {
         System.out.println(PROMPT + "Error! " + error);
     }
 
+    public boolean unlock(String name) {
+        for (IECSNode node : nodesLaunched) {
+            if(node.getNodeName().equals(name)) {
+                return ecsInstance.sendWriteUnlock(node);
+            }
+        }
+        return false;
+    }
+
+    public boolean lock(String name) {
+        for (IECSNode node : nodesLaunched) {
+            if(node.getNodeName().equals(name)) {
+                return ecsInstance.sendWriteLock(node);
+            }
+        }
+        return false;
+    }
+
     public boolean start() {
         boolean success = true; 
         for (IECSNode node : nodesLaunched) {
@@ -326,31 +369,32 @@ public class ECSClient implements IECSClient {
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
         if(ecsInstance.availableServersCount() == 0) return null;
+        IECSNode node = null;
         if(ecsInstance.ringNetworkSize() == 0) {
-            return setupFirstNode(cacheStrategy, cacheSize);
+            node = setupFirstNode(cacheStrategy, cacheSize);
         }
-        return ecsInstance.addNode(cacheStrategy, cacheSize);
+        else {
+            node = ecsInstance.addNode(cacheStrategy, cacheSize);
+        }
+        if(node != null) {
+            this.nodesLaunched.add(node);
+        }
+        return node;
     }
 
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
-        if(count > ecsInstance.availableServersCount()) return null;
+        if(count > ecsInstance.availableServersCount()) return new ArrayList<IECSNode>();
         return setupNodes(count, cacheStrategy, cacheSize);
     }
 
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
-        //First init and launch the server that has all the data - aka the lastRemoved
-        IECSNode firstNode = setupFirstNode(cacheStrategy, cacheSize);
-        //Then init and launch the remaining count - 1servers if there are any
         Collection<IECSNode> nodes = new ArrayList<IECSNode>();
-        nodes.add(firstNode);
-        count--;
         while(count > 0) {
             nodes.add(addNode(cacheStrategy, cacheSize));
             count--;
         }
-        this.nodesLaunched = nodes;
         //Await nodes queries ZK nodes for a status update
         try {
 			awaitNodes(count, KVConstants.LAUNCH_TIMEOUT);
@@ -378,7 +422,6 @@ public class ECSClient implements IECSClient {
             else {
                 logger.error("ERROR. Unable to launch KVServer :" + entry.getNodeName() + " Host: " + entry.getNodeHost()+ " Port: " + entry.getNodePort());           
             }
-            logger.error("entry name is " + entry.getNodeName());
         }
         success = ecsInstance.alertMetaDataUpdate();
         if(success)

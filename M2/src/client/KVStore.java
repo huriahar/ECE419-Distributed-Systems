@@ -54,12 +54,10 @@ public class KVStore implements KVCommInterface {
         // Add the server address and port to the hash ring
         BigInteger serverHash = md5.encode(address + KVConstants.HASH_DELIM +
                 Integer.toString(port));
-        System.out.println("serverHash " + serverHash);
 
         ServerMetaData serverNode = new ServerMetaData(null, address, port, null, null);
 		// Setup begin and end hashing for server
 		serverNode = updateMetaData(serverHash, serverNode);
-		serverNode.printMeta();
 		ringNetwork.put(serverHash, serverNode);
     }
 
@@ -68,7 +66,6 @@ public class KVStore implements KVCommInterface {
 		assert currNode != null;
 
         ServerMetaData nextNode = new ServerMetaData();
-        logger.debug("Updating metadata from the nodes");
         // Only one in network, so start and end are yours
         if(ringNetwork.isEmpty()) {
             currNode.setBeginHash(nodeHash);
@@ -297,11 +294,12 @@ public class KVStore implements KVCommInterface {
     
     public void printRing() {
         ServerMetaData node;
+        System.out.println("Printing ring network-------------------------------------------------");
         for(Map.Entry<BigInteger, ServerMetaData> entry : ringNetwork.entrySet()) {
             node = entry.getValue();
-            System.out.println("serverHash: " + entry.getKey());
             System.out.println(node.getServerAddr() + " : " + node.getServerPort() + " : " + node.getHashRange()[0] + " : " + node.getHashRange()[1]);
         }
+        System.out.println("Done printing ring network--------------------------------------------");
     }
 
     private BigInteger getResponsibleServer(String key) {
