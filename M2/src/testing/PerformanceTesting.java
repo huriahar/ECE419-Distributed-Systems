@@ -309,22 +309,7 @@ public class PerformanceTesting extends TestCase {
 
     // ------------------------------ tests start here -----------------------------------------//
     
-
     @Test
-    public void  testInitialization() {
-       try{
-            System.out.println("********** In 1 Test **************");
-            
-            nodes = ecsClient.addNodes(1, "LRU", 5);
-            assertTrue(ecsClient.start()); 
-            //assertTrue(ecsClient.shutdown());
-            assertTrue(ecsClient.stop());
-        } catch (Exception io) {
-            throw new RuntimeException(io);
-        }
-    } 
-
-/*    @Test
     public void testOneClientOneServer() {
        try{
            clientOneServer(1); 
@@ -489,5 +474,4 @@ public class PerformanceTesting extends TestCase {
             throw new RuntimeException(io);
         }
     } 
-    */
 }
