@@ -32,7 +32,7 @@ public class ECSClient implements IECSClient {
     private boolean stop = false;
     private int timeout = KVConstants.LAUNCH_TIMEOUT;
 
-    public ECSClient (String configFile) {
+    public ECSClient (String configFile, String ugmachine) {
     	Path ecsConfig = Paths.get(configFile);
         this.nodesLaunched = new ArrayList<IECSNode>();
     	// If file doesn't exist or does not point to a valid file
@@ -42,7 +42,7 @@ public class ECSClient implements IECSClient {
             System.exit(1);
     	}
     	else {
-            this.ecsInstance = new ECS(ecsConfig);
+            this.ecsInstance = new ECS(ecsConfig, ugmachine);
     	} 
     }
 
@@ -495,14 +495,14 @@ public class ECSClient implements IECSClient {
     public static void main(String[] args) {
         try {
             new LogSetup("logs/ECSClient.log", Level.ALL);
-            if (args.length != 1) {
+            if (args.length != 2) {
                 System.out.println("Error! Invalid number of arguments!");
-                System.out.println("Usage: ecs <ecs.config>");
+                System.out.println("Usage: ecs <ecs.config> <ugXXX>");
             }
             else {
                 String configFile = args[0];
                 System.out.println(System.getProperty("user.dir"));
-                ECSClient ECSClientApp = new ECSClient(configFile);
+                ECSClient ECSClientApp = new ECSClient(configFile, args[1]);
                 ECSClientApp.run();
             }
         }

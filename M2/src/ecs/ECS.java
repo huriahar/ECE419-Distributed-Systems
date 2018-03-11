@@ -46,10 +46,20 @@ public class ECS implements IECS {
     private OutputStream output; 
     private InputStream input;
     private String lastRemovedName = null;
+    private String ugmachine;
     
     private ZKImplementation ZKImpl;
 
-    public ECS(Path configFile) {
+    public ECS(Path configFile, String ugmachine) {
+        //First, start zookeeper
+        try {
+            String cmd = System.getProperty("user.dir") + "/zookeeper-3.4.11/bin/zkServer.sh start";
+            logger.info("Starting zookeeper: " + cmd); 
+            Process p = Runtime.getRuntime().exec(new String[]{"csh","-c", cmd});
+        } catch (IOException e) {
+            logger.error("could not start zookeeper: " + e); 
+        }
+        this.ugmachine = ugmachine;
         this.configFile = configFile;
         this.ringNetwork = new TreeMap<BigInteger, IECSNode>();
         this.allAvailableServers = new HashMap<IECSNode, String>();
@@ -60,7 +70,7 @@ public class ECS implements IECS {
         	}
             this.metaDataFile = Files.createFile(Paths.get(metaFile));
             populateAvailableNodes();
-            ZKImpl.zkConnect("localhost");
+            ZKImpl.zkConnect(ugmachine);
             ZKImpl.deleteGroup(KVConstants.ZK_ROOT);
             ZKImpl.createGroup(KVConstants.ZK_ROOT);
         }
@@ -533,7 +543,7 @@ public class ECS implements IECS {
 
         Runtime run = Runtime.getRuntime();
         try {
-            String[] launchCmd = {"m2ssh.sh", node.getNodeName(), node.getNodeHost(), Integer.toString(node.getNodePort())};
+            String[] launchCmd = {"m2ssh.sh", ugmachine, System.getProperty("user.dir"), node.getNodeName(), node.getNodeHost(), Integer.toString(node.getNodePort())};
             proc = run.exec(launchCmd);
             // Also create a new znode for the node
             // Update data on znode about server config and join ZK_ROOT group
@@ -637,14 +647,9 @@ public class ECS implements IECS {
     }
 
     public boolean removeZKNode(IECSNode node) {
-        logger.debug("in removeZKNode!");
         try {
-            logger.debug("in removeZKNode2!");
             String path = KVConstants.ZK_ROOT + KVConstants.ZK_SEP + node.getNodeName();
             ZKImpl.deleteGroup(path);
-            logger.debug("in removeZKNode3!");
-            //TODO is this for ZK or the launch script??
-            //Thread.sleep(KVConstants.LAUNCH_TIMEOUT);
         } catch (InterruptedException e) {
         	logger.error("ERROR: Unable to remove znode from ZK for server" + node.getNodeName() + ": " + e);
             return false;

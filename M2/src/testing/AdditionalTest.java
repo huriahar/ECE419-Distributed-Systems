@@ -26,7 +26,7 @@ public class AdditionalTest extends TestCase {
     Collection<IECSNode> nodes;
     
 	public void setUp() {
-        ecsClient = new ECSClient("testECS.config");
+        ecsClient = new ECSClient("testECS.config", "localhost");
         ecsClient.setLevel("INFO");
         try {
             Process p = Runtime.getRuntime().exec(new String[]{"csh","-c","rm -rf SERVER_5000*"});
