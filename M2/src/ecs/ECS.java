@@ -725,7 +725,7 @@ public class ECS implements IECS {
             connectNode(node);
         } catch (IOException e) {
             try{
-                TimeUnit.SECONDS.sleep(2);
+                TimeUnit.SECONDS.sleep(4);
                 connectNode(node);
             } catch (IOException ex) {
                 logger.error("Failed to connect to server <" + node.getNodeHost() + ":" + node.getNodePort() + ">. KVServer launch script may have failed.");

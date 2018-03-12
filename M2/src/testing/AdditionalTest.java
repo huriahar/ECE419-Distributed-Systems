@@ -92,7 +92,7 @@ public class AdditionalTest extends TestCase {
             throw new RuntimeException(io);
         }
     } 
-/*
+
     @Test
     public void testHashingWithAdd() {
         System.out.println("********** In 2 Test **************");
@@ -326,5 +326,5 @@ public class AdditionalTest extends TestCase {
         //get should be successful
         getKVPair(kvClient, "b", "bb", StatusType.GET_SUCCESS);
     }
-*/
+
 }
