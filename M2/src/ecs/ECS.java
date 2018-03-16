@@ -556,7 +556,7 @@ public class ECS implements IECS {
             // Also create a new znode for the node
             // Update data on znode about server config and join ZK_ROOT group
             ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
-            String data = "SERVER_STOPPED" + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort();
+            String data = "SERVER_STOPPED" + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + KVConstants.TIMESTAMP_DEFAULT;
             String path = KVConstants.ZK_SEP + KVConstants.ZK_ROOT + KVConstants.ZK_SEP + node.getNodeName();
             ZKImpl.updateData(path, data);
             Thread.sleep(KVConstants.LAUNCH_TIMEOUT);
@@ -853,6 +853,19 @@ public class ECS implements IECS {
                 + ECSSocket.getPort() + ">: '" 
                 + msg.getMsg().trim() + "'");
         return msg;
+    }
+
+    public boolean checkServersStatus(IECSNode node) {
+        String path = getZKPath(node.getNodeName());
+        data = zkImplServer.readData(this.zkPath);			
+        String[] info = data.split(KVConstants.SPLIT_DELIM);
+        long currentTime = System.currentTimeMillis();
+        long lastTimeStamp = Integer.parse(info[3]);
+        if(currentTime - lastTimeStamp > KVConstants.SERVER_TIMESTAMP_TIMEOUT) {
+            logger.error("Server " + node.getNodeName() + " has crashed!");
+            return false;
+        }
+        return true;
     }
 
     public boolean shutDownOneNode(IECSNode node) {
