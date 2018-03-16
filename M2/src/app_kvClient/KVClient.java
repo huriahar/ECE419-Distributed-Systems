@@ -136,6 +136,9 @@ public class KVClient implements IKVClient {
                             	System.out.println(PROMPT + "SERVER_WRITE_LOCK! Server not accepting any put requests at the moment.");
                             	logger.error(PROMPT + "SERVER_WRITE_LOCK! Server not accepting any put requests at the moment.");
                             }
+                            else if (status == KVMessage.StatusType.SERVER_WRITE_LOCK) {
+                                System.out.println(PROMPT + "SERVER_WRITE_LOCK! Server not accepting any put requests at the moment.");
+                            }
                             else {
                                 System.out.println(PROMPT + "Invalid Message Type from server!");
                                 logger.error("Invalid Message Type from server!");

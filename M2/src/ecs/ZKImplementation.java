@@ -73,7 +73,7 @@ public class ZKImplementation implements Watcher{
 		String path = KVConstants.ZK_SEP + groupName + KVConstants.ZK_SEP + memberName;
 		// When a server joins the group, it is in SERVER_STOPPED state - save that in znode
 		String createdPath = zk.create(path, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-		logger.info("Added node " + createdPath);
+		System.out.println("Added node " + createdPath);
 	}
 	
 	public void updateData (String path, String data)
@@ -105,6 +105,7 @@ public class ZKImplementation implements Watcher{
 		}
 		catch (KeeperException.NoNodeException e) {
 			logger.error("Unable to delete path " + path);
+            System.out.println("in deleteGroup ZK: failed");
 		}
 	}
 }

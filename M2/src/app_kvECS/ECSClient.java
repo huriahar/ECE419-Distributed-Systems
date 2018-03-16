@@ -30,9 +30,16 @@ public class ECSClient implements IECSClient {
 
     private Collection<IECSNode> nodesLaunched;
     private boolean stop = false;
+    private int timeout = KVConstants.LAUNCH_TIMEOUT;
 
-    public ECSClient (String configFile) {
+    public ECSClient(String zkHostname, int zkPort) {
+        this("ecs.config", "localhost");
+        this.ecsInstance.setZKInfo(zkHostname, zkPort);
+    }
+
+    public ECSClient (String configFile, String ugmachine) {
     	Path ecsConfig = Paths.get(configFile);
+        this.nodesLaunched = new ArrayList<IECSNode>();
     	// If file doesn't exist or does not point to a valid file
     	if (!Files.exists(ecsConfig)) {
     		printError("ECS Config file does not exist! " + ecsConfig);
@@ -40,7 +47,7 @@ public class ECSClient implements IECSClient {
             System.exit(1);
     	}
     	else {
-            this.ecsInstance = new ECS(ecsConfig);
+            this.ecsInstance = new ECS(ecsConfig, ugmachine);
     	} 
     }
 
@@ -50,6 +57,7 @@ public class ECSClient implements IECSClient {
             System.out.print(PROMPT);
 
             try {
+                this.checkServersStatus();
                 String cmdLine = stdin.readLine();
                 this.handleCommand(cmdLine);
             }
@@ -59,6 +67,18 @@ public class ECSClient implements IECSClient {
                 logger.error("ESClient Application does not respond - Application terminated ");
             }
         }
+    }
+
+    private void checkServersStatus() {
+        Collection<IECSNode> nodesToRemove = new ArrayList<IECSNode>();
+        for (IECSNode node : nodesLaunched) {
+            boolean success = ecsInstance.checkServersStatus(node);
+            if(!success) {
+                //TODO make one of the replicas the new coordinator
+                nodesToRemove.add(node);
+            }
+        }
+        nodesLaunched.removeAll(nodesToRemove);
     }
 
     private void handleCommand (String cmdLine) {
@@ -78,7 +98,6 @@ public class ECSClient implements IECSClient {
                         int numNodes = Integer.parseInt(tokens[1]);
                         String cacheStrategy = tokens[2];
                         int cacheSize = Integer.parseInt(tokens[3]);
-
                         if(numNodes <= ecsInstance.availableServers()) {
                             if (KVCache.isValidStrategy(cacheStrategy)) {
                                 nodesLaunched = addNodes(numNodes, cacheStrategy, cacheSize);
@@ -111,7 +130,30 @@ public class ECSClient implements IECSClient {
                     printHelp();
                 }
                 break;
-            
+            case "unlock":
+                if(tokens.length == 2) {
+                    if(!unlock(tokens[1])) {
+                        printError(PROMPT + "Write unlock " + tokens[1] + " failed.");
+                        logger.error("Write unlock failed");
+                    }
+                }
+                else {
+                    printError(PROMPT + "Invalid number of arguments");
+                    printHelp();
+                }
+                break;
+            case "lock":
+                if(tokens.length == 2) {
+                    if(!lock(tokens[1])) {
+                        printError(PROMPT + "Write lock " + tokens[1] + " failed.");
+                        logger.error("Write lock failed");
+                    }
+                }
+                else {
+                    printError(PROMPT + "Invalid number of arguments");
+                    printHelp();
+                }
+                break;
             case "start":
                 if(!start()) {
                     printError(PROMPT + "Start failed");
@@ -127,16 +169,13 @@ public class ECSClient implements IECSClient {
                 break;
 
             case "shutdown":
-                if(stop()) {
-                    if(!shutdown()) {
-                        printError(PROMPT + "Unable to exit ECS process");
-                        logger.error("shutDown failed");
-                    }
+                if(!shutdown()) {
+                    printError(PROMPT + "Unable to exit ECS process");
+                    logger.error("shutDown failed");
                 }
-                else {
-                    printError(PROMPT + "Stop failed");
-                    logger.error("Stop failed");
-                }
+                stop = true;
+                disconnect();
+                System.out.println(PROMPT + "Application exit!");
                 break;
 
             // addNode cacheSize cacheStrategy
@@ -147,10 +186,7 @@ public class ECSClient implements IECSClient {
                         int cacheSize = Integer.parseInt(tokens[2]);
                         if (KVCache.isValidStrategy(cacheStrategy)) {
                             IECSNode newNode = addNode(cacheStrategy, cacheSize);
-                            if (newNode != null) {
-                                nodesLaunched.add(newNode);
-                            }
-                            else {
+                            if (newNode == null) {
                                 printError(PROMPT + "Unable to find any remaining unlaunched nodes supplied in config file");
                                 logger.error("Unable to find any remaining unlaunched nodes supplied in config file");
                             }
@@ -226,9 +262,13 @@ public class ECSClient implements IECSClient {
         sb.append(PROMPT).append("start");
         sb.append("\t 1) Starts storage service on all launched server instances \n");
         sb.append(PROMPT).append("stop");
-        sb.append("\t\t Stops the storage service (get/put requests) but process is running. \n");
+        sb.append("\t\t Stops the storage service (get/put requests) but process is running.\n");
+        sb.append(PROMPT).append("lock <nodeName>");
+        sb.append("\t\t Write locks the storage service (locks put requests) but gets are acceptable.\n");
+        sb.append(PROMPT).append("unlock <nodeName>");
+        sb.append("\t\t Write unlocks the storage service (unlocks put requests).\n");
         sb.append(PROMPT).append("shutdown");
-        sb.append("\t\t Stop all the servers and shuts down process  \n");
+        sb.append("\t\t Stop all the servers and shuts down process\n");
         sb.append(PROMPT).append("addNode <cacheStrategy> <cacheSize>");
         sb.append("\t\t Adds a new server of cacheSize with cacheStrategy \n");
         sb.append(PROMPT).append("removeNode <serverName1> <serverName2> ...");
@@ -252,7 +292,7 @@ public class ECSClient implements IECSClient {
                 + "ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF");
     }
 
-    private String setLevel(String levelString) {
+    public String setLevel(String levelString) {
         
         if(levelString.equals(Level.ALL.toString())) {
             logger.setLevel(Level.ALL);
@@ -280,7 +320,7 @@ public class ECSClient implements IECSClient {
         }
     }
 
-    private void disconnect() {
+    public void disconnect() {
         ecsInstance.disconnect();    
     }
 
@@ -288,8 +328,25 @@ public class ECSClient implements IECSClient {
         System.out.println(PROMPT + "Error! " + error);
     }
 
+    public boolean unlock(String name) {
+        for (IECSNode node : nodesLaunched) {
+            if(node.getNodeName().equals(name)) {
+                return ecsInstance.sendWriteUnlock(node);
+            }
+        }
+        return false;
+    }
+
+    public boolean lock(String name) {
+        for (IECSNode node : nodesLaunched) {
+            if(node.getNodeName().equals(name)) {
+                return ecsInstance.sendWriteLock(node);
+            }
+        }
+        return false;
+    }
+
     public boolean start() {
-        // TODO
         boolean success = true; 
         for (IECSNode node : nodesLaunched) {
             if (!ecsInstance.start(node)) {
@@ -303,7 +360,6 @@ public class ECSClient implements IECSClient {
 
     @Override
     public boolean stop() {
-        // TODO
         boolean success = true;
 
         for (IECSNode node : nodesLaunched) {
@@ -319,71 +375,120 @@ public class ECSClient implements IECSClient {
 
     @Override
     public boolean shutdown() {
-        // TODO
         boolean success = true;
-        if(!ecsInstance.ECSShutDown())
-            success = false;
-
+        success = ecsInstance.removeNodes(nodesLaunched);
+        if(success) nodesLaunched.clear();
+        success = success & ecsInstance.shutdown();
         return success;
-
     }
 
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
-        // TODO
-        return ecsInstance.addNode(cacheStrategy, cacheSize);
+        if(ecsInstance.availableServersCount() == 0) return null;
+        IECSNode node = null;
+        if(ecsInstance.ringNetworkSize() == 0) {
+            node = setupFirstNode(cacheStrategy, cacheSize);
+            System.out.println("setupFirstNode after");
+            //If we couldn't find the lastRemoved... use any available
+            //server
+            if(ecsInstance.ringNetworkSize() == 0) {
+                System.out.println("setupFirstNode after, trying to add node");
+                node = ecsInstance.addNode(cacheStrategy, cacheSize);
+            }
+        }
+        else {
+            node = ecsInstance.addNode(cacheStrategy, cacheSize);
+        }
+        if(node != null) {
+            this.nodesLaunched.add(node);
+        } else {
+        System.out.println("node is null");
+        }
+        return node;
     }
 
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
-        Collection<IECSNode> nodes = setupNodes(count, cacheStrategy, cacheSize);
-        // It is not necessary to do something in awaitNodes
-        // As our code just waits for all nodes to try executing anyways...
-        // As long as the server is in the server stopped stage till it is started
-        // we are good
-        /*try {
-			awaitNodes(count, KVConstants.LAUNCH_TIMEOUT);
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}*/
-        return nodes;
-        
+        if(count > ecsInstance.availableServersCount()) return new ArrayList<IECSNode>();
+        return setupNodes(count, cacheStrategy, cacheSize);
     }
 
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
-        boolean success = true;
-    	// This is called before launching the servers - decides which nodes to add in hashRing, adds them
-    	Collection<IECSNode> nodes  = ecsInstance.initAddNodesToHashRing(count);
-    	for(IECSNode entry: nodes) {
-            //for each node, launch server and set status as stopped
-            if(ecsInstance.launchKVServer(entry, cacheStrategy, cacheSize)) {
-                logger.info("SUCCESS. Launched KVServer :" + entry.getNodeName());
-            } 
-            else {
-                logger.error("ERROR. Unable to launch KVServer :" + entry.getNodeName() + " Host: " + entry.getNodeHost()+ " Port: " + entry.getNodePort());           
+        Collection<IECSNode> nodes = new ArrayList<IECSNode>();
+        int counter = 0;
+        while(counter < count) {
+            nodes.add(addNode(cacheStrategy, cacheSize));
+            counter++;
+        }
+        //Await nodes queries ZK nodes for a status update
+        try {
+			if(!awaitNodes(count, KVConstants.LAUNCH_TIMEOUT)) {
+                logger.error("awaitNodes times out! servers are not responsive");
             }
-        }
-        success = ecsInstance.alertMetaDataUpdate(false);
-        if(success)
-        	nodes = ecsInstance.setupNodesCacheConfig(nodes, cacheStrategy, cacheSize);
-        else {
-        	logger.error("Unable to do meta data update for servers");
-        }
-        System.out.println(nodes.size());
-        return nodes;    
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+        return nodes;
     }
 
+    public IECSNode setupFirstNode(String cacheStrategy, int cacheSize) {
+        //This function should only be used to setup the first node on the ring network
+        boolean success = false;
+    	// This is called before launching the servers - decides which nodes to add in hashRing, adds them
+        //TODO this loop only iterates once... always... remove loop
+    	IECSNode node = ecsInstance.initAddNodesToHashRing();
+        if(node == null) {
+            logger.debug("Could not find lastRemoved in the list of available servers!");
+            logger.debug("Will look for any available server..");
+            return null;
+        }
+        //for each node, launch server and set status as stopped
+        if(ecsInstance.launchKVServer(node, cacheStrategy, cacheSize)) {
+            logger.info("SUCCESS. Launched KVServer :" + node.getNodeName());
+        } 
+        else {
+            logger.error("ERROR. Unable to launch KVServer :" + node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());           
+        }
+        //Update meta data and setup cache config for node
+        success = ecsInstance.sendMetaDataUpdate(node);
+        success = success & ecsInstance.setupNodesCacheConfigOneNode(node, cacheStrategy, cacheSize);
+        if(!success) {
+        	logger.error("Unable to do meta data update for servers");
+        }
+        System.out.println("at the end of setupFirstNode");
+        return node;
+    }
+
+
+    /**
+     * Wait for all nodes to report status or until timeout expires
+     * @param count     number of nodes to wait for
+     * @param timeout   the timeout in milliseconds
+     * @return  true if all nodes reported successfully, false otherwise
+     */
     @Override
     public boolean awaitNodes(int count, int timeout) throws Exception {
-        // TODO
-        return false;
+        String path = null, status = null;
+        int counter = 0;
+        long endTimeMillis = System.currentTimeMillis() + timeout*4;
+        for(IECSNode entry : nodesLaunched) {
+            path = ecsInstance.getZKPath(entry.getNodeName());
+            if(path != null) {
+                status = ecsInstance.checkZKStatus(path,endTimeMillis); 
+                if(status.equals("SERVER_LAUNCHED")) {
+                    counter++;                
+                }
+                if(System.currentTimeMillis() > endTimeMillis) {
+                    return false;
+                }   
+            }
+        }
+        return (counter == count);
     }
 
     @Override
     public boolean removeNodes(Collection<String> nodeNames) {
-        // TODO
         Collection<IECSNode> nodesToRemove = new ArrayList<IECSNode>();
         boolean success = true;
         for(String name : nodeNames) {
@@ -401,29 +506,35 @@ public class ECSClient implements IECSClient {
         return success;
     }
 
+    public int numNodesLaunched() {
+        return nodesLaunched.size();
+    }
+
+    public void addToLaunchedNodes(IECSNode node) {
+        nodesLaunched.add(node);
+    }
+
     @Override
     public Map<String, IECSNode> getNodes() {
-        // TODO
         return ecsInstance.getNodes();
     }
 
     @Override
     public IECSNode getNodeByKey(String Key) {
-        // TODO
         return ecsInstance.getNodeByKey(Key);
     }
 
     public static void main(String[] args) {
         try {
             new LogSetup("logs/ECSClient.log", Level.ALL);
-            if (args.length != 1) {
+            if (args.length != 2) {
                 System.out.println("Error! Invalid number of arguments!");
-                System.out.println("Usage: ecs <ecs.config>");
+                System.out.println("Usage: ecs <ecs.config> <ugXXX>");
             }
             else {
                 String configFile = args[0];
                 System.out.println(System.getProperty("user.dir"));
-                ECSClient ECSClientApp = new ECSClient(configFile);
+                ECSClient ECSClientApp = new ECSClient(configFile, args[1]);
                 ECSClientApp.run();
             }
         }

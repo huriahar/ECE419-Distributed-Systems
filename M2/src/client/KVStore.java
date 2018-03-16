@@ -54,12 +54,10 @@ public class KVStore implements KVCommInterface {
         // Add the server address and port to the hash ring
         BigInteger serverHash = md5.encode(address + KVConstants.HASH_DELIM +
                 Integer.toString(port));
-        System.out.println("serverHash " + serverHash.toString(16));
 
         ServerMetaData serverNode = new ServerMetaData(null, address, port, null, null);
 		// Setup begin and end hashing for server
 		serverNode = updateMetaData(serverHash, serverNode);
-		serverNode.printMeta();
 		ringNetwork.put(serverHash, serverNode);
     }
 
@@ -68,7 +66,6 @@ public class KVStore implements KVCommInterface {
 		assert currNode != null;
 
         ServerMetaData nextNode = new ServerMetaData();
-
         // Only one in network, so start and end are yours
         if(ringNetwork.isEmpty()) {
             currNode.setBeginHash(nodeHash);
@@ -227,6 +224,7 @@ public class KVStore implements KVCommInterface {
             return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
         }
 
+        connectToResponsibleServer(key);
         // step 2 - send a PUT request to the server
         TextMessage message = new TextMessage(KVConstants.GET_CMD + KVConstants.DELIM + key);
         sendMessage(message);
@@ -264,6 +262,7 @@ public class KVStore implements KVCommInterface {
 
     private KVReplyMessage retryRequest(String key, String value, String request)
             throws Exception {
+        logger.debug("retrying " + request + " for kvp (" + key + ", " + value + ")");
         // step 1 - Update ServerMetaData
         String status = (value == null) ? "DELETE_ERROR" : "PUT_ERROR";
         status = (request.equals(KVConstants.GET_CMD)) ? "GET_ERROR" : status;
@@ -276,8 +275,8 @@ public class KVStore implements KVCommInterface {
         else {
             // Update ServerMetaData
             updateMetaData(reply.getMsg());
-            
             return (request.equals(KVConstants.PUT_CMD)) ? put(key, value) : get(key);
+            
         }
     }
 
@@ -295,11 +294,12 @@ public class KVStore implements KVCommInterface {
     
     public void printRing() {
         ServerMetaData node;
+        System.out.println("Printing ring network-------------------------------------------------");
         for(Map.Entry<BigInteger, ServerMetaData> entry : ringNetwork.entrySet()) {
             node = entry.getValue();
-            System.out.println("Key: " + entry.getKey().toString(16));
-            System.out.println(node.getServerAddr() + " : " + node.getServerPort() + " : " + node.getHashRange()[0].toString(16) + " : " + node.getHashRange()[1].toString(16));
+            System.out.println(node.getServerAddr() + " : " + node.getServerPort() + " : " + node.getHashRange()[0] + " : " + node.getHashRange()[1]);
         }
+        System.out.println("Done printing ring network--------------------------------------------");
     }
 
     private BigInteger getResponsibleServer(String key) {
@@ -351,7 +351,7 @@ public class KVStore implements KVCommInterface {
         logger.info("Send message:\t '" + msg.getMsg() + "'");
     }
 
-    private TextMessage receiveMessage()
+    public TextMessage receiveMessage()
             throws IOException {
         int index = 0;
         byte[] msgBytes = null, tmp = null;

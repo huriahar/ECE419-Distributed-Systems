@@ -77,20 +77,27 @@ public class ClientConnection implements Runnable {
                     if(msgContent.length > 1){
                         key = msgContent[1];
                     }
-
+                    boolean success = true;
+                    logger.debug("step 5");
                     if (command.equals("ECS")) {
                         String[] ecsCmd = Arrays.copyOfRange(msgContent, 1, msgContent.length);
                         handleECSCmd(ecsCmd);
                         continue;
                     }
                     else if(command.equals("MOVE_KVPAIRS")) {
+                        // Receiving KVPairs from another server
                         if(key != null) {
-                            handleMoveKVPairs(key + KVConstants.DELIM + value);
+                            success = handleMoveKVPairs(key + KVConstants.DELIM + value);
+                            String res = success ? "MOVE_SUCCESS" : "MOVE_FAILED";
+                            sendMessage(new TextMessage(res));
+                            logger.info(res);
+                            continue;
                         }
                     }
                     logger.debug("step 6");
                     //Just a guard
                     if(key == null) {
+                        logger.debug("key is null");
                         continue;
                     }
                     System.out.println("Is server stopped? "  + server.isStopped());
@@ -122,6 +129,10 @@ public class ClientConnection implements Runnable {
                     else if (command.equals("GET")) {
                         if(!server.isReadLocked()) {
                             handleGetCmd(key);
+                        } else {
+                            sendMessage(new TextMessage("SERVER_STOPPED"));
+                            logger.info("SERVER_READ_LOCKED cannot handle client requests at the moment.");
+                            continue;
                         }
                     }
                     else {
@@ -179,8 +190,8 @@ public class ClientConnection implements Runnable {
         return result;
     }
 
-    private void handleMoveKVPairs(String kvpairs) {
-        if(kvpairs == null) return;
+    private boolean handleMoveKVPairs(String kvpairs) {
+        if(kvpairs == null) return true;
         logger.debug(kvpairs);
         String[] KVPairs = kvpairs.split(KVConstants.NEWLINE_DELIM);
         for(int i = 0; i < KVPairs.length ; i++) {
@@ -189,14 +200,25 @@ public class ClientConnection implements Runnable {
             try {
                 server.putKV(kvpair[0], kvpair[1]);
             } catch (Exception e) {
-                logger.error("failed to move KVpair ( " + kvpair[0] + ", " + kvpair[1] + ") to server " + server.getHostname());
+                logger.error("failed to move KVpair (" + kvpair[0] + ", " + kvpair[1] + ") to server " + server.getHostname());
+                return false;
             }
         }
+        return true;
     }
 
     private void handleECSCmd (String[] msg) {
+        boolean success;
         try {
             switch(msg[0]) {
+                case "WRITE_UNLOCK":
+                    server.unlockWrite();
+                    sendMessage(new TextMessage("UNLOCK_SUCCESS"));
+                    return;
+                case "WRITE_LOCK":
+                    server.lockWrite();
+                    sendMessage(new TextMessage("LOCK_SUCCESS"));
+                    return;
                 case "SETUP_NODE":
                     int cacheSize = Integer.parseInt(msg[2]);
                     server.setupCache(cacheSize, msg[1]);
@@ -216,21 +238,26 @@ public class ClientConnection implements Runnable {
                     return;
                 case "MOVE_ALL_KVPAIRS":
                     server.setMoveAll(true);
-                case "UPDATE_METADATA":
-                    boolean success = server.updateMetaData();
+                case "MOVE_KVPAIRS":
+                    //targetRange in msg[1], msg[2]
+                    System.out.println("Updated metadata. Now moving data");
+                    String[] targetRange = Arrays.copyOfRange(msg, 2, 2);
+                    String targetName = msg[1];
+                    success = server.moveData(targetRange, targetName);
                     if(success) {
-                        //targetRange in msg[1], msg[2]
-                        System.out.println("Updated metadata. Now moving data");
-                        String[] targetRange = Arrays.copyOfRange(msg, 2, 2);
-                        String targetName = msg[1];
-                        success = server.moveData(targetRange, targetName);
+                        sendMessage(new TextMessage("MOVE_SUCCESS"));
+                    } else {
+                        sendMessage(new TextMessage("MOVE_FAILED"));
                     }
+                    server.setMoveAll(false);
+                    return;
+                case "UPDATE_METADATA":
+                    success = server.updateMetaData();
                     if(success) {
                         sendMessage(new TextMessage("UPDATE_SUCCESS"));
                     } else {
                         sendMessage(new TextMessage("UPDATE_FAILED"));
                     }
-                    server.setMoveAll(false);
                     return;
                 default:
                     logger.error("Unknown ECS cmd!");
@@ -292,8 +319,13 @@ public class ClientConnection implements Runnable {
             //Done in KVServer;
             try {
                 String value = server.getKV(key);
-                result = "GET_SUCCESS" + KVConstants.DELIM + value;
-                logger.info("Successfully fetched the value " + value + " for the key " + key + " on server");
+                result = (value.equals(""))? "GET_ERROR": ("GET_SUCCESS" + KVConstants.DELIM + value);
+                if(result.equals("GET_ERROR")) {
+                    logger.info("GET_ERROR: Unable to fetch the value for the key " + key + " on server");
+                }
+                else {
+                    logger.info("Successfully fetched the value " + value + " for the key " + key + " on server");
+                }
             }
             catch (Exception ex) {
                 result = "GET_ERROR";

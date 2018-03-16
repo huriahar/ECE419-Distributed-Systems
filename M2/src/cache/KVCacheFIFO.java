@@ -21,6 +21,11 @@ public class KVCacheFIFO extends KVCache {
     @Override
     public synchronized void insert(String key, String value){
         if(value.equals("")) return;
+        System.out.println("inserting into cache... " + key + " " + value);
+        if(this.getCacheSize() == 0) {
+            System.out.println("cache sizeis 0");
+            return;
+        }
 
         // check if it already exists
         if (kvp_map.containsKey(key)) {
