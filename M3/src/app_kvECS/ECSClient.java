@@ -69,7 +69,7 @@ public class ECSClient implements IECSClient {
         }
     }
 
-    private void checkServersStatus() {
+    public void checkServersStatus() {
         Collection<IECSNode> nodesToRemove = new ArrayList<IECSNode>();
         for (IECSNode node : nodesLaunched) {
             boolean success = ecsInstance.checkServersStatus(node);

@@ -208,11 +208,11 @@ public class KVServer implements IKVServer, Runnable {
 
     private void updateTimeStamp() {
         //Update timestamp on the server's Znode
-        data = zkImplServer.readData(this.zkPath);			
-        String[] info = data.split(KVConstants.SPLIT_DELIM);
-        info[3] = Long.toString(System.currentTimeMillis());
-        data = String.join(KVConstants.DELIM, info);
         try {
+            String data = zkImplServer.readData(this.zkPath);			
+            String[] info = data.split(KVConstants.SPLIT_DELIM);
+            info[3] = Long.toString(System.currentTimeMillis());
+            data = String.join(KVConstants.DELIM, info);
             zkImplServer.updateData(this.zkPath, data);
         } catch (KeeperException e) {
         	logger.error("ERROR: Unable to update ZK " + e);
