@@ -410,6 +410,7 @@ public class ECSClient implements IECSClient {
     @Override
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
         if(count > ecsInstance.availableServersCount()) return new ArrayList<IECSNode>();
+        //Adds on replicas here
         return setupNodes(count, cacheStrategy, cacheSize);
     }
 
@@ -429,6 +430,13 @@ public class ECSClient implements IECSClient {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+
+        //After the launches are successful, setup replica nodes
+        //Setup replicas only if there are enough to form one full layer...? could change this easily
+        ecsInstance.populateCoordinators();
+        ecsInstance.setupReplica1();
+        ecsInstance.setupReplica2();
+
         return nodes;
     }
 

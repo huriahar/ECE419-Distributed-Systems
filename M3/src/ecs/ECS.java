@@ -45,6 +45,7 @@ public class ECS implements IECS {
     private TreeMap<BigInteger, IECSNode> ringNetwork;
     // IECSNode and status {"Available", "Taken"} - TODO: Convert to an ENUM
     private HashMap<IECSNode, String> allAvailableServers;
+    private HashMap<IECSNode, ECSReplica> coordinatorReplicas;
     private static Logger logger = Logger.getRootLogger();
     private OutputStream output; 
     private InputStream input;
@@ -403,6 +404,7 @@ public class ECS implements IECS {
     }
 
     public IECSNode initAddNodesToHashRing() {
+        //TODO rename this so it happens only for one node!!
         //This function is ONLY used for the first node added to the system/ringNetwork
         IECSNode chosenNode = null;     
         int counter = 0, numNodes = 1;
@@ -466,6 +468,63 @@ public class ECS implements IECS {
         } 
         return success;
     }
+
+    public void populateCoordinators() {
+        //Initially all coordinators have 0 replicas
+        for(Map.Entry<BigInteger, IECSNode> entry: ringNetwork.entrySet()) {
+            IECSNode coordinator = entry.getValue(); 
+            ECSReplica replicaSet = new ECSReplica();
+            coordinatorReplicas.put(coordinator, replicaSet);
+        }
+    }
+
+    public void setupReplica1() {
+        //Go around the all the coordinators and assign replicas for each
+        //Go through list of available servers to find replicas
+        //Update replica structure
+        if(availableServersCount() >= ringNetworkSize()){
+            for(Map.Entry<IECSNode, ECSReplica> CRSet: coordinatorReplicas.entrySet()) {
+                for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
+                    if(entry.getValue().equals("AVAILABLE")) {
+                        IECSNode coordinator = CRSet.getKey();
+                        IECSNode r1 = entry.getKey();
+                        r1.setNodeBeginHash(coordinator.getNodeHashRange()[0]);
+                        r1.setNodeEndHash(coordinator.getNodeHashRange()[1]);
+                        ECSReplica replicaSet =  CRSet.getValue();
+                        replicaSet.setR1(r1);
+                        coordinatorReplicas.put(coordinator, replicaSet);
+                        entry.setValue("TAKEN");
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    public void setupReplica2() {
+        //Go around the all the coordinators and assign replicas for each
+        //Go through list of available servers to find replicas
+        //Update replica structure
+        if(availableServersCount() >= ringNetworkSize()){
+            for(Map.Entry<IECSNode, ECSReplica> CRSet: coordinatorReplicas.entrySet()) {
+                for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
+                    if(entry.getValue().equals("AVAILABLE")) {
+                        IECSNode coordinator = CRSet.getKey();
+                        IECSNode r2 = entry.getKey();
+                        r2.setNodeBeginHash(coordinator.getNodeHashRange()[0]);
+                        r2.setNodeEndHash(coordinator.getNodeHashRange()[1]);
+                        ECSReplica replicaSet =  CRSet.getValue();
+                        replicaSet.setR2(r2);
+                        coordinatorReplicas.put(coordinator, replicaSet);
+                        entry.setValue("TAKEN");
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+
 
     public Collection<IECSNode> setupNodesCacheConfig(Collection<IECSNode> nodes, String cacheStrategy, int cacheSize) {
         Collection<IECSNode> nodesResult = new ArrayList<IECSNode>();
