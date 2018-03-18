@@ -33,21 +33,44 @@ public class ServerMetaData {
             this.eHash = new BigInteger(data[END_HASH], 16);
         }
         else {
-        	this.bHash = null;
-        	this.eHash = null;
+            this.bHash = null;
+            this.eHash = null;
         }
     }
     
     public ServerMetaData() {
-    	
+        
     }
 
     public ServerMetaData(String dataStr) {
-        this(dataStr, "\\" + KVConstants.DELIM);
+        this(dataStr, KVConstants.SPLIT_DELIM);
     }
 
     public ServerMetaData(String name, String addr, int port) {
         this(name, addr, port, null, null);
+    }
+
+    public void updateServerMetaData(String dataStr) {
+        String[] data = dataStr.split(KVConstants.SPLIT_DELIM);
+        this.name = data[SERVER_NAME];
+        this.addr = data[SERVER_ADDR];
+        this.port = Integer.parseInt(data[SERVER_PORT]);
+        if(data.length > 3) {
+            this.bHash = new BigInteger(data[BEGIN_HASH], 16);
+            this.eHash = new BigInteger(data[END_HASH], 16);
+        }
+        else {
+            this.bHash = null;
+            this.eHash = null;
+        }
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setPort(int port) {
+        this.port = port;
     }
 
     public void setAddr(String addr) {
@@ -63,34 +86,34 @@ public class ServerMetaData {
     }
     
     public String getServerName() {
-    	return this.name;
+        return this.name;
     }
     
     public String getServerAddr() {
-    	return this.addr;
+        return this.addr;
     }
     
     public int getServerPort() {
-    	return this.port;
+        return this.port;
     }
     
     public BigInteger getBeginHash() {
-    	return this.bHash;
+        return this.bHash;
     }
     
     public BigInteger getEndHash() {
-    	return this.eHash;
+        return this.eHash;
     }
     
     public BigInteger[] getHashRange() {
-    	BigInteger[] hashRange = {this.bHash, this.eHash};
-    	return hashRange;
+        BigInteger[] hashRange = {this.bHash, this.eHash};
+        return hashRange;
     }
     
     public void printMeta() {
-    	System.out.println("Server Name: " + getServerName() + " ServerAddr: " + getServerAddr() + " ServerPort: " + getServerPort());
-    	if ((getBeginHash() != null) && (getEndHash() != null))
-    		System.out.println("Server bHash: " + getBeginHash().toString(16) + " eHash: " + getEndHash().toString(16));
+        System.out.println("Server Name: " + getServerName() + " ServerAddr: " + getServerAddr() + " ServerPort: " + getServerPort());
+        if ((getBeginHash() != null) && (getEndHash() != null))
+            System.out.println("Server bHash: " + getBeginHash().toString(16) + " eHash: " + getEndHash().toString(16));
     }
 }
 

@@ -259,6 +259,18 @@ public class ClientConnection implements Runnable {
                         sendMessage(new TextMessage("UPDATE_FAILED"));
                     }
                     return;
+                case "UPDATE_REPLICAS":
+                    System.out.println("Here at UPDATE_REPLICAS");
+                    String primaryReplica = msg[1];
+                    String secondaryReplica = msg[2];
+                    System.out.println("Replicas received: " + primaryReplica + " " + secondaryReplica);
+                    success = server.updateReplicas(primaryReplica, secondaryReplica);
+                    if(success) {
+                        sendMessage(new TextMessage("REPLICA_UPDATE_SUCCESS"));
+                    } else {
+                        sendMessage(new TextMessage("REPLICA_UPDATE_FAILED"));
+                    }
+                    return;
                 default:
                     logger.error("Unknown ECS cmd!");
                     return;

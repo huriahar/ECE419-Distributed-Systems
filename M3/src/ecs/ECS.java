@@ -260,6 +260,31 @@ public class ECS implements IECS {
             logger.debug(node.getNodeName() + " : " + node.getNodeHashRange()[0] + " : " + node.getNodeHashRange()[1]);
             
         }               
+    }
+
+    public boolean sendReplicas(IECSNode node, String replicas) {
+        boolean success = true;
+        TextMessage response, message;
+        // Step 1
+        // Ask the rNode to update its replicas
+        message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_REPLICAS" + replicas);
+        try {
+            response = sendNodeMessage(message, node);
+            if(response.getMsg().equals("REPLICA_UPDATE_SUCCESS")) {
+                logger.info("SUCCESS: Replicas updated for KVServer: " + node.getNodeName());
+            }
+            else if(response.getMsg().equals("REPLICA_UPDATE_FAILED")) {
+                logger.error("ERROR: Replicas not updated for KVServer: " + node.getNodeName());
+                success = false;
+            } else {
+                logger.error("ERROR: Replicas not updated for KVServer: " + node.getNodeName());
+                success = false;
+            }
+        } catch (IOException ex) {
+            success = false;
+            logger.error("UPDATE_ERROR: Update for KVServer failed: " + ex);
+        }
+        return success;
     } 
    
     public boolean sendMetaDataUpdate(IECSNode rNode) {
@@ -359,8 +384,17 @@ public class ECS implements IECS {
                 logger.error("Could not find next node while adding a new node!!");
                 return null;
             }
+
+            // Find the replicas of the added server
+            ArrayList<String> replicas = getReplicas(currNode);
+            for (String i : replicas) {
+                printDebug("Replica: " + i);
+            }
+            String joinedReplicas = getReplicasString(replicas);
+
             // Send metadata update and setup cache config
             success = sendMetaDataUpdate(currNode);
+            success = success & sendReplicas(currNode, joinedReplicas);
             success = success & setupNodesCacheConfigOneNode(currNode, cacheStrategy, cacheSize);
             if(nextNode != currNode) {
                 success = success & sendMetaDataUpdate(nextNode);
@@ -378,6 +412,33 @@ public class ECS implements IECS {
         }
         //Other errors ??
         return currNode; 
+    }
+
+    ArrayList<String> getReplicas(IECSNode currNode) {
+        ArrayList<String> replicas = new ArrayList<String>();
+        // Give end hash of own server
+        IECSNode primaryReplica = findNextNode(currNode.getNodeHashRange()[1]);
+        if (!primaryReplica.getNodeName().equals(currNode.getNodeName())) {
+            replicas.add(primaryReplica.getNodeName());
+            IECSNode secondaryReplica = findNextNode(primaryReplica.getNodeHashRange()[1]);
+            if(!secondaryReplica.getNodeName().equals(currNode.getNodeName())) {
+                replicas.add(secondaryReplica.getNodeName());
+            }
+        }
+        return replicas;
+    }
+
+    String getReplicasString(ArrayList<String> replicas) {
+        String joinedReplicas = "";
+        for (int i = 0; i < KVConstants.NUM_REPLICAS; ++i) {
+            if (i < replicas.size()) {
+                joinedReplicas = joinedReplicas + KVConstants.DELIM + replicas.get(i);
+            }
+            else {
+                joinedReplicas = joinedReplicas + KVConstants.DELIM + KVConstants.NULL_STRING;
+            }
+        }
+        return joinedReplicas;
     }
 
     private String getLastRemoved() {
