@@ -51,6 +51,10 @@ public class KVServer implements IKVServer, Runnable {
     private Path metaDataFile;
     private String serverFilePath;
     private String zkPath;
+
+    // This server's replicas
+    private ServerMetaData primaryReplica;
+    private ServerMetaData secondaryReplica;
     //State
     private boolean running = false;
     private boolean writeLocked = true;     //start in a stopped state
@@ -85,6 +89,9 @@ public class KVServer implements IKVServer, Runnable {
         this.serverFilePath = "SERVER_" + Integer.toString(zkPort);
         this.cache = KVCache.createKVCache(0, "FIFO");
         this.metaDataFile = Paths.get("metaDataECS.config");
+
+        this.primaryReplica = new ServerMetaData();
+        this.secondaryReplica = new ServerMetaData();
         /////////////////////// 
         //Update ZK node status
         /////////////////////// 
@@ -551,6 +558,27 @@ public class KVServer implements IKVServer, Runnable {
         return Long.toString(System.currentTimeMillis());
     }
 
+
+    public boolean updateReplicas(String pReplica, String sReplica) {
+        if (!pReplica.equals(KVConstants.NULL_STRING)) {
+            String pMetaData = getMetaDataOfServer(pReplica);
+            if(pMetaData == null) {
+                logger.error("Could not find meta data of server " + pReplica);
+                return false;
+            }
+            this.primaryReplica.updateServerMetaData(pMetaData);
+        }
+
+        if (!sReplica.equals(KVConstants.NULL_STRING)) {
+            String sMetaData = getMetaDataOfServer(sReplica);
+            if(sMetaData == null) {
+                logger.error("Could not find meta data of server " + sReplica);
+                return false;
+            }
+            this.secondaryReplica.updateServerMetaData(sMetaData);
+        }
+        return true;
+    }
 
     @Override
     public void start() {

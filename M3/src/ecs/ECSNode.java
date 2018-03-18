@@ -6,7 +6,7 @@ import common.*;
 
 public class ECSNode implements IECSNode{
     private ServerMetaData meta;
-    
+
     public ECSNode(String name, String addr, int port, BigInteger bHash, BigInteger eHash) {
         this.meta = new ServerMetaData(name, addr, port, bHash, eHash);
     }

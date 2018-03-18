@@ -17,6 +17,8 @@ public class KVConstants {
     public static final int LAUNCH_TIMEOUT = 10000;
     public static final String TIMESTAMP_DEFAULT = "00:00:00";
     public static final long SERVER_TIMESTAMP_TIMEOUT = 5000;
+    public static final int NUM_REPLICAS = 2;
+    public static final String NULL_STRING = "NULL";
     
     // Consistent Hashing
     public static final BigInteger MIN_HASH = new BigInteger("00000000000000000000000000000000", 16);
