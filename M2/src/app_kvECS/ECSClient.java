@@ -57,7 +57,6 @@ public class ECSClient implements IECSClient {
             System.out.print(PROMPT);
 
             try {
-                this.checkServersStatus();
                 String cmdLine = stdin.readLine();
                 this.handleCommand(cmdLine);
             }
@@ -67,18 +66,6 @@ public class ECSClient implements IECSClient {
                 logger.error("ESClient Application does not respond - Application terminated ");
             }
         }
-    }
-
-    private void checkServersStatus() {
-        Collection<IECSNode> nodesToRemove = new ArrayList<IECSNode>();
-        for (IECSNode node : nodesLaunched) {
-            boolean success = ecsInstance.checkServersStatus(node);
-            if(!success) {
-                //TODO make one of the replicas the new coordinator
-                nodesToRemove.add(node);
-            }
-        }
-        nodesLaunched.removeAll(nodesToRemove);
     }
 
     private void handleCommand (String cmdLine) {
@@ -504,10 +491,6 @@ public class ECSClient implements IECSClient {
             success = false;
             
         return success;
-    }
-
-    public int numNodesLaunched() {
-        return nodesLaunched.size();
     }
 
     public void addToLaunchedNodes(IECSNode node) {

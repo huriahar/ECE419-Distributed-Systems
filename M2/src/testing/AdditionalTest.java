@@ -19,7 +19,6 @@ import common.*;
 import java.lang.Process;
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.concurrent.TimeUnit;
 
 public class AdditionalTest extends TestCase {
     
@@ -328,16 +327,4 @@ public class AdditionalTest extends TestCase {
         getKVPair(kvClient, "b", "bb", StatusType.GET_SUCCESS);
     }
 
-
-   @Test
-   public void testDetectServerCrash() {
-        System.out.println("********** In 13 Test **************");
-        nodes = ecsClient.addNodes(1, "LRU", 5);
-        IECSNode node1 = nodes.iterator().next();
-        //KILL server
-        TimeUnit.SECONDS.sleep(KVConstants.SERVER_TIMESTAMP_TIMEOUT);
-        int numActiveNodes = ecsClient.numNodesLaunched();
-        ecsClient.checkServersStatus();
-        assertTrue(ecsClient.numNodesLaunched() == 0 && numActiveNodes == 1);
-   }
 }

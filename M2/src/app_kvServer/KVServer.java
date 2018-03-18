@@ -194,8 +194,6 @@ public class KVServer implements IKVServer, Runnable {
                     logger.info("Connected to " 
                             + client.getInetAddress().getHostName() 
                             +  " on port " + client.getPort());
-
-                    updateTimeStamp();
                 }
                 catch (IOException e) {
                     logger.error("Error! " +
@@ -204,21 +202,6 @@ public class KVServer implements IKVServer, Runnable {
             }
         }
         logger.info("Server stopped.");
-    }
-
-    private void updateTimeStamp() {
-        //Update timestamp on the server's Znode
-        data = zkImplServer.readData(this.zkPath);			
-        String[] info = data.split(KVConstants.SPLIT_DELIM);
-        info[3] = Long.toString(System.currentTimeMillis());
-        data = String.join(KVConstants.DELIM, info);
-        try {
-            zkImplServer.updateData(this.zkPath, data);
-        } catch (KeeperException e) {
-        	logger.error("ERROR: Unable to update ZK " + e);
-        } catch (InterruptedException e) {
-        	logger.error("ERROR: ZK Interrupted" + e);
-        }
     }
 
     private boolean isRunning() {
