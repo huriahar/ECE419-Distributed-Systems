@@ -57,8 +57,11 @@ public class ECSClient implements IECSClient {
             System.out.print(PROMPT);
 
             try {
-                String cmdLine = stdin.readLine();
-                this.handleCommand(cmdLine);
+                boolean nocrashes = this.checkServerStatus();
+                if(nocrashes) {
+                    String cmdLine = stdin.readLine();
+                    this.handleCommand(cmdLine);
+                }
             }
             catch (IOException e) {
                 stop = true;
@@ -66,6 +69,21 @@ public class ECSClient implements IECSClient {
                 logger.error("ESClient Application does not respond - Application terminated ");
             }
         }
+    }
+
+    public boolean checkServerStatus() {
+        Collection<IECSNode> nodesToRemove = new ArrayList<IECSNode>();
+        for (IECSNode node : nodesLaunched) {
+            boolean success = ecsInstance.checkServersStatus(node);
+            if(!success) {
+                logger.error("Removing " + node.getNodeName() + " from system");
+                nodesToRemove.add(node);
+                //addNode("LRU", KVConstants.DEFAULT_CACHE_SIZE);
+            }
+        }
+        //true indicates that this is a list of crashed servers
+        removeNodesDirectly(nodesToRemove, true);
+        return (nodesToRemove.size() == 0);
     }
 
     private void handleCommand (String cmdLine) {
@@ -363,8 +381,7 @@ public class ECSClient implements IECSClient {
     @Override
     public boolean shutdown() {
         boolean success = true;
-        success = ecsInstance.removeNodes(nodesLaunched);
-        if(success) nodesLaunched.clear();
+        success = removeNodesDirectly(nodesLaunched, false);
         success = success & ecsInstance.shutdown();
         return success;
     }
@@ -474,23 +491,27 @@ public class ECSClient implements IECSClient {
         return (counter == count);
     }
 
+    
+    public boolean removeNodesDirectly(Collection<IECSNode> nodes, boolean nodesCrashed) {
+        //Use ths function if you want to remove nodes given a list of
+        //nodes (as opposed to a list of node names)
+        if(ecsInstance.removeNodes(nodes, nodesCrashed)) {
+            nodesLaunched.removeAll(nodes);
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public boolean removeNodes(Collection<String> nodeNames) {
         Collection<IECSNode> nodesToRemove = new ArrayList<IECSNode>();
-        boolean success = true;
         for(String name : nodeNames) {
             for(IECSNode entry: nodesLaunched) {
                 if(entry.getNodeName().equals(name))
                     nodesToRemove.add(entry);
             }
         }
-        if(ecsInstance.removeNodes(nodesToRemove)) {
-            nodesLaunched.removeAll(nodesToRemove);
-        }
-        else 
-            success = false;
-            
-        return success;
+        return removeNodesDirectly(nodesToRemove, false);
     }
 
     public void addToLaunchedNodes(IECSNode node) {

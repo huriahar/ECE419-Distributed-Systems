@@ -5,6 +5,7 @@ import java.math.BigInteger;
 public class KVConstants {
     // Message marshalling and parsing
     public static final String DELIM = "|";
+    public static final String SPLIT_DELIM = "\\|";
     public static final String NEWLINE_DELIM = "%";
     public static final String CONFIG_DELIM = " ";
     public static final String HASH_DELIM = ":";

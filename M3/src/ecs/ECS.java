@@ -556,9 +556,8 @@ public class ECS implements IECS {
             // Also create a new znode for the node
             // Update data on znode about server config and join ZK_ROOT group
             ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
-            String data = "SERVER_STOPPED" + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort();
-            String path = KVConstants.ZK_SEP + KVConstants.ZK_ROOT + KVConstants.ZK_SEP + node.getNodeName();
-            ZKImpl.updateData(path, data);
+            String data = "SERVER_STOPPED" + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + KVConstants.TIMESTAMP_DEFAULT;
+            ZKImpl.updateData(getZKPath(node.getNodeName()), data);
             Thread.sleep(KVConstants.LAUNCH_TIMEOUT);
 
         } catch (InterruptedException ex) {
@@ -587,7 +586,7 @@ public class ECS implements IECS {
         logger.debug("DEBUG! " + dbgmsg);
     }
 
-    public boolean removeNodes(Collection<IECSNode> nodes) {
+    public boolean removeNodes(Collection<IECSNode> nodes, boolean nodesCrashed) {
         if(nodes.size() == 0) return true;
         //Need to let the node know to stop
     	BigInteger currNodeHash;    
@@ -645,7 +644,14 @@ public class ECS implements IECS {
                         logger.error("ERROR: Unable to update metaData with nodes removed");
                         success = false;
                     }
-                    success = success & shutDownOneNode(currNode);
+                    if(nodesCrashed) {
+                        //if currNode has crashed, we cannot expect to be able to send it stop
+                        //and shutdown msgs through the shutDownOneNode() function. Just put the
+                        //node back as an available server.
+                        allAvailableServers.put(currNode, "AVAILABLE");
+                    } else {
+                        success = success & shutDownOneNode(currNode);
+                    }
                     success = success & removeZKNode(currNode);
                 }
                 
@@ -913,4 +919,41 @@ public class ECS implements IECS {
         }
 		return true;
 	}
+
+    public boolean checkServersStatus(IECSNode node) {
+        //returns true if server is running
+        //false if the server has crashed
+
+        //read the server info from its znode
+        try {
+            String path = getZKPath(node.getNodeName());
+            String data = ZKImpl.readData(path);         
+            String[] info = data.split(KVConstants.SPLIT_DELIM);
+            //check if it has the default time stamp - aka server hasn't launched
+            if(info[3].equals(KVConstants.TIMESTAMP_DEFAULT)) {
+                return true;
+            }
+            //check if the last timestamp the server put is too old
+            long currentTime = System.currentTimeMillis();
+            long lastTimeStamp = 0;
+            try {
+                lastTimeStamp = Long.parseLong(info[3]);
+            } catch (NumberFormatException e) {
+                logger.error("Error while checking server timestamp! NaN: " + info[3]); 
+                //can't tell that the server has crashed!
+                return true;
+            }
+            if(currentTime - lastTimeStamp > KVConstants.SERVER_TIMESTAMP_TIMEOUT) {
+                logger.error(node.getNodeName() + " has crashed!");
+                return false;
+            }
+        } catch (KeeperException e) {
+            logger.error("While checking status, could not read znode for server " + node.getNodeName());
+            logger.error(e);
+        } catch (InterruptedException e) {
+            logger.error("While checking status, could not read znode for server " + node.getNodeName());
+            logger.error(e);
+        }
+        return true;
+    }
 }

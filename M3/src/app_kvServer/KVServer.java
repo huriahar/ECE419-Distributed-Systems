@@ -88,15 +88,18 @@ public class KVServer implements IKVServer, Runnable {
         /////////////////////// 
         //Update ZK node status
         /////////////////////// 
-        data = "SERVER_LAUNCHED" + KVConstants.DELIM + this.metadata.addr + KVConstants.DELIM + this.metadata.port;
         try {
-            zkImplServer.updateData(this.zkPath, data);
+            zkImplServer.updateData(this.zkPath, getZnodeData("SERVER_LAUNCHED", getCurrentTimeString()));
         } catch (KeeperException e) {
         	logger.error("ERROR: Unable to update ZK " + e);
         } catch (InterruptedException e) {
         	logger.error("ERROR: ZK Interrupted" + e);
         }
      }
+
+    private String getZnodeData(String status, String timestamp) {
+        return status + KVConstants.DELIM + this.metadata.addr + KVConstants.DELIM + this.metadata.port + KVConstants.DELIM + timestamp;
+    }
 
     public int getPort(){
         return this.metadata.getServerPort();
@@ -194,6 +197,9 @@ public class KVServer implements IKVServer, Runnable {
                     logger.info("Connected to " 
                             + client.getInetAddress().getHostName() 
                             +  " on port " + client.getPort());
+
+                   updateTimeStamp(); 
+
                 }
                 catch (IOException e) {
                     logger.error("Error! " +
@@ -528,13 +534,30 @@ public class KVServer implements IKVServer, Runnable {
         return true;
     }
 
+    private void updateTimeStamp() {
+        //Update timestamp on the server's Znode
+        try {
+            String data = zkImplServer.readData(this.zkPath);         
+            String[] info = data.split(KVConstants.SPLIT_DELIM);
+            zkImplServer.updateData(this.zkPath, getZnodeData(info[0], getCurrentTimeString()));
+        } catch (KeeperException e) {
+           logger.error("ERROR: Unable to update ZK " + e);
+        } catch (InterruptedException e) {
+           logger.error("ERROR: ZK Interrupted" + e);
+        }
+    }
+
+    private String getCurrentTimeString() {
+        return Long.toString(System.currentTimeMillis());
+    }
+
+
     @Override
     public void start() {
         writeLocked = false;
         readLocked = false;
-        String data = "SERVER_STARTED" + KVConstants.DELIM + this.metadata.addr + KVConstants.DELIM + this.metadata.port;
         try {
-            zkImplServer.updateData(this.zkPath, data);
+            zkImplServer.updateData(this.zkPath, getZnodeData("SERVER_STARTED", getCurrentTimeString()));
         } catch (KeeperException e) {
         	logger.error("ERROR: Unable to update ZK " + e);
         } catch (InterruptedException e) {
@@ -546,10 +569,8 @@ public class KVServer implements IKVServer, Runnable {
     public void stop() {
         writeLocked = true;
         readLocked = true;
-        String data = "SERVER_STOPPED" + KVConstants.DELIM + this.metadata.addr + KVConstants.DELIM + this.metadata.port;
         try {
-            data = zkImplServer.readData(this.zkPath);			
-            zkImplServer.updateData(this.zkPath, data);
+            zkImplServer.updateData(this.zkPath, getZnodeData("SERVER_STOPPED", getCurrentTimeString()));
         } catch (KeeperException e) {
         	logger.error("ERROR: Unable to update ZK " + e);
         } catch (InterruptedException e) {
@@ -564,9 +585,8 @@ public class KVServer implements IKVServer, Runnable {
         writeLocked = true;
         readLocked = true;
         running = false;
-        String data = "SERVER_SHUTDOWN" + KVConstants.DELIM + this.metadata.addr + KVConstants.DELIM + this.metadata.port;
         try {
-            zkImplServer.updateData(this.zkPath, data);
+            zkImplServer.updateData(this.zkPath, getZnodeData("SERVER_SHUTDOWN", getCurrentTimeString()));
         } catch (KeeperException e) {
         	logger.error("ERROR: Unable to update ZK " + e);
         } catch (InterruptedException e) {
