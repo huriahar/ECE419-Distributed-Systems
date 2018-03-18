@@ -33,7 +33,7 @@ import common.messages.TextMessage;
 
 import java.util.concurrent.TimeUnit;
 
-public class ECSReplica implements IECS {
+public class ECSReplica {
 
     private IECSNode replica1;
     private IECSNode replica2;
