@@ -51,7 +51,8 @@ public class KVServer implements IKVServer, Runnable {
     private Path metaDataFile;
     private String serverFilePath;
     private String zkPath;
-
+    // TimeStamper
+    private TimeStamper timeStamper;
     // This server's replicas
     private ServerMetaData primaryReplica;
     private ServerMetaData secondaryReplica;
@@ -102,6 +103,8 @@ public class KVServer implements IKVServer, Runnable {
         } catch (InterruptedException e) {
         	logger.error("ERROR: ZK Interrupted" + e);
         }
+        this.timeStamper = new TimeStamper(this.zkImplServer, this.zkPath);
+        new Thread(timeStamper).start();
      }
 
     private String getZnodeData(String status, String timestamp) {
@@ -555,7 +558,9 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     private String getCurrentTimeString() {
-        return Long.toString(System.currentTimeMillis());
+        String ret = Long.toString(System.currentTimeMillis());
+        System.out.println("updating kvserver's timestamp.... " + ret);
+        return ret;
     }
 
 
@@ -606,6 +611,7 @@ public class KVServer implements IKVServer, Runnable {
         } catch (Exception e) {
         	logger.error("ERROR: ZK Exception" + e);
         }
+        this.timeStamper.stop();
     }
 
     @Override
@@ -620,6 +626,7 @@ public class KVServer implements IKVServer, Runnable {
         } catch (InterruptedException e) {
         	logger.error("ERROR: ZK Interrupted" + e);
         }
+        this.timeStamper.stop();
         this.close();
     }
 

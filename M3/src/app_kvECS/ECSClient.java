@@ -392,11 +392,9 @@ public class ECSClient implements IECSClient {
         IECSNode node = null;
         if(ecsInstance.ringNetworkSize() == 0) {
             node = setupFirstNode(cacheStrategy, cacheSize);
-            System.out.println("setupFirstNode after");
             //If we couldn't find the lastRemoved... use any available
             //server
             if(ecsInstance.ringNetworkSize() == 0) {
-                System.out.println("setupFirstNode after, trying to add node");
                 node = ecsInstance.addNode(cacheStrategy, cacheSize);
             }
         }
@@ -460,7 +458,6 @@ public class ECSClient implements IECSClient {
         if(!success) {
         	logger.error("Unable to do meta data update for servers");
         }
-        System.out.println("at the end of setupFirstNode");
         return node;
     }
 

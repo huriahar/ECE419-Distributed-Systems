@@ -647,6 +647,15 @@ public class ECS implements IECS {
         logger.debug("DEBUG! " + dbgmsg);
     }
 
+    private boolean nodeInList(IECSNode node, Collection<IECSNode> nodes) {
+        for(IECSNode server: nodes) {
+            if(server.getNodeName().equals(node.getNodeName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public boolean removeNodes(Collection<IECSNode> nodes, boolean nodesCrashed) {
         if(nodes.size() == 0) return true;
         //Need to let the node know to stop
@@ -694,11 +703,19 @@ public class ECS implements IECS {
                         }
 
                         updateMetaDataFile();
-                        // Update meta data for the node AFTER the removed node
-                        // Move KVpairs from removedNode to nextNode
-                        if(!onlyOneNode) {
+                        //Only move data to the nextNode if
+                        // 1-  currNode != nextNode
+                        // 2a- we are removing functioning nodes OR
+                        // 2b- we are removing crashed nodes AND nextNode hasn't crashed (it is not in the list of crashed nodes nodesCrashed
+                        if(!onlyOneNode &&
+                            ( !nodesCrashed || (nodesCrashed && !nodeInList(nextNode, nodes)))) {
+                            // Update meta data for the node AFTER the removed node
+                            // Move KVpairs from removedNode to nextNode
                             success = sendMetaDataUpdate(nextNode);
-                            success = success & sendMoveKVPairs(currNode, nextNode, true);
+                            if(!nodesCrashed) {
+                                //if currNode has crashed, we can't ask it to move its data over!
+                                success = success & sendMoveKVPairs(currNode, nextNode, true);
+                            }
                         }
                     
                     } catch (IOException io) {
@@ -1005,7 +1022,7 @@ public class ECS implements IECS {
                 return true;
             }
             if(currentTime - lastTimeStamp > KVConstants.SERVER_TIMESTAMP_TIMEOUT) {
-                logger.error(node.getNodeName() + " has crashed!");
+                logger.error(node.getNodeName() + " has crashed! currentTime is " + currentTime + " and lastTimeStamp = " + lastTimeStamp + " and the timeout is " + KVConstants.SERVER_TIMESTAMP_TIMEOUT);
                 return false;
             }
         } catch (KeeperException e) {
