@@ -49,7 +49,10 @@ public class KVServer implements IKVServer, Runnable {
     //Metadata
     private ServerMetaData metadata;
     private Path metaDataFile;
+    private String currFilePath;
     private String serverFilePath;
+    private String pReplicaFilePath;
+    private String sReplicaFilePath;
     private String zkPath;
     // TimeStamper
     private TimeStamper timeStamper;
@@ -61,6 +64,8 @@ public class KVServer implements IKVServer, Runnable {
     private boolean writeLocked = true;     //start in a stopped state
     private boolean readLocked = true;      //start in a stopped state
     private boolean moveAll = false;
+    private boolean pReplica = false;
+    private boolean sReplica = false;
     //Default values
     private static final String UNSET_ADDR = null;
     private static final int DEFAULT_CACHE_SIZE = 5;
@@ -88,6 +93,9 @@ public class KVServer implements IKVServer, Runnable {
     	String[] zNodeData = data.split("\\" + KVConstants.DELIM);
     	this.metadata = new ServerMetaData(name, zNodeData[1], Integer.parseInt(zNodeData[2]), null, null);
         this.serverFilePath = "SERVER_" + Integer.toString(zkPort);
+        this.pReplicaFilePath = "SERVER_" + Integer.toString(zkPort) + "_PRIMARY";
+        this.sReplicaFilePath = "SERVER_" + Integer.toString(zkPort) + "_SECONDARY";
+        this.currFilePath = this.serverFilePath;
         this.cache = KVCache.createKVCache(0, "FIFO");
         this.metaDataFile = Paths.get("metaDataECS.config");
 
@@ -130,6 +138,27 @@ public class KVServer implements IKVServer, Runnable {
     public int getCacheSize(){
         return this.cache.getCacheSize();
     }
+
+    public String getServerFilePath(){
+        return this.serverFilePath;
+    }
+
+    public String getPReplicaFilePath(){
+        return this.pReplicaFilePath;
+    }
+
+    public String getSReplicaFilePath(){
+        return this.sReplicaFilePath;
+    }
+
+    public String getCurrFilePath(){
+        return this.currFilePath;
+    }
+
+    public void setCurrFilePath(String path){
+        this.currFilePath = path;
+    }
+
 
     public void setupCache(int size, String strategy) {
         this.cache = KVCache.createKVCache(size, strategy);
@@ -337,7 +366,7 @@ public class KVServer implements IKVServer, Runnable {
 
 
     public void storeKV(String key, String value) throws IOException {
-        String filePath  = this.serverFilePath;
+        String filePath  = this.currFilePath;
         BufferedWriter wr  = null;
         PrintWriter pw = null;
         boolean toBeDeleted = false; 
@@ -406,7 +435,7 @@ public class KVServer implements IKVServer, Runnable {
 
         String key_val;
         String KVPair;
-        String filePath  = this.serverFilePath; 
+        String filePath  = this.currFilePath; 
         StringBuffer stringBuffer = new StringBuffer();            
         BufferedReader br = null;
         BufferedWriter wr  = null;
@@ -564,25 +593,46 @@ public class KVServer implements IKVServer, Runnable {
     }
 
 
-    public boolean updateReplicas(String pReplica, String sReplica) {
-        if (!pReplica.equals(KVConstants.NULL_STRING)) {
-            String pMetaData = getMetaDataOfServer(pReplica);
+    public boolean updateReplicas(String pReplicaName, String sReplicaName) {
+        boolean success = true;
+        logger.debug("Inside updateReplica");
+        if (!pReplicaName.equals(KVConstants.NULL_STRING)) {
+            String pMetaData = getMetaDataOfServer(pReplicaName);
             if(pMetaData == null) {
-                logger.error("Could not find meta data of server " + pReplica);
+                logger.error("Could not find meta data of server " + pReplicaName);
                 return false;
             }
+
             this.primaryReplica.updateServerMetaData(pMetaData);
+            String[] pHash = {primaryReplica.getBeginHash().toString(), KVConstants.DELIM,  primaryReplica.getEndHash().toString()};            
+            try{
+                this.pReplica = true;
+                success = moveData(pHash, pReplicaName);
+                this.pReplica = false;
+            } catch (Exception o) {
+                logger.error("MoveData failed for primaryReplica");
+            }
         }
 
-        if (!sReplica.equals(KVConstants.NULL_STRING)) {
-            String sMetaData = getMetaDataOfServer(sReplica);
+        if (!sReplicaName.equals(KVConstants.NULL_STRING)) {
+            String sMetaData = getMetaDataOfServer(sReplicaName);
             if(sMetaData == null) {
-                logger.error("Could not find meta data of server " + sReplica);
+                logger.error("Could not find meta data of server " + sReplicaName);
                 return false;
             }
             this.secondaryReplica.updateServerMetaData(sMetaData);
+            String[] sHash = {secondaryReplica.getBeginHash().toString(), KVConstants.DELIM, secondaryReplica.getEndHash().toString()};            
+            try {
+                this.sReplica = true;
+                success = moveData(sHash, sReplicaName);
+                this.sReplica = false;
+            } catch (Exception o) {
+                logger.error("MoveData failed for primaryReplica");
+            }
         }
-        return true;
+
+        //Connect with each replica and send it all the data you have
+        return success;
     }
 
     @Override
@@ -665,6 +715,19 @@ public class KVServer implements IKVServer, Runnable {
         lockWrite();
         StringBuilder toSend = new StringBuilder();
         toSend.append("MOVE_KVPAIRS" + KVConstants.DELIM);
+        if(pReplica) {
+            logger.debug("Writing to pReplica : " + targetName);
+            toSend.append("PREPLICA" + KVConstants.DELIM);    
+        }
+        else if(sReplica) {
+            logger.debug("Writing to sReplica: " + targetName);
+            toSend.append("SREPLICA" + KVConstants.DELIM);    
+        }
+        else {
+            logger.debug("Writing to Coordinator: " + targetName);
+            toSend.append("COORDINATOR" + KVConstants.DELIM);        
+        }
+        logger.debug("Command is: " + toSend.toString());
         boolean found = false;
         boolean success = true;
         ArrayList<String> toDelete = new ArrayList<>(); 
@@ -682,7 +745,9 @@ public class KVServer implements IKVServer, Runnable {
                         logger.debug(getHostname() + " not responsible for key " + kvp[0]);
                         found = true;
                         toSend.append(line + KVConstants.NEWLINE_DELIM);
-                        toDelete.add(kvp[0]);
+                        if(!(pReplica || sReplica)) {
+                            toDelete.add(kvp[0]);
+                        }
                     }
                     else {
                         logger.debug(getHostname() + " responsible for key " + kvp[0]);
@@ -690,6 +755,7 @@ public class KVServer implements IKVServer, Runnable {
                 }
             }
             else {
+                // TODO we don't need to creat a file. putKV will do it on its own
                 serverPath = Files.createFile(serverPath);
             }
         } catch (IOException e) {
@@ -706,6 +772,8 @@ public class KVServer implements IKVServer, Runnable {
             sender.disconnect();
             success = (reply.getMsg().equals("MOVE_SUCCESS"));
             if(success) {
+                logger.debug("Number of keys to delete: " + toDelete.size());
+                //For replicas, toDelete should be empty
                 for(String key: toDelete) {
                     deleteKV(key);
                 }

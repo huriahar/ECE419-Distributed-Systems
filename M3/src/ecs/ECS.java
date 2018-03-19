@@ -262,12 +262,15 @@ public class ECS implements IECS {
         }               
     }
 
-    public boolean sendReplicas(IECSNode node, String replicas) {
+    public boolean sendReplicas(IECSNode node) {
         boolean success = true;
+        // Find the replicas of the given server
+        ArrayList<String> replicas = getReplicas(node);
+        String joinedReplicas = getReplicasString(replicas);
         TextMessage response, message;
         // Step 1
         // Ask the rNode to update its replicas
-        message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_REPLICAS" + replicas);
+        message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_REPLICAS" + joinedReplicas);
         try {
             response = sendNodeMessage(message, node);
             if(response.getMsg().equals("REPLICA_UPDATE_SUCCESS")) {
@@ -282,7 +285,7 @@ public class ECS implements IECS {
             }
         } catch (IOException ex) {
             success = false;
-            logger.error("UPDATE_ERROR: Update for KVServer failed: " + ex);
+            logger.error("REPLICA_UPDATE_FAILED: Update for KVServer failed: " + ex);
         }
         return success;
     } 
@@ -296,10 +299,10 @@ public class ECS implements IECS {
         message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_METADATA");
         try {
             response = sendNodeMessage(message, rNode);
-            if(response.getMsg().equals("UPDATE_SUCCESS")) {
+            if(response.getMsg().equals("METADATA_UPDATE_SUCCESS")) {
                 logger.info("SUCCESS: MetaData updated for KVServer: " + rNode.getNodeName());
             }
-            else if(response.getMsg().equals("UPDATE_FAILED")) {
+            else if(response.getMsg().equals("METADATA_UPDATE_FAILED")) {
                 logger.error("ERROR: MetaData not updated for KVServer: " + rNode.getNodeName());
                 success = false;
             } else {
@@ -308,7 +311,7 @@ public class ECS implements IECS {
             }
         } catch (IOException ex) {
             success = false;
-            logger.error("UPDATE_ERROR: Update for KVServer failed: " + ex);
+            logger.error("METADATA_UPDATE_ERROR: Update for KVServer failed: " + ex);
         }
         return success;
     }
@@ -385,16 +388,8 @@ public class ECS implements IECS {
                 return null;
             }
 
-            // Find the replicas of the added server
-            ArrayList<String> replicas = getReplicas(currNode);
-            for (String i : replicas) {
-                printDebug("Replica: " + i);
-            }
-            String joinedReplicas = getReplicasString(replicas);
-
             // Send metadata update and setup cache config
             success = sendMetaDataUpdate(currNode);
-            success = success & sendReplicas(currNode, joinedReplicas);
             success = success & setupNodesCacheConfigOneNode(currNode, cacheStrategy, cacheSize);
             if(nextNode != currNode) {
                 success = success & sendMetaDataUpdate(nextNode);
@@ -402,6 +397,19 @@ public class ECS implements IECS {
             } else {
                 logger.debug("nextNode is the same as currNode");
             }
+
+            //Updating replicas of previous nodes and currNodes
+            IECSNode prevNode = findPrevNode(currNode);
+            if(prevNode != currNode) {
+                success = success & sendReplicas(prevNode);
+            }
+            
+            IECSNode prevPrevNode = findPrevNode(prevNode);
+            if(prevPrevNode != currNode) {
+                success = success & sendReplicas(prevPrevNode);
+            }
+            success = success & sendReplicas(currNode);
+
             if(!success) {
                 logger.error("in addNode: unable to update metaData in Servers");
             }
@@ -658,6 +666,7 @@ public class ECS implements IECS {
 
     public boolean removeNodes(Collection<IECSNode> nodes, boolean nodesCrashed) {
         if(nodes.size() == 0) return true;
+        logger.debug("In Remove Nodes");
         //Need to let the node know to stop
     	BigInteger currNodeHash;    
         IECSNode nextNode = null, currNode = null, node;
@@ -752,17 +761,23 @@ public class ECS implements IECS {
         return true;
     }
 
-    public BigInteger findPrevKey(BigInteger currHash) {
+    public IECSNode findPrevNode(IECSNode node) {
+        IECSNode prevNode = new ECSNode();
+        BigInteger currHash = node.getNodeHashRange()[1];
+        //We only want to return null if ring is empty or node not in ring
         if(ringNetwork.size() < 1) {
-            return new BigInteger("0", 16);
+            prevNode = null;
         } else {
             if(ringNetwork.lowerKey(currHash) == null) {
-                return ringNetwork.lastKey();
+                BigInteger keyHash = ringNetwork.lastKey();
+                prevNode = ringNetwork.get(keyHash);
             }
             else {
-                return ringNetwork.lowerKey(currHash);
+                BigInteger keyHash = ringNetwork.lowerKey(currHash);
+                prevNode = ringNetwork.get(keyHash);
             }
         }
+        return prevNode;
     }
 
     public IECSNode findNextNode(BigInteger currHash) {

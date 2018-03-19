@@ -10,6 +10,12 @@ import java.util.Arrays;
 import common.messages.TextMessage;
 import common.KVConstants;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import java.nio.file.*;
+
 import org.apache.log4j.*;
 
 
@@ -74,9 +80,6 @@ public class ClientConnection implements Runnable {
                     }
                     String value = String.join(KVConstants.DELIM, valueParts);
                     String key = null;
-                    if(msgContent.length > 1){
-                        key = msgContent[1];
-                    }
                     boolean success = true;
                     logger.debug("step 5");
                     if (command.equals("ECS")) {
@@ -86,13 +89,60 @@ public class ClientConnection implements Runnable {
                     }
                     else if(command.equals("MOVE_KVPAIRS")) {
                         // Receiving KVPairs from another server
-                        if(key != null) {
-                            success = handleMoveKVPairs(key + KVConstants.DELIM + value);
+                        System.out.println("************Received Move KV Pairs from someone**********");
+                        String destination = msgContent[1];
+                        System.out.println("New destination is:" + destination);
+                        System.out.println("Initial path is:" + this.server.getCurrFilePath());
+                        if(destination.equals("COORDINATOR")) {
+                            this.server.setCurrFilePath(this.server.getServerFilePath());
+                        }
+                        else if(destination.equals("PREPLICA")) {
+                            // TODO DELETE THE current pReplica file
+                            String pReplicaFile = this.server.getPReplicaFilePath();
+                            System.out.println("pReplica File is:" + pReplicaFile);
+                            try {
+                                Files.deleteIfExists(Paths.get(pReplicaFile));
+                            } catch (NoSuchFileException x) {
+                                System.out.println("No such file or directory");
+                            } catch (DirectoryNotEmptyException x) {
+                                System.out.println("Directory not empty");
+                            } catch (IOException x) {
+                                // File permission problems are caught here.
+                                System.out.println("Permissions problems");
+                            }
+                            System.out.println("Delete old file");
+                            this.server.setCurrFilePath(pReplicaFile);
+                        }
+                        else if(destination.equals("SREPLICA")) {
+                            // TODO DELETE THE current sReplica file
+                            String sReplicaFile = this.server.getSReplicaFilePath();
+                            try {
+                                Files.deleteIfExists(Paths.get(sReplicaFile));
+                            } catch (NoSuchFileException x) {
+                                System.out.println("No such file or directory");
+                            } catch (DirectoryNotEmptyException x) {
+                                System.out.println("Directory not empty");
+                            } catch (IOException x) {
+                                // File permission problems are caught here.
+                                System.out.println("Permissions problems");
+                            }
+                            
+                            this.server.setCurrFilePath(this.server.getSReplicaFilePath());
+                        }
+                        System.out.println("File path before call is:" + this.server.getCurrFilePath());
+
+                        if(msgContent.length > 2){
+                            success = handleMoveKVPairs(value);
                             String res = success ? "MOVE_SUCCESS" : "MOVE_FAILED";
                             sendMessage(new TextMessage(res));
                             logger.info(res);
+                            this.server.setCurrFilePath(this.server.getServerFilePath());
+                            System.out.println("End File path is:" + this.server.getCurrFilePath());
                             continue;
-                        }
+                        }                        
+                    }
+                    if(msgContent.length > 1){
+                        key = msgContent[1];
                     }
                     logger.debug("step 6");
                     //Just a guard
@@ -254,22 +304,26 @@ public class ClientConnection implements Runnable {
                 case "UPDATE_METADATA":
                     success = server.updateMetaData();
                     if(success) {
-                        sendMessage(new TextMessage("UPDATE_SUCCESS"));
+                        sendMessage(new TextMessage("METADATA_UPDATE_SUCCESS"));
                     } else {
-                        sendMessage(new TextMessage("UPDATE_FAILED"));
+                        sendMessage(new TextMessage("METADATA_UPDATE_FAILED"));
                     }
                     return;
                 case "UPDATE_REPLICAS":
+                    server.setMoveAll(true);
                     System.out.println("Here at UPDATE_REPLICAS");
                     String primaryReplica = msg[1];
                     String secondaryReplica = msg[2];
                     System.out.println("Replicas received: " + primaryReplica + " " + secondaryReplica);
                     success = server.updateReplicas(primaryReplica, secondaryReplica);
                     if(success) {
+                        System.out.println("REPLICAS UPDATED");
                         sendMessage(new TextMessage("REPLICA_UPDATE_SUCCESS"));
                     } else {
+                        System.out.println("REPLICAS NOT UPDATED");
                         sendMessage(new TextMessage("REPLICA_UPDATE_FAILED"));
                     }
+                    server.setMoveAll(false);
                     return;
                 default:
                     logger.error("Unknown ECS cmd!");
