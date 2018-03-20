@@ -128,6 +128,8 @@ public class ClientConnection implements Runnable {
                             TextMessage getMetaData = receiveMessage();
                             if(getMetaData.getMsg().equals("GET_METADATA")) {
                                 sendMessage(new TextMessage(server.getMetaDataFromFile()));
+                                System.out.println(server.getServerReplicas());
+                                sendMessage(new TextMessage(server.getServerReplicas()));
                             } else {
                                 logger.info("ERROR!!! EXPECTED TO RECEIVE GET_METADATA MSG!!");
                             }

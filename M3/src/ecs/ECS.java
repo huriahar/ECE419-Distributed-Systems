@@ -271,6 +271,16 @@ public class ECS implements IECS {
         // Ask the rNode to update its replicas
         message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_REPLICAS" + joinedReplicas);
         try {
+            try {
+                String data = ZKImpl.readData(getZKPath(node.getNodeName()));
+                String[] splitData = data.split(KVConstants.SPLIT_DELIM);
+                data = splitData[0]+KVConstants.DELIM +splitData[1]+KVConstants.DELIM +splitData[2]+KVConstants.DELIM +splitData[3]+joinedReplicas;
+                ZKImpl.updateData(getZKPath(node.getNodeName()), data);
+            } catch (KeeperException e) {
+                System.out.println("Error cannot update znode replicas");
+            } catch (InterruptedException e) {
+                System.out.println("Error cannot update znode replicas");
+            }
             response = sendNodeMessage(message, node);
             if(response.getMsg().equals("REPLICA_UPDATE_SUCCESS")) {
                 logger.info("SUCCESS: Replicas updated for KVServer: " + node.getNodeName());
@@ -401,20 +411,23 @@ public class ECS implements IECS {
             IECSNode prevNode = findPrevNode(currNode);
             if(prevNode != currNode) {
                 success = success & sendReplicas(prevNode);
+                logger.debug("Step 1");
             }
             
             IECSNode prevPrevNode = findPrevNode(prevNode);
             if(prevPrevNode != currNode) {
                 success = success & sendReplicas(prevPrevNode);
+                logger.debug("Step 2");
             }
             success = success & sendReplicas(currNode);
+            logger.debug("Step 3");
 
             if(!success) {
                 logger.error("in addNode: unable to update metaData in Servers");
             }
+    
 
-        }
-        catch (IOException io) {
+        }catch (IOException io) {
             logger.error("Unable to write to metaDataFile"); 
         }
         //Other errors ??
@@ -624,7 +637,7 @@ public class ECS implements IECS {
             // Also create a new znode for the node
             // Update data on znode about server config and join ZK_ROOT group
             ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
-            String data = "SERVER_STOPPED" + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + KVConstants.TIMESTAMP_DEFAULT;
+            String data = "SERVER_STOPPED" + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + KVConstants.TIMESTAMP_DEFAULT + KVConstants.DELIM + KVConstants.NULL_STRING + KVConstants.DELIM + KVConstants.NULL_STRING;
             ZKImpl.updateData(getZKPath(node.getNodeName()), data);
             Thread.sleep(KVConstants.LAUNCH_TIMEOUT);
 

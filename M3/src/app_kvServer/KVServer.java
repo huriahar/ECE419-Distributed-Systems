@@ -124,7 +124,18 @@ public class KVServer implements IKVServer, Runnable {
      }
 
     private String getZnodeData(String status, String timestamp) {
-        return status + KVConstants.DELIM + this.metadata.addr + KVConstants.DELIM + this.metadata.port + KVConstants.DELIM + timestamp;
+        String data = "";
+        try {
+            String[] info = zkImplServer.readData(this.zkPath).split(KVConstants.SPLIT_DELIM);
+            info[0] = status;
+            info[3] = timestamp;
+            data = String.join(KVConstants.DELIM, info);
+        } catch (KeeperException e) {
+            logger.error("ERROR: Unable to update ZK " + e);
+        } catch (InterruptedException e) {
+            logger.error("ERROR: ZK Interrupted" + e);
+        }
+        return data;
     }
 
     public int getPort(){
@@ -692,12 +703,36 @@ public class KVServer implements IKVServer, Runnable {
         }
     }
 
+    public String getServerReplicas() {
+        StringBuilder marshalledData = new StringBuilder();
+        try {
+            ArrayList<String> metaDataLines = new ArrayList<>(Files.readAllLines(this.metaDataFile,
+                                                         StandardCharsets.UTF_8));
+            for (int i = 0; i < metaDataLines.size(); ++i) {
+                String[] metaData = metaDataLines.get(i).split(KVConstants.SPLIT_DELIM);
+                String zkServerPath = KVConstants.ZK_SEP + KVConstants.ZK_ROOT + KVConstants.ZK_SEP + metaData[ServerMetaData.SERVER_NAME];
+                String[] znodedata = zkImplServer.readData(zkServerPath).split(KVConstants.SPLIT_DELIM);
+                marshalledData.append(metaData[ServerMetaData.SERVER_NAME] + KVConstants.DELIM + znodedata[4] + KVConstants.DELIM + znodedata[5] + KVConstants.NEWLINE_DELIM);
+            }
+        } catch (IOException e) {
+            marshalledData.append("REPLICA_FETCH_ERROR");
+            logger.error("REPLICA_FETCH_ERROR could not fetch meta data: " + e);
+        } catch (KeeperException ex) {
+            marshalledData.append("REPLICA_FETCH_ERROR");
+            logger.error("REPLICA_FETCH_ERROR Could not read zkInfo");
+        } catch (InterruptedException ex) {
+            marshalledData.append("Interrupted");
+            logger.error("Interrupted: Could not read zkInfo");
+        }
+        return marshalledData.toString();
+    }
+
     public String getMetaDataFromFile() {
         StringBuilder marshalledData = new StringBuilder();
         try {
-            ArrayList<String> metaData = new ArrayList<>(Files.readAllLines(this.metaDataFile,
+            ArrayList<String> metaDataLines = new ArrayList<>(Files.readAllLines(this.metaDataFile,
                                                          StandardCharsets.UTF_8));
-            for(String line : metaData) {
+            for(String line : metaDataLines) {
                 marshalledData.append(line + KVConstants.NEWLINE_DELIM);
             }
         } catch (IOException e) {
