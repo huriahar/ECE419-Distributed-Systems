@@ -62,17 +62,17 @@ public class ClientConnection implements Runnable {
         try {
             output = clientSocket.getOutputStream();
             input = clientSocket.getInputStream();
-        
+
             sendMessage(new TextMessage(
                     "Connection to KV server established: " 
                     + clientSocket.getLocalAddress() + " / "
                     + clientSocket.getLocalPort()));
-            
+
             while (isOpen) {
                 try {
                     TextMessage msgReceived = receiveMessage();
                     // Unmarshalling of received message
-                    String[] msgContent = msgReceived.getMsg().split("\\" + KVConstants.DELIM);
+                    String[] msgContent = msgReceived.getMsg().split(KVConstants.SPLIT_DELIM);
                     String command = msgContent[0];
                     // Key cannot contain DELIM, but value can
                     // So combine all strings from msgContent[2] till end to get value
@@ -90,60 +90,17 @@ public class ClientConnection implements Runnable {
                     }
                     else if (command.equals("MOVE_KVPAIRS")) {
                         // Receiving KVPairs from another server
-                        System.out.println("************Received Move KV Pairs from someone**********");
                         String destination = msgContent[1];
-                        System.out.println("New destination is:" + destination);
-                        System.out.println("Initial path is:" + this.server.getCurrFilePath());
-                        if(destination.equals("COORDINATOR")) {
-                            this.server.setCurrFilePath(this.server.getServerFilePath());
-                        }
-                        else if (destination.equals(KVConstants.PREPLICA)) {
-                            // TODO DELETE THE current pReplica file
-                            String pReplicaFile = this.server.getPReplicaFilePath();
-                            System.out.println("pReplica File is:" + pReplicaFile);
-                            try {
-                                Files.deleteIfExists(Paths.get(pReplicaFile));
-                            } catch (NoSuchFileException x) {
-                                System.out.println("No such file or directory");
-                            } catch (DirectoryNotEmptyException x) {
-                                System.out.println("Directory not empty");
-                            } catch (IOException x) {
-                                // File permission problems are caught here.
-                                System.out.println("Permissions problems");
-                            }
-                            System.out.println("Delete old file");
-                            this.server.setCurrFilePath(pReplicaFile);
-                        }
-                        else if (destination.equals(KVConstants.SREPLICA)) {
-                            // TODO DELETE THE current sReplica file
-                            String sReplicaFile = this.server.getSReplicaFilePath();
-                            try {
-                                Files.deleteIfExists(Paths.get(sReplicaFile));
-                            } catch (NoSuchFileException x) {
-                                System.out.println("No such file or directory");
-                            } catch (DirectoryNotEmptyException x) {
-                                System.out.println("Directory not empty");
-                            } catch (IOException x) {
-                                // File permission problems are caught here.
-                                System.out.println("Permissions problems");
-                            }
-                            
-                            this.server.setCurrFilePath(this.server.getSReplicaFilePath());
-                        }
-                        System.out.println("File path before call is:" + this.server.getCurrFilePath());
-
-                        if(msgContent.length > 2){
-                            success = handleMoveKVPairs(value);
+                        if (msgContent.length > 2) {
+                            success = server.handleMoveKVPairs(destination, value);
                             String res = success ? "MOVE_SUCCESS" : "MOVE_FAILED";
                             sendMessage(new TextMessage(res));
                             logger.info(res);
-                            this.server.setCurrFilePath(this.server.getServerFilePath());
-                            System.out.println("End File path is:" + this.server.getCurrFilePath());
-                            continue;
-                        }                        
+                        }
+                        continue;
                     }
                     else if (command.equals("UPDATE")) {
-                        System.out.println("Received UPDATE msg");
+                        // Add / Update / Delete of a single KVPair
                         String destination = msgContent[1];
                         String action = msgContent[2];
                         String updateKey = msgContent[3];
@@ -162,19 +119,16 @@ public class ClientConnection implements Runnable {
                         if(msgContent.length > 1){
                             key = msgContent[1];
                         }
-                        logger.debug("step 6");
                         //Just a guard
                         if(key == null) {
-                            logger.debug("key is null");
+                            logger.debug("Error! key is null!!");
                             continue;
                         }
-                        System.out.println("Is server stopped? "  + server.isStopped());
                         if (server.isStopped()) {
                             sendMessage(new TextMessage("SERVER_STOPPED"));
                             logger.info("SERVER_STOPPED cannot handle client requests at the moment.");
                             continue;
                         }
-                        System.out.println("Is server responsible? "  + server.isResponsible(key));
                         // Check if server is responsible for this key
                         if (!server.isResponsible(key)){
                             sendMessage(new TextMessage("SERVER_NOT_RESPONSIBLE"));
@@ -195,13 +149,12 @@ public class ClientConnection implements Runnable {
                             handlePutCmd(key, value);
                         }
                         else if (command.equals("GET")) {
-                            if(!server.isReadLocked()) {
-                                handleGetCmd(key);
-                            } else {
+                            if(server.isReadLocked()) {
                                 sendMessage(new TextMessage("SERVER_STOPPED"));
                                 logger.info("SERVER_READ_LOCKED cannot handle client requests at the moment.");
                                 continue;
                             }
+                            handleGetCmd(key);
                         }
                         else {
                             logger.error("Received invalid message type from client.");
@@ -257,23 +210,6 @@ public class ClientConnection implements Runnable {
             result = false;
         }
         return result;
-    }
-
-    private boolean handleMoveKVPairs(String kvpairs) {
-        if(kvpairs == null) return true;
-        logger.debug(kvpairs);
-        String[] KVPairs = kvpairs.split(KVConstants.NEWLINE_DELIM);
-        for(int i = 0; i < KVPairs.length ; i++) {
-            String[] kvpair = KVPairs[i].split("\\" + KVConstants.DELIM);
-            logger.debug("MOVING KVPAIR " + kvpair[0] + kvpair[1]);
-            try {
-                server.putKV(kvpair[0], kvpair[1]);
-            } catch (Exception e) {
-                logger.error("failed to move KVpair (" + kvpair[0] + ", " + kvpair[1] + ") to server " + server.getHostname());
-                return false;
-            }
-        }
-        return true;
     }
 
     private void handleECSCmd (String[] msg) {

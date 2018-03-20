@@ -18,7 +18,9 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -356,13 +358,114 @@ public class KVServer implements IKVServer, Runnable {
             }
         }
 
-        return value;        
+        return value;
     }
 
     @Override
     public void deleteKV(String key) throws Exception {
         this.cache.delete(key);
         storeKV(key, "");
+    }
+
+    public boolean handleMoveKVPairs (String destination, String KVPairs) {
+        if (KVPairs == null) return true;
+        boolean success = true;
+        if (destination.equals(KVConstants.PREPLICA)) {
+            // DELETE THE current pReplica file
+            try {
+                Files.deleteIfExists(Paths.get(pReplicaFilePath));
+            } catch (NoSuchFileException ex) {
+                logger.error("No such file or directory " + ex);
+                success = false;
+            } catch (DirectoryNotEmptyException ex) {
+                logger.error("Directory not empty " + ex);
+                success = false;
+            } catch (IOException ex) {
+                // File permission problems are caught here.
+                logger.error("Permission problems " + ex);
+                success = false;
+            }
+            setCurrFilePath(pReplicaFilePath);
+        }
+        else if (destination.equals(KVConstants.SREPLICA)) {
+            // DELETE THE current sReplica file
+            try {
+                Files.deleteIfExists(Paths.get(sReplicaFilePath));
+            } catch (NoSuchFileException ex) {
+                logger.error("Directory not empty " + ex);
+                success = false;
+            } catch (DirectoryNotEmptyException ex) {
+                logger.error("Directory not empty " + ex);
+                success = false;
+            } catch (IOException ex) {
+                // File permission problems are caught here.
+                logger.error("Permission problems " + ex);
+                success = false;
+            }
+            setCurrFilePath(sReplicaFilePath);
+        }
+        else if (destination.equals(KVConstants.COORDINATOR)) {
+            setCurrFilePath(serverFilePath);
+        }
+        else {
+        	logger.error("MOVE_KVPAIRS destination is not COORDINATOR/PREPLICA/SREPLICA!");
+        	success = false;
+        }
+        logger.debug("KVPairs: " + KVPairs);
+        String[] kvPairs = KVPairs.split(KVConstants.NEWLINE_DELIM);
+
+        for(int i = 0; i < kvPairs.length ; ++i) {
+            String[] kvpair = kvPairs[i].split(KVConstants.SPLIT_DELIM);
+            logger.debug("MOVING KVPAIR " + kvpair[0] + " " + kvpair[1]);
+            try {
+                // POTENTIAL ISSUE! May not want to add KV pair to cache
+                putKV(kvpair[0], kvpair[1]);
+            } catch (Exception e) {
+                logger.error("failed to move KVpair (" + kvpair[0] + ", " + kvpair[1] + ") to server " + getHostname());
+                success = false;
+            }
+        }
+        setCurrFilePath(serverFilePath);
+        return success;
+    }
+
+    private boolean appendToFile (String fileName, String key, String value) {
+        BufferedWriter wr  = null;
+        boolean success = true;
+        try {
+            File file = new File(fileName);
+
+            FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
+            FileLock lock = null;
+            try {
+                lock = channel.tryLock();
+            } catch (OverlappingFileLockException e) {
+                 logger.error("Overlapping File Lock Error: " + e.getMessage());
+            }
+
+            if (lock != null) {
+                if (!file.exists()) {
+                    file.createNewFile();
+                }
+
+                FileWriter fw = new FileWriter(file, true);
+                wr = new BufferedWriter(fw);
+                String KVPair = key + "|" + value + "\n";
+                wr.write(KVPair);
+                wr.close();
+                lock.release();
+            }
+            else {
+                System.out.println("Did not acquire file lock!");
+                success = false;
+            }
+            channel.close();
+        }
+        catch (IOException io) {
+            io.printStackTrace();
+            success = false;
+        }
+        return success;
     }
 
     public boolean handleUpdateKVPair (String destination, String action, String key, String value) {
@@ -377,48 +480,12 @@ public class KVServer implements IKVServer, Runnable {
         }
         else {
             logger.error("UPDATE destination should always be PREPLICA or SREPLICA!");
-            success = false;
-            return success;
+            return false;
         }
-
-        BufferedWriter wr  = null;
 
         if (action.equals(ReplicaDataAction.NEW.name())) {
             // It is a new KV pair - Append to the end of replica file
-            try {
-                File file = new File(currFilePath);
-
-                FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
-                FileLock lock = null;
-                try {
-                    lock = channel.tryLock();
-                } catch (OverlappingFileLockException e) {
-                     logger.error("Overlapping File Lock Error: " + e.getMessage());
-                }
-
-                if (lock != null) {
-                    if (!file.exists()) {
-                        file.createNewFile();
-                    }
-
-                    FileWriter fw = new FileWriter(file, true);
-                    wr = new BufferedWriter(fw);
-                    String KVPair = key + "|" + value + "\n";
-                    wr.write(KVPair);
-                    wr.close();
-                    lock.release();
-                }
-                else {
-                    System.out.println("Did not acquire file lock!");
-                    success = false;
-                }
-
-                channel.close();
-            }
-            catch (IOException io) {
-                io.printStackTrace();
-                success = false;
-            }
+            appendToFile(currFilePath, key, value);
         }
         else if (action.equals(ReplicaDataAction.UPDATE.name()) || action.equals(ReplicaDataAction.DELETE.name())) {
             boolean delete = (action.equals(ReplicaDataAction.DELETE.name())) ? true : false;
@@ -493,7 +560,6 @@ public class KVServer implements IKVServer, Runnable {
     public void storeKV(String key, String value) throws IOException {
         String filePath  = this.currFilePath;
         BufferedWriter wr  = null;
-        PrintWriter pw = null;
         boolean toBeDeleted = false; 
 
         String curVal = onDisk(key);
@@ -502,59 +568,15 @@ public class KVServer implements IKVServer, Runnable {
         }
 
         if(!curVal.equals("")) {
-                //rewrite entire file back with new values
+            //rewrite entire file back with new values
             writeNewFile(key, value, toBeDeleted);
             ReplicaDataAction action = toBeDeleted ? ReplicaDataAction.DELETE : ReplicaDataAction.UPDATE;
             sendToReplicas(key, value, action);
         }
-        else{
+        else {
             if(!toBeDeleted) {
-                
-                //simply append it to the end
-                try {
-                    File file = new File(filePath);
-                
-                    FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
-                    FileLock lock = channel.lock();            
-    
-                    try {
-                        lock = channel.tryLock();
-
-                    } catch (OverlappingFileLockException e) {
-                         //logger.error("Overlapping File Lock Error: " + e.getMessage());
-                    }
-
-                    if (!file.exists()) {
-                        file.createNewFile();
-                    }
-                
-                    FileWriter fw = new FileWriter(file, true);
-                    wr = new BufferedWriter(fw);
-                    pw = new PrintWriter(wr);
-                    String KVPair = key + "|" + value ;    
-                    pw.println(KVPair);
-
-                    lock.release();
-                    channel.close();
-
-                    sendToReplicas(key, value, ReplicaDataAction.NEW);
-
-                } catch (IOException io) {
-                
-                    io.printStackTrace();
-                }
-                    
-                finally
-                {
-                    try{
-                        if(wr!=null) {
-                            wr.close();
-                        }
-                
-                    } catch(Exception ex){
-                        logger.error("Error in closing the BufferedWriter"+ex);
-                    }
-                }
+                appendToFile(filePath, key, value);
+                sendToReplicas(key, value, ReplicaDataAction.NEW);
             }
         }
     }
