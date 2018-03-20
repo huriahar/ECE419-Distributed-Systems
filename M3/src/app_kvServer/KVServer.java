@@ -94,6 +94,14 @@ public class KVServer implements IKVServer, Runnable {
         this.serverFilePath = "SERVER_" + Integer.toString(zkPort);
         this.pReplicaFilePath = "SERVER_" + Integer.toString(zkPort) + "_PRIMARY";
         this.sReplicaFilePath = "SERVER_" + Integer.toString(zkPort) + "_SECONDARY";
+        // Delete Replica files, if they exist
+        try {
+            Files.deleteIfExists(Paths.get(pReplicaFilePath));
+            Files.deleteIfExists(Paths.get(sReplicaFilePath));
+        } catch (IOException ex) {
+            // File permission problems are caught here.
+            logger.error("Permission problems " + ex);
+        }
         this.currFilePath = this.serverFilePath;
         this.cache = KVCache.createKVCache(0, "FIFO");
         this.metaDataFile = Paths.get("metaDataECS.config");
@@ -370,12 +378,6 @@ public class KVServer implements IKVServer, Runnable {
             // DELETE THE current pReplica file
             try {
                 Files.deleteIfExists(Paths.get(pReplicaFilePath));
-            } catch (NoSuchFileException ex) {
-                logger.error("No such file or directory " + ex);
-                success = false;
-            } catch (DirectoryNotEmptyException ex) {
-                logger.error("Directory not empty " + ex);
-                success = false;
             } catch (IOException ex) {
                 // File permission problems are caught here.
                 logger.error("Permission problems " + ex);
@@ -387,12 +389,6 @@ public class KVServer implements IKVServer, Runnable {
             // DELETE THE current sReplica file
             try {
                 Files.deleteIfExists(Paths.get(sReplicaFilePath));
-            } catch (NoSuchFileException ex) {
-                logger.error("Directory not empty " + ex);
-                success = false;
-            } catch (DirectoryNotEmptyException ex) {
-                logger.error("Directory not empty " + ex);
-                success = false;
             } catch (IOException ex) {
                 // File permission problems are caught here.
                 logger.error("Permission problems " + ex);
@@ -407,6 +403,7 @@ public class KVServer implements IKVServer, Runnable {
             logger.error("MOVE_KVPAIRS destination is not COORDINATOR/PREPLICA/SREPLICA!");
             success = false;
         }
+        System.out.println("handleMoveKVPairs writing to file " + currFilePath);
         logger.debug("KVPairs: " + KVPairs);
         String[] kvPairs = KVPairs.split(KVConstants.NEWLINE_DELIM);
 
@@ -467,17 +464,16 @@ public class KVServer implements IKVServer, Runnable {
     public boolean handleUpdateKVPair (String destination, String action, String key, String value) {
         boolean success = true;
         if (destination.equals(KVConstants.PREPLICA)) {
-            System.out.println("pReplica file is: " + pReplicaFilePath);
             setCurrFilePath(pReplicaFilePath);
         }
         else if (destination.equals(KVConstants.SREPLICA)) {
-            System.out.println("sReplica file is: " + sReplicaFilePath);
             setCurrFilePath(sReplicaFilePath);
         }
         else {
             logger.error("UPDATE destination should always be PREPLICA or SREPLICA!");
             return false;
         }
+        System.out.println("handleUpdateKVPair writing to file : " + currFilePath);
 
         if (action.equals(ReplicaDataAction.NEW.name())) {
             // It is a new KV pair - Append to the end of replica file
@@ -565,12 +561,14 @@ public class KVServer implements IKVServer, Runnable {
 
         if(!curVal.equals("")) {
             //rewrite entire file back with new values
+            System.out.println("storeKV: rewriting file toBeDeleted: " + toBeDeleted);
             writeNewFile(key, value, toBeDeleted);
             ReplicaDataAction action = toBeDeleted ? ReplicaDataAction.DELETE : ReplicaDataAction.UPDATE;
             sendToReplicas(key, value, action);
         }
         else {
             if(!toBeDeleted) {
+                System.out.println("storeKV: appending to file");
                 appendToFile(filePath, key, value);
                 sendToReplicas(key, value, ReplicaDataAction.NEW);
             }
