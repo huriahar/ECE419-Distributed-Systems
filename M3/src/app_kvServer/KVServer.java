@@ -18,9 +18,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -60,6 +58,7 @@ public class KVServer implements IKVServer, Runnable {
     // TimeStamper
     private TimeStamper timeStamper;
     // This server's replicas
+    private String role = KVConstants.COORDINATOR;
     private ServerMetaData primaryReplica;
     private ServerMetaData secondaryReplica;
     //State
@@ -94,6 +93,14 @@ public class KVServer implements IKVServer, Runnable {
         this.serverFilePath = "SERVER_" + Integer.toString(zkPort);
         this.pReplicaFilePath = "SERVER_" + Integer.toString(zkPort) + "_PRIMARY";
         this.sReplicaFilePath = "SERVER_" + Integer.toString(zkPort) + "_SECONDARY";
+        // Delete Replica files, if they exist
+        try {
+            Files.deleteIfExists(Paths.get(pReplicaFilePath));
+            Files.deleteIfExists(Paths.get(sReplicaFilePath));
+        } catch (IOException ex) {
+            // File permission problems are caught here.
+            logger.error("Permission problems " + ex);
+        }
         this.currFilePath = this.serverFilePath;
         this.cache = KVCache.createKVCache(0, "FIFO");
         this.metaDataFile = Paths.get("metaDataECS.config");
@@ -125,7 +132,7 @@ public class KVServer implements IKVServer, Runnable {
     public String getHostname(){
         return this.metadata.getServerName();
     }
-    
+
     public String getHostAddr() {
         return this.metadata.getServerAddr();
     }
@@ -154,10 +161,21 @@ public class KVServer implements IKVServer, Runnable {
         return this.currFilePath;
     }
 
-    public void setCurrFilePath(String path){
-        this.currFilePath = path;
+    public void setRole(String role) {
+        logger.debug(this.metadata.getServerName() + " role changed to " + role);
+        this.role = role;
+        switch(role){
+            case KVConstants.COORDINATOR:
+                this.currFilePath = getServerFilePath();
+                return;
+            case KVConstants.PREPLICA:
+                this.currFilePath = getPReplicaFilePath();
+                return;
+            case KVConstants.SREPLICA:
+                this.currFilePath = getSReplicaFilePath();
+                return;
+        }
     }
-
 
     public void setupCache(int size, String strategy) {
         this.cache = KVCache.createKVCache(size, strategy);
@@ -257,7 +275,7 @@ public class KVServer implements IKVServer, Runnable {
         try {
             serverSocket = new ServerSocket(metadata.getServerPort());
             logger.info("Server listening on port: " 
-                    + serverSocket.getLocalPort());    
+                    + serverSocket.getLocalPort());
             return true;
         }
         catch (IOException e) {
@@ -300,7 +318,7 @@ public class KVServer implements IKVServer, Runnable {
         try {
             File file = new File(filePath);
             FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
-            FileLock lock = channel.lock();            
+            FileLock lock = channel.lock();
 
             try {
                 lock = channel.tryLock();
@@ -317,7 +335,7 @@ public class KVServer implements IKVServer, Runnable {
                 FileReader fr = new FileReader(file);
                 br = new BufferedReader(fr);
                 KVPair = br.readLine();
-    
+
                 while(KVPair != null) {
                     if(KVPair.trim().length() == 0) {
                         KVPair = br.readLine();
@@ -332,7 +350,7 @@ public class KVServer implements IKVServer, Runnable {
                     get_value = String.join(KVConstants.DELIM, valueParts);
                     if(key_val.equals(key)) {
                         value = get_value;
-                        break;     
+                        break;
                     }
                     KVPair = br.readLine();
                 }
@@ -348,7 +366,6 @@ public class KVServer implements IKVServer, Runnable {
             try{
                 if(br!=null)
                     br.close();
-        
             }   catch(Exception ex){
                     logger.error("Error in closing the BufferedReader"+ex);
             }
@@ -370,43 +387,32 @@ public class KVServer implements IKVServer, Runnable {
             // DELETE THE current pReplica file
             try {
                 Files.deleteIfExists(Paths.get(pReplicaFilePath));
-            } catch (NoSuchFileException ex) {
-                logger.error("No such file or directory " + ex);
-                success = false;
-            } catch (DirectoryNotEmptyException ex) {
-                logger.error("Directory not empty " + ex);
-                success = false;
             } catch (IOException ex) {
                 // File permission problems are caught here.
                 logger.error("Permission problems " + ex);
                 success = false;
             }
-            setCurrFilePath(pReplicaFilePath);
+            setRole(KVConstants.PREPLICA);
         }
         else if (destination.equals(KVConstants.SREPLICA)) {
             // DELETE THE current sReplica file
             try {
                 Files.deleteIfExists(Paths.get(sReplicaFilePath));
-            } catch (NoSuchFileException ex) {
-                logger.error("Directory not empty " + ex);
-                success = false;
-            } catch (DirectoryNotEmptyException ex) {
-                logger.error("Directory not empty " + ex);
-                success = false;
             } catch (IOException ex) {
                 // File permission problems are caught here.
                 logger.error("Permission problems " + ex);
                 success = false;
             }
-            setCurrFilePath(sReplicaFilePath);
+            setRole(KVConstants.SREPLICA);
         }
         else if (destination.equals(KVConstants.COORDINATOR)) {
-            setCurrFilePath(serverFilePath);
+            setRole(KVConstants.COORDINATOR);
         }
         else {
             logger.error("MOVE_KVPAIRS destination is not COORDINATOR/PREPLICA/SREPLICA!");
             success = false;
         }
+        System.out.println("handleMoveKVPairs writing to file " + currFilePath);
         logger.debug("KVPairs: " + KVPairs);
         String[] kvPairs = KVPairs.split(KVConstants.NEWLINE_DELIM);
 
@@ -421,7 +427,7 @@ public class KVServer implements IKVServer, Runnable {
                 success = false;
             }
         }
-        setCurrFilePath(serverFilePath);
+        setRole(KVConstants.COORDINATOR);
         return success;
     }
 
@@ -468,16 +474,17 @@ public class KVServer implements IKVServer, Runnable {
         boolean success = true;
         if (destination.equals(KVConstants.PREPLICA)) {
             System.out.println("pReplica file is: " + pReplicaFilePath);
-            setCurrFilePath(pReplicaFilePath);
+            setRole(KVConstants.PREPLICA);
         }
         else if (destination.equals(KVConstants.SREPLICA)) {
             System.out.println("sReplica file is: " + sReplicaFilePath);
-            setCurrFilePath(sReplicaFilePath);
+            setRole(KVConstants.SREPLICA);
         }
         else {
             logger.error("UPDATE destination should always be PREPLICA or SREPLICA!");
             return false;
         }
+        System.out.println("handleUpdateKVPair writing to file : " + currFilePath);
 
         if (action.equals(ReplicaDataAction.NEW.name())) {
             // It is a new KV pair - Append to the end of replica file
@@ -487,7 +494,7 @@ public class KVServer implements IKVServer, Runnable {
             boolean delete = (action.equals(ReplicaDataAction.DELETE.name())) ? true : false;
             writeNewFile(key, value, delete);
         }
-        setCurrFilePath(serverFilePath);
+        setRole(KVConstants.COORDINATOR);
         return success;
     }
 
@@ -563,16 +570,24 @@ public class KVServer implements IKVServer, Runnable {
             toBeDeleted = true;
         }
 
-        if(!curVal.equals("")) {
-            //rewrite entire file back with new values
-            writeNewFile(key, value, toBeDeleted);
-            ReplicaDataAction action = toBeDeleted ? ReplicaDataAction.DELETE : ReplicaDataAction.UPDATE;
-            sendToReplicas(key, value, action);
-        }
-        else {
-            if(!toBeDeleted) {
+        //if the value is not on disk
+        if(curVal.equals("")) {
+            if(!toBeDeleted) {    // value is non-empty
                 appendToFile(filePath, key, value);
-                sendToReplicas(key, value, ReplicaDataAction.NEW);
+                //only a coordinator should be sending data to replicas
+                if(this.role.equals(KVConstants.COORDINATOR)) {
+                    sendToReplicas(key, value, ReplicaDataAction.NEW);
+                }
+            }
+        }
+        else { //value is on disk already
+            //rewrite entire file back with new values
+            System.out.println("storeKV: rewriting file toBeDeleted: " + toBeDeleted);
+            writeNewFile(key, value, toBeDeleted);
+            //only a coordinator should be sending data to replicas
+            if(this.role.equals(KVConstants.COORDINATOR)) {
+                ReplicaDataAction action = toBeDeleted ? ReplicaDataAction.DELETE : ReplicaDataAction.UPDATE;
+                sendToReplicas(key, value, action);
             }
         }
     }
@@ -587,25 +602,25 @@ public class KVServer implements IKVServer, Runnable {
         BufferedReader br = null;
         BufferedWriter wr  = null;
         String newPair = key + "|" + value ;
-        
+
         try {
             File file = new File(filePath);
             
             FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
             FileLock lock = channel.lock();            
-    
+
             try {
                 lock = channel.tryLock();
 
             } catch (OverlappingFileLockException e) {
                  //logger.error("Overlapping File Lock Error: " + e.getMessage());
             }
-            
+
             if(!file.exists()) {
                 logger.error("File not found");
             }
             else{
-            
+
                 FileReader fr = new FileReader(file);
                 br = new BufferedReader(fr);
                 KVPair = br.readLine();
@@ -636,8 +651,8 @@ public class KVServer implements IKVServer, Runnable {
                 FileWriter fw = new FileWriter(file);
                 wr = new BufferedWriter(fw);
                 PrintWriter pw = new PrintWriter(wr);
-                pw.println(inputString);            
-                wr.close();    
+                pw.println(inputString);
+                wr.close();
             }
 
             lock.release();
@@ -762,6 +777,13 @@ public class KVServer implements IKVServer, Runnable {
         }
         else {
             this.primaryReplica = null;
+            // Delete pReplicaFile
+            try {
+                Files.deleteIfExists(Paths.get(pReplicaFilePath));
+            } catch (IOException ex) {
+                // File permission problems are caught here.
+                logger.error("Permission problems " + ex);
+            }
         }
 
         if (!sReplicaName.equals(KVConstants.NULL_STRING)) {
@@ -782,6 +804,13 @@ public class KVServer implements IKVServer, Runnable {
         }
         else {
             this.secondaryReplica = null;
+            // Delete sReplicaFile
+            try {
+                Files.deleteIfExists(Paths.get(sReplicaFilePath));
+            } catch (IOException ex) {
+                // File permission problems are caught here.
+                logger.error("Permission problems " + ex);
+            }
         }
 
         //Connect with each replica and send it all the data you have
@@ -830,6 +859,14 @@ public class KVServer implements IKVServer, Runnable {
             logger.error("ERROR: ZK Interrupted" + e);
         }
         this.timeStamper.stop();
+        // Delete replica files
+        try {
+            Files.deleteIfExists(Paths.get(pReplicaFilePath));
+            Files.deleteIfExists(Paths.get(sReplicaFilePath));
+        } catch (IOException ex) {
+            // File permission problems are caught here.
+            logger.error("Permission problems " + ex);
+        }
         this.close();
     }
 
