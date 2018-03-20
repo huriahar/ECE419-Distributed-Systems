@@ -489,7 +489,7 @@ public class ECSClient implements IECSClient {
 
     
     public boolean removeNodesDirectly(Collection<IECSNode> nodes, boolean nodesCrashed) {
-        //Use ths function if you want to remove nodes given a list of
+        //Use this function if you want to remove nodes given a list of
         //nodes (as opposed to a list of node names)
         if(ecsInstance.removeNodes(nodes, nodesCrashed)) {
             nodesLaunched.removeAll(nodes);

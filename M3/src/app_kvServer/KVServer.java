@@ -18,9 +18,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -134,7 +132,7 @@ public class KVServer implements IKVServer, Runnable {
     public String getHostname(){
         return this.metadata.getServerName();
     }
-    
+
     public String getHostAddr() {
         return this.metadata.getServerAddr();
     }
@@ -178,6 +176,7 @@ public class KVServer implements IKVServer, Runnable {
                 return;
         }
     }
+
     public void setupCache(int size, String strategy) {
         this.cache = KVCache.createKVCache(size, strategy);
     }
@@ -276,7 +275,7 @@ public class KVServer implements IKVServer, Runnable {
         try {
             serverSocket = new ServerSocket(metadata.getServerPort());
             logger.info("Server listening on port: " 
-                    + serverSocket.getLocalPort());    
+                    + serverSocket.getLocalPort());
             return true;
         }
         catch (IOException e) {
@@ -319,7 +318,7 @@ public class KVServer implements IKVServer, Runnable {
         try {
             File file = new File(filePath);
             FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
-            FileLock lock = channel.lock();            
+            FileLock lock = channel.lock();
 
             try {
                 lock = channel.tryLock();
@@ -336,7 +335,7 @@ public class KVServer implements IKVServer, Runnable {
                 FileReader fr = new FileReader(file);
                 br = new BufferedReader(fr);
                 KVPair = br.readLine();
-    
+
                 while(KVPair != null) {
                     if(KVPair.trim().length() == 0) {
                         KVPair = br.readLine();
@@ -351,7 +350,7 @@ public class KVServer implements IKVServer, Runnable {
                     get_value = String.join(KVConstants.DELIM, valueParts);
                     if(key_val.equals(key)) {
                         value = get_value;
-                        break;     
+                        break;
                     }
                     KVPair = br.readLine();
                 }
@@ -367,7 +366,6 @@ public class KVServer implements IKVServer, Runnable {
             try{
                 if(br!=null)
                     br.close();
-        
             }   catch(Exception ex){
                     logger.error("Error in closing the BufferedReader"+ex);
             }
@@ -604,25 +602,25 @@ public class KVServer implements IKVServer, Runnable {
         BufferedReader br = null;
         BufferedWriter wr  = null;
         String newPair = key + "|" + value ;
-        
+
         try {
             File file = new File(filePath);
             
             FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
             FileLock lock = channel.lock();            
-    
+
             try {
                 lock = channel.tryLock();
 
             } catch (OverlappingFileLockException e) {
                  //logger.error("Overlapping File Lock Error: " + e.getMessage());
             }
-            
+
             if(!file.exists()) {
                 logger.error("File not found");
             }
             else{
-            
+
                 FileReader fr = new FileReader(file);
                 br = new BufferedReader(fr);
                 KVPair = br.readLine();
@@ -653,8 +651,8 @@ public class KVServer implements IKVServer, Runnable {
                 FileWriter fw = new FileWriter(file);
                 wr = new BufferedWriter(fw);
                 PrintWriter pw = new PrintWriter(wr);
-                pw.println(inputString);            
-                wr.close();    
+                pw.println(inputString);
+                wr.close();
             }
 
             lock.release();
@@ -779,6 +777,13 @@ public class KVServer implements IKVServer, Runnable {
         }
         else {
             this.primaryReplica = null;
+            // Delete pReplicaFile
+            try {
+                Files.deleteIfExists(Paths.get(pReplicaFilePath));
+            } catch (IOException ex) {
+                // File permission problems are caught here.
+                logger.error("Permission problems " + ex);
+            }
         }
 
         if (!sReplicaName.equals(KVConstants.NULL_STRING)) {
@@ -799,6 +804,13 @@ public class KVServer implements IKVServer, Runnable {
         }
         else {
             this.secondaryReplica = null;
+            // Delete sReplicaFile
+            try {
+                Files.deleteIfExists(Paths.get(sReplicaFilePath));
+            } catch (IOException ex) {
+                // File permission problems are caught here.
+                logger.error("Permission problems " + ex);
+            }
         }
 
         //Connect with each replica and send it all the data you have
@@ -847,6 +859,14 @@ public class KVServer implements IKVServer, Runnable {
             logger.error("ERROR: ZK Interrupted" + e);
         }
         this.timeStamper.stop();
+        // Delete replica files
+        try {
+            Files.deleteIfExists(Paths.get(pReplicaFilePath));
+            Files.deleteIfExists(Paths.get(sReplicaFilePath));
+        } catch (IOException ex) {
+            // File permission problems are caught here.
+            logger.error("Permission problems " + ex);
+        }
         this.close();
     }
 
