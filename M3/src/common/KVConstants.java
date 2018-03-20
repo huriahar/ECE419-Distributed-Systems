@@ -16,7 +16,7 @@ public class KVConstants {
     public static final int SESSION_TIMEOUT = 5000;
     public static final int LAUNCH_TIMEOUT = 10000;
     public static final String TIMESTAMP_DEFAULT = "00:00:00";
-    public static final long SERVER_TIMESTAMP_TIMEOUT = 5000;
+    public static final long SERVER_TIMESTAMP_TIMEOUT = 8000;
     public static final long TIMESTAMPER_SLEEP_TIME = 5000;    
     public static final int NUM_REPLICAS = 2;
     public static final String NULL_STRING = "NULL";
