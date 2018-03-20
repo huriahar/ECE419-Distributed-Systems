@@ -451,7 +451,7 @@ public class ECS implements IECS {
 
     private String getLastRemoved() {
         try {
-            File f = new File(this.lastRemovedFile);
+            File f = new File(ECS.lastRemovedFile);
             if(f.exists()) {
                 ArrayList<String> lines = new ArrayList<>(Files.readAllLines(f.toPath(), StandardCharsets.UTF_8));
                 return lines.get(0);
@@ -473,11 +473,11 @@ public class ECS implements IECS {
 
     public IECSNode initAddNodesToHashRing() {
         //This function is ONLY used for the first node added to the system/ringNetwork
-        IECSNode chosenNode = null;     
+        IECSNode chosenNode = null;
         int counter = 0, numNodes = 1;
         lastRemovedName = getLastRemoved();
         if(lastRemovedName != null){
-            lastRemovedName = lastRemovedName.split("\\" + KVConstants.DELIM)[0];
+            lastRemovedName = lastRemovedName.split(KVConstants.SPLIT_DELIM)[0];
         }
     
         try { 

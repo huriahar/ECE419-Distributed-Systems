@@ -408,8 +408,8 @@ public class KVServer implements IKVServer, Runnable {
             setCurrFilePath(serverFilePath);
         }
         else {
-        	logger.error("MOVE_KVPAIRS destination is not COORDINATOR/PREPLICA/SREPLICA!");
-        	success = false;
+            logger.error("MOVE_KVPAIRS destination is not COORDINATOR/PREPLICA/SREPLICA!");
+            success = false;
         }
         logger.debug("KVPairs: " + KVPairs);
         String[] kvPairs = KVPairs.split(KVConstants.NEWLINE_DELIM);
@@ -764,6 +764,9 @@ public class KVServer implements IKVServer, Runnable {
                 logger.error("MoveData failed for primaryReplica");
             }
         }
+        else {
+            this.primaryReplica = null;
+        }
 
         if (!sReplicaName.equals(KVConstants.NULL_STRING)) {
             String sMetaData = getMetaDataOfServer(sReplicaName);
@@ -780,6 +783,9 @@ public class KVServer implements IKVServer, Runnable {
             } catch (Exception o) {
                 logger.error("MoveData failed for primaryReplica");
             }
+        }
+        else {
+            this.secondaryReplica = null;
         }
 
         //Connect with each replica and send it all the data you have

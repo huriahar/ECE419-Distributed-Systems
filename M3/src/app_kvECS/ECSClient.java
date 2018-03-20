@@ -438,7 +438,6 @@ public class ECSClient implements IECSClient {
         //This function should only be used to setup the first node on the ring network
         boolean success = false;
     	// This is called before launching the servers - decides which nodes to add in hashRing, adds them
-        //TODO this loop only iterates once... always... remove loop
     	IECSNode node = ecsInstance.initAddNodesToHashRing();
         if(node == null) {
             logger.debug("Could not find lastRemoved in the list of available servers!");
