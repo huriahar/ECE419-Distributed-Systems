@@ -60,6 +60,7 @@ public class KVServer implements IKVServer, Runnable {
     // TimeStamper
     private TimeStamper timeStamper;
     // This server's replicas
+    private String role = KVConstants.COORDINATOR;
     private ServerMetaData primaryReplica;
     private ServerMetaData secondaryReplica;
     //State
@@ -162,11 +163,21 @@ public class KVServer implements IKVServer, Runnable {
         return this.currFilePath;
     }
 
-    public void setCurrFilePath(String path){
-        this.currFilePath = path;
+    public void setRole(String role) {
+        logger.debug(this.metadata.getServerName() + " role changed to " + role);
+        this.role = role;
+        switch(role){
+            case KVConstants.COORDINATOR:
+                this.currFilePath = getServerFilePath();
+                return;
+            case KVConstants.PREPLICA:
+                this.currFilePath = getPReplicaFilePath();
+                return;
+            case KVConstants.SREPLICA:
+                this.currFilePath = getSReplicaFilePath();
+                return;
+        }
     }
-
-
     public void setupCache(int size, String strategy) {
         this.cache = KVCache.createKVCache(size, strategy);
     }
@@ -383,7 +394,7 @@ public class KVServer implements IKVServer, Runnable {
                 logger.error("Permission problems " + ex);
                 success = false;
             }
-            setCurrFilePath(pReplicaFilePath);
+            setRole(KVConstants.PREPLICA);
         }
         else if (destination.equals(KVConstants.SREPLICA)) {
             // DELETE THE current sReplica file
@@ -394,10 +405,10 @@ public class KVServer implements IKVServer, Runnable {
                 logger.error("Permission problems " + ex);
                 success = false;
             }
-            setCurrFilePath(sReplicaFilePath);
+            setRole(KVConstants.SREPLICA);
         }
         else if (destination.equals(KVConstants.COORDINATOR)) {
-            setCurrFilePath(serverFilePath);
+            setRole(KVConstants.COORDINATOR);
         }
         else {
             logger.error("MOVE_KVPAIRS destination is not COORDINATOR/PREPLICA/SREPLICA!");
@@ -418,7 +429,7 @@ public class KVServer implements IKVServer, Runnable {
                 success = false;
             }
         }
-        setCurrFilePath(serverFilePath);
+        setRole(KVConstants.COORDINATOR);
         return success;
     }
 
@@ -464,10 +475,12 @@ public class KVServer implements IKVServer, Runnable {
     public boolean handleUpdateKVPair (String destination, String action, String key, String value) {
         boolean success = true;
         if (destination.equals(KVConstants.PREPLICA)) {
-            setCurrFilePath(pReplicaFilePath);
+            System.out.println("pReplica file is: " + pReplicaFilePath);
+            setRole(KVConstants.PREPLICA);
         }
         else if (destination.equals(KVConstants.SREPLICA)) {
-            setCurrFilePath(sReplicaFilePath);
+            System.out.println("sReplica file is: " + sReplicaFilePath);
+            setRole(KVConstants.SREPLICA);
         }
         else {
             logger.error("UPDATE destination should always be PREPLICA or SREPLICA!");
@@ -483,7 +496,7 @@ public class KVServer implements IKVServer, Runnable {
             boolean delete = (action.equals(ReplicaDataAction.DELETE.name())) ? true : false;
             writeNewFile(key, value, delete);
         }
-        setCurrFilePath(serverFilePath);
+        setRole(KVConstants.COORDINATOR);
         return success;
     }
 
@@ -559,18 +572,24 @@ public class KVServer implements IKVServer, Runnable {
             toBeDeleted = true;
         }
 
-        if(!curVal.equals("")) {
+        //if the value is not on disk
+        if(curVal.equals("")) {
+            if(!toBeDeleted) {    // value is non-empty
+                appendToFile(filePath, key, value);
+                //only a coordinator should be sending data to replicas
+                if(this.role.equals(KVConstants.COORDINATOR)) {
+                    sendToReplicas(key, value, ReplicaDataAction.NEW);
+                }
+            }
+        }
+        else { //value is on disk already
             //rewrite entire file back with new values
             System.out.println("storeKV: rewriting file toBeDeleted: " + toBeDeleted);
             writeNewFile(key, value, toBeDeleted);
-            ReplicaDataAction action = toBeDeleted ? ReplicaDataAction.DELETE : ReplicaDataAction.UPDATE;
-            sendToReplicas(key, value, action);
-        }
-        else {
-            if(!toBeDeleted) {
-                System.out.println("storeKV: appending to file");
-                appendToFile(filePath, key, value);
-                sendToReplicas(key, value, ReplicaDataAction.NEW);
+            //only a coordinator should be sending data to replicas
+            if(this.role.equals(KVConstants.COORDINATOR)) {
+                ReplicaDataAction action = toBeDeleted ? ReplicaDataAction.DELETE : ReplicaDataAction.UPDATE;
+                sendToReplicas(key, value, action);
             }
         }
     }
