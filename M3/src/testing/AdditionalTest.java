@@ -16,12 +16,13 @@ import common.*;
 import java.lang.Process;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.concurrent.TimeUnit;
 
 public class AdditionalTest extends TestCase {
     
     private ECSClient ecsClient;
     Collection<IECSNode> nodes;
-    
+
 	public void setUp() {
         ecsClient = new ECSClient("testECS.config", "localhost");
         ecsClient.setLevel("INFO");
@@ -75,7 +76,7 @@ public class AdditionalTest extends TestCase {
     }
 
     // ------------------------------ tests start here -----------------------------------------//
-
+/*
     @Test
     public void  testInitialization() {
        try{
@@ -323,18 +324,29 @@ public class AdditionalTest extends TestCase {
         //get should be successful
         getKVPair(kvClient, "b", "bb", StatusType.GET_SUCCESS);
     }
-/*
+*/
     @Test
     public void testDetectServerCrash() {
         System.out.println("********** In 13 Test **************");
         nodes = ecsClient.addNodes(1, "LRU", 5);
         IECSNode node1 = nodes.iterator().next();
-        //KILL server look for this regex
-        //java     11515 elsaye10   23u  IPv6 547623      0t0  TCP *:50005 (LISTEN)
-        TimeUnit.SECONDS.sleep(KVConstants.SERVER_TIMESTAMP_TIMEOUT);
-        int numActiveNodes = ecsClient.numNodesLaunched();
-        ecsClient.checkServersStatus();
-        assertTrue(ecsClient.numNodesLaunched() == 0 && numActiveNodes == 1);
+        Exception ex = null;
+        try {
+            Runtime run = Runtime.getRuntime();
+            //kill_knserver.py finds this pattern with the given port and kills the process
+            //java     11515 elsaye10   23u  IPv6 547623      0t0  TCP *:50005 (LISTEN)
+            String[] launchCmd = {"python", "kill_kvserver.py", Integer.toString(node1.getNodePort())};
+            Process proc;
+            proc = run.exec(launchCmd);
+            TimeUnit.SECONDS.sleep(10);
+        } catch (InterruptedException e) {
+            ex = e;
+        } catch (IOException e) {
+            ex = e;
+        }
+        assertTrue(ex == null);
+        boolean nocrashes = ecsClient.checkServerStatus();
+        assertFalse(nocrashes);
    }
-*/
+
 }

@@ -72,18 +72,20 @@ public class ECSClient implements IECSClient {
     }
 
     public boolean checkServerStatus() {
+        boolean nocrashes = true;
         Collection<IECSNode> nodesToRemove = new ArrayList<IECSNode>();
         for (IECSNode node : nodesLaunched) {
             boolean success = ecsInstance.checkServersStatus(node);
             if(!success) {
                 logger.error("Removing " + node.getNodeName() + " from system");
                 nodesToRemove.add(node);
-                //addNode("LRU", KVConstants.DEFAULT_CACHE_SIZE);
+                nocrashes = false;
             }
         }
         //true indicates that this is a list of crashed servers
         removeNodesDirectly(nodesToRemove, true);
-        return (nodesToRemove.size() == 0);
+        //TODO addNodes
+        return nocrashes;
     }
 
     private void handleCommand (String cmdLine) {
@@ -489,7 +491,7 @@ public class ECSClient implements IECSClient {
 
     
     public boolean removeNodesDirectly(Collection<IECSNode> nodes, boolean nodesCrashed) {
-        //Use ths function if you want to remove nodes given a list of
+        //Use this function if you want to remove nodes given a list of
         //nodes (as opposed to a list of node names)
         if(ecsInstance.removeNodes(nodes, nodesCrashed)) {
             nodesLaunched.removeAll(nodes);
