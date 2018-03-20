@@ -69,10 +69,6 @@ public class KVServer implements IKVServer, Runnable {
     private boolean moveAll = false;
     private boolean pReplica = false;
     private boolean sReplica = false;
-    //Default values
-    private static final String UNSET_ADDR = null;
-    private static final int DEFAULT_CACHE_SIZE = 5;
-    private static final String DEFAULT_CACHE_STRATEGY = "FIFO";
     
     private ZKImplementation zkImplServer;
     /**

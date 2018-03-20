@@ -9,7 +9,6 @@ import java.net.Socket;
 import java.util.Iterator;
 import java.io.IOException;
 import java.lang.InterruptedException;
-import java.net.SocketTimeoutException;
 import java.net.SocketException;
 
 import java.io.OutputStream;
@@ -669,7 +668,7 @@ public class ECS implements IECS {
         logger.debug("In Remove Nodes");
         //Need to let the node know to stop
     	BigInteger currNodeHash;    
-        IECSNode nextNode = null, currNode = null, node;
+        IECSNode nextNode = null, currNode = null;
         boolean onlyOneNode = false;
         boolean success = true;
         for(IECSNode server: nodes) {
@@ -703,7 +702,7 @@ public class ECS implements IECS {
                                 String lastNode = currNode.getNodeName() + KVConstants.DELIM +
                                                   currNode.getNodeHost() + KVConstants.DELIM +
                                                   currNode.getNodePort();
-                                Path file = Paths.get(this.lastRemovedFile);
+                                Path file = Paths.get(ECS.lastRemovedFile);
                                 Files.write(file, lastNode.getBytes());
                             } catch (Exception e) {
                                 logger.error("could not write last removed node to lastRemovedFile");
