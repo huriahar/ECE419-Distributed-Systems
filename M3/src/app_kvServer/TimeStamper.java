@@ -46,7 +46,7 @@ public class TimeStamper implements Runnable {
 
     private String getCurrentTimeString() {
         String ret = Long.toString(System.currentTimeMillis());
-        System.out.println("updating kvserver's timestamp.... " + ret);
+        //System.out.println("updating kvserver's timestamp.... " + ret);
         return ret;
     }
 

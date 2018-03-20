@@ -398,7 +398,7 @@ public class ECS implements IECS {
                 logger.debug("nextNode is the same as currNode");
             }
 
-            //Updating replicas of previous nodes and currNodes
+            // Updating replicas of previous nodes and currNode
             IECSNode prevNode = findPrevNode(currNode);
             if(prevNode != currNode) {
                 success = success & sendReplicas(prevNode);
@@ -563,7 +563,7 @@ public class ECS implements IECS {
     	
     	assert currNode != null;
         
-        IECSNode prevNode = new ECSNode(), nextNode = new ECSNode();
+        IECSNode nextNode = new ECSNode();
 
         // Only one in network, so start and end are yours
         if(ringNetwork.isEmpty()) {

@@ -7,6 +7,8 @@ import java.net.Socket;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Arrays;
+
+import app_kvServer.IKVServer.ReplicaDataAction;
 import common.messages.TextMessage;
 import common.KVConstants;
 
@@ -81,13 +83,12 @@ public class ClientConnection implements Runnable {
                     String value = String.join(KVConstants.DELIM, valueParts);
                     String key = null;
                     boolean success = true;
-                    logger.debug("step 5");
                     if (command.equals("ECS")) {
                         String[] ecsCmd = Arrays.copyOfRange(msgContent, 1, msgContent.length);
                         handleECSCmd(ecsCmd);
                         continue;
                     }
-                    else if(command.equals("MOVE_KVPAIRS")) {
+                    else if (command.equals("MOVE_KVPAIRS")) {
                         // Receiving KVPairs from another server
                         System.out.println("************Received Move KV Pairs from someone**********");
                         String destination = msgContent[1];
@@ -96,7 +97,7 @@ public class ClientConnection implements Runnable {
                         if(destination.equals("COORDINATOR")) {
                             this.server.setCurrFilePath(this.server.getServerFilePath());
                         }
-                        else if(destination.equals("PREPLICA")) {
+                        else if (destination.equals(KVConstants.PREPLICA)) {
                             // TODO DELETE THE current pReplica file
                             String pReplicaFile = this.server.getPReplicaFilePath();
                             System.out.println("pReplica File is:" + pReplicaFile);
@@ -113,7 +114,7 @@ public class ClientConnection implements Runnable {
                             System.out.println("Delete old file");
                             this.server.setCurrFilePath(pReplicaFile);
                         }
-                        else if(destination.equals("SREPLICA")) {
+                        else if (destination.equals(KVConstants.SREPLICA)) {
                             // TODO DELETE THE current sReplica file
                             String sReplicaFile = this.server.getSReplicaFilePath();
                             try {
@@ -141,53 +142,71 @@ public class ClientConnection implements Runnable {
                             continue;
                         }                        
                     }
-                    if(msgContent.length > 1){
-                        key = msgContent[1];
-                    }
-                    logger.debug("step 6");
-                    //Just a guard
-                    if(key == null) {
-                        logger.debug("key is null");
-                        continue;
-                    }
-                    System.out.println("Is server stopped? "  + server.isStopped());
-                    if (server.isStopped()) {
-                        sendMessage(new TextMessage("SERVER_STOPPED"));
-                        logger.info("SERVER_STOPPED cannot handle client requests at the moment.");
-                        continue;
-                    }
-                    System.out.println("Is server responsible? "  + server.isResponsible(key));
-                    // Check if server is responsible for this key
-                    if (!server.isResponsible(key)){
-                        sendMessage(new TextMessage("SERVER_NOT_RESPONSIBLE"));
-                        TextMessage getMetaData = receiveMessage();
-                        if(getMetaData.getMsg().equals("GET_METADATA")) {
-                            sendMessage(new TextMessage(server.getMetaDataFromFile()));
-                        } else {
-                            logger.info("ERROR!!! EXPECTED TO RECEIVE GET_METADATA MSG!!");
+                    else if (command.equals("UPDATE")) {
+                        System.out.println("Received UPDATE msg");
+                        String destination = msgContent[1];
+                        String action = msgContent[2];
+                        String updateKey = msgContent[3];
+                        List<String> updateValueParts = new LinkedList<>();
+                        for (int i = 4; i < msgContent.length; ++i) {
+                            updateValueParts.add(msgContent[i]);
                         }
+                        String updateValue = String.join(KVConstants.DELIM, updateValueParts);
+                        success = server.handleUpdateKVPair(destination, action, updateKey, updateValue);
+                        String res = success ? "UPDATE_SUCCESS" : "UPDATE_FAILED";
+                        logger.info(res);
+                        sendMessage(new TextMessage(res));
                         continue;
-                    }
-                    if (command.equals("PUT")) {
-                        if(server.isWriteLocked()){
-                            sendMessage(new TextMessage("SERVER_WRITE_LOCK"));
-                            logger.info("SERVER_WRITE_LOCK: server locked, write operation failed");
-                            continue;
-                        }
-                        handlePutCmd(key, value);
-                    }
-                    else if (command.equals("GET")) {
-                        if(!server.isReadLocked()) {
-                            handleGetCmd(key);
-                        } else {
-                            sendMessage(new TextMessage("SERVER_STOPPED"));
-                            logger.info("SERVER_READ_LOCKED cannot handle client requests at the moment.");
-                            continue;
-                        }
                     }
                     else {
-                        logger.error("Received invalid message type from client.");
-                        System.out.println("Received invalid message type from client.");
+                        if(msgContent.length > 1){
+                            key = msgContent[1];
+                        }
+                        logger.debug("step 6");
+                        //Just a guard
+                        if(key == null) {
+                            logger.debug("key is null");
+                            continue;
+                        }
+                        System.out.println("Is server stopped? "  + server.isStopped());
+                        if (server.isStopped()) {
+                            sendMessage(new TextMessage("SERVER_STOPPED"));
+                            logger.info("SERVER_STOPPED cannot handle client requests at the moment.");
+                            continue;
+                        }
+                        System.out.println("Is server responsible? "  + server.isResponsible(key));
+                        // Check if server is responsible for this key
+                        if (!server.isResponsible(key)){
+                            sendMessage(new TextMessage("SERVER_NOT_RESPONSIBLE"));
+                            TextMessage getMetaData = receiveMessage();
+                            if(getMetaData.getMsg().equals("GET_METADATA")) {
+                                sendMessage(new TextMessage(server.getMetaDataFromFile()));
+                            } else {
+                                logger.info("ERROR!!! EXPECTED TO RECEIVE GET_METADATA MSG!!");
+                            }
+                            continue;
+                        }
+                        if (command.equals("PUT")) {
+                            if(server.isWriteLocked()){
+                                sendMessage(new TextMessage("SERVER_WRITE_LOCK"));
+                                logger.info("SERVER_WRITE_LOCK: server locked, write operation failed");
+                                continue;
+                            }
+                            handlePutCmd(key, value);
+                        }
+                        else if (command.equals("GET")) {
+                            if(!server.isReadLocked()) {
+                                handleGetCmd(key);
+                            } else {
+                                sendMessage(new TextMessage("SERVER_STOPPED"));
+                                logger.info("SERVER_READ_LOCKED cannot handle client requests at the moment.");
+                                continue;
+                            }
+                        }
+                        else {
+                            logger.error("Received invalid message type from client.");
+                            System.out.println("Received invalid message type from client.");
+                        }
                     }
                 }
                 /* connection either terminated by the client or lost due to 
@@ -352,7 +371,8 @@ public class ClientConnection implements Runnable {
                 catch (Exception ex) {
                     result = "PUT_ERROR";
                     logger.error("PUT Error! Unable to add key " + key + " and value "
-                        + value + " to server");
+                        + value + " to server " + ex);
+                    ex.printStackTrace();
                 }
             }
             else {

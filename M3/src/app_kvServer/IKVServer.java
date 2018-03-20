@@ -4,6 +4,12 @@ import cache.IKVCache.CacheStrategy;
 
 public interface IKVServer {
 
+	public enum ReplicaDataAction {
+        NEW,
+        UPDATE,
+        DELETE
+    };
+
     /**
      * Get the port number of the server
      * @return  port number

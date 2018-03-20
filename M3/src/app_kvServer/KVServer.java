@@ -13,6 +13,7 @@ import java.math.BigInteger;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
@@ -79,19 +80,19 @@ public class KVServer implements IKVServer, Runnable {
      * @param zkPort        port where zookeeper is running
      */
     public KVServer(String name, String zkHostname, int zkPort) {
-    	zkImplServer = new ZKImplementation();
-    	String data = null;
-    	try {
-			zkImplServer.zkConnect(zkHostname);
-			this.zkPath = KVConstants.ZK_SEP + KVConstants.ZK_ROOT + KVConstants.ZK_SEP + name;
-			data = zkImplServer.readData(this.zkPath);			
-		} catch (IOException | InterruptedException e) {
-			logger.error("Unable to connect to zk and read data: " + e);
-		} catch (KeeperException e) {
-			logger.error("Unable to connect to zk and read data: " + e);
-		}
-    	String[] zNodeData = data.split("\\" + KVConstants.DELIM);
-    	this.metadata = new ServerMetaData(name, zNodeData[1], Integer.parseInt(zNodeData[2]), null, null);
+        zkImplServer = new ZKImplementation();
+        String data = null;
+        try {
+            zkImplServer.zkConnect(zkHostname);
+            this.zkPath = KVConstants.ZK_SEP + KVConstants.ZK_ROOT + KVConstants.ZK_SEP + name;
+            data = zkImplServer.readData(this.zkPath);
+        } catch (IOException | InterruptedException e) {
+            logger.error("Unable to connect to zk and read data: " + e);
+        } catch (KeeperException e) {
+            logger.error("Unable to connect to zk and read data: " + e);
+        }
+        String[] zNodeData = data.split("\\" + KVConstants.DELIM);
+        this.metadata = new ServerMetaData(name, zNodeData[1], Integer.parseInt(zNodeData[2]), null, null);
         this.serverFilePath = "SERVER_" + Integer.toString(zkPort);
         this.pReplicaFilePath = "SERVER_" + Integer.toString(zkPort) + "_PRIMARY";
         this.sReplicaFilePath = "SERVER_" + Integer.toString(zkPort) + "_SECONDARY";
@@ -99,17 +100,17 @@ public class KVServer implements IKVServer, Runnable {
         this.cache = KVCache.createKVCache(0, "FIFO");
         this.metaDataFile = Paths.get("metaDataECS.config");
 
-        this.primaryReplica = new ServerMetaData();
-        this.secondaryReplica = new ServerMetaData();
+        this.primaryReplica = null;
+        this.secondaryReplica = null;
         /////////////////////// 
         //Update ZK node status
         /////////////////////// 
         try {
             zkImplServer.updateData(this.zkPath, getZnodeData("SERVER_LAUNCHED", getCurrentTimeString()));
         } catch (KeeperException e) {
-        	logger.error("ERROR: Unable to update ZK " + e);
+            logger.error("ERROR: Unable to update ZK " + e);
         } catch (InterruptedException e) {
-        	logger.error("ERROR: ZK Interrupted" + e);
+            logger.error("ERROR: ZK Interrupted" + e);
         }
         this.timeStamper = new TimeStamper(this.zkImplServer, this.zkPath);
         new Thread(timeStamper).start();
@@ -128,7 +129,7 @@ public class KVServer implements IKVServer, Runnable {
     }
     
     public String getHostAddr() {
-    	return this.metadata.getServerAddr();
+        return this.metadata.getServerAddr();
     }
 
     public CacheStrategy getCacheStrategy(){
@@ -364,6 +365,130 @@ public class KVServer implements IKVServer, Runnable {
         storeKV(key, "");
     }
 
+    public boolean handleUpdateKVPair (String destination, String action, String key, String value) {
+        boolean success = true;
+        if (destination.equals(KVConstants.PREPLICA)) {
+            System.out.println("pReplica file is: " + pReplicaFilePath);
+            setCurrFilePath(pReplicaFilePath);
+        }
+        else if (destination.equals(KVConstants.SREPLICA)) {
+            System.out.println("sReplica file is: " + sReplicaFilePath);
+            setCurrFilePath(sReplicaFilePath);
+        }
+        else {
+            logger.error("UPDATE destination should always be PREPLICA or SREPLICA!");
+            success = false;
+            return success;
+        }
+
+        BufferedWriter wr  = null;
+
+        if (action.equals(ReplicaDataAction.NEW.name())) {
+            // It is a new KV pair - Append to the end of replica file
+            try {
+                File file = new File(currFilePath);
+
+                FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
+                FileLock lock = null;
+                try {
+                    lock = channel.tryLock();
+                } catch (OverlappingFileLockException e) {
+                     logger.error("Overlapping File Lock Error: " + e.getMessage());
+                }
+
+                if (lock != null) {
+                    if (!file.exists()) {
+                        file.createNewFile();
+                    }
+
+                    FileWriter fw = new FileWriter(file, true);
+                    wr = new BufferedWriter(fw);
+                    String KVPair = key + "|" + value + "\n";
+                    wr.write(KVPair);
+                    wr.close();
+                    lock.release();
+                }
+                else {
+                    System.out.println("Did not acquire file lock!");
+                    success = false;
+                }
+
+                channel.close();
+            }
+            catch (IOException io) {
+                io.printStackTrace();
+                success = false;
+            }
+        }
+        else if (action.equals(ReplicaDataAction.UPDATE.name()) || action.equals(ReplicaDataAction.DELETE.name())) {
+            boolean delete = (action.equals(ReplicaDataAction.DELETE.name())) ? true : false;
+            writeNewFile(key, value, delete);
+        }
+        setCurrFilePath(serverFilePath);
+        return success;
+    }
+
+    private void sendToReplicas(String key, String value, ReplicaDataAction action) {
+        logger.debug("Sending key: " + key + " value: " + value + " Action: " + action.name());
+
+        boolean unlock = !isStopped(), success = true;
+        lockWrite();
+
+        TextMessage reply;
+        // Send to primary & secondary replica
+        if (primaryReplica != null) {
+            KVStore pReceiver = new KVStore(primaryReplica.getServerAddr(), primaryReplica.getServerPort());
+            StringBuilder toSend = new StringBuilder();
+            toSend.append("UPDATE" + KVConstants.DELIM);
+            try {
+                toSend.append(KVConstants.PREPLICA + KVConstants.DELIM);
+                toSend.append(action.name() + KVConstants.DELIM);
+                toSend.append(key + KVConstants.DELIM + value);
+                logger.debug("Command is: " + toSend.toString());
+                pReceiver.connect();
+                pReceiver.sendMessage(new TextMessage(toSend.toString()));
+                reply = pReceiver.receiveMessage();
+                pReceiver.disconnect();
+                success = reply.getMsg().equals("UPDATE_SUCCESS");
+            }
+            catch (UnknownHostException e) {
+                logger.error("UnknownHostException at sendToReplicas Primary " + e);
+                success = false;
+            } catch (IOException e) {
+                logger.error("IOException at sendToReplicas Primary " + e);
+                success = false;
+            }
+        }
+
+        if (secondaryReplica != null) {
+            KVStore sReceiver = new KVStore(secondaryReplica.getServerAddr(), secondaryReplica.getServerPort());
+            StringBuilder toSend = new StringBuilder();
+            toSend.append("UPDATE" + KVConstants.DELIM);
+            try {
+                toSend.append(KVConstants.SREPLICA + KVConstants.DELIM);
+                toSend.append(action.name() + KVConstants.DELIM);
+                toSend.append(key + KVConstants.DELIM + value);
+                logger.debug("Command is: " + toSend.toString());
+                sReceiver.connect();
+                sReceiver.sendMessage(new TextMessage(toSend.toString()));
+                reply = sReceiver.receiveMessage();
+                sReceiver.disconnect();
+                success = success & reply.getMsg().equals("UPDATE_SUCCESS");
+            }
+            catch (UnknownHostException e) {
+                logger.error("UnknownHostException at sendToReplicas Secondary " + e);
+                success = false;
+            } catch (IOException e) {
+                logger.error("IOException at sendToReplicas Secondary " + e);
+                success = false;
+            }
+        }
+
+        if (unlock) {
+            unlockWrite();
+        }
+        logger.info("Result of sendUpdateToReplicas: " + success);
+    }
 
     public void storeKV(String key, String value) throws IOException {
         String filePath  = this.currFilePath;
@@ -378,7 +503,9 @@ public class KVServer implements IKVServer, Runnable {
 
         if(!curVal.equals("")) {
                 //rewrite entire file back with new values
-            writeNewFile(key, value, toBeDeleted);        
+            writeNewFile(key, value, toBeDeleted);
+            ReplicaDataAction action = toBeDeleted ? ReplicaDataAction.DELETE : ReplicaDataAction.UPDATE;
+            sendToReplicas(key, value, action);
         }
         else{
             if(!toBeDeleted) {
@@ -409,6 +536,8 @@ public class KVServer implements IKVServer, Runnable {
 
                     lock.release();
                     channel.close();
+
+                    sendToReplicas(key, value, ReplicaDataAction.NEW);
 
                 } catch (IOException io) {
                 
@@ -544,19 +673,19 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public String getMetaDataOfServer(String hostName) {
-    	ArrayList<String> metaDataLines = null;
-		try {
-			metaDataLines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
-		}
-		catch (IOException e) {
-			logger.error("METADATA_FETCH_ERROR could not fetch meta data: " + e);
-		}
-    	for (int i = 0; i < metaDataLines.size(); ++i) {
-    		String[] metaData = metaDataLines.get(i).split("\\" + KVConstants.DELIM);
-    		if (metaData[ServerMetaData.SERVER_NAME].equals(hostName)) {
-    			return metaDataLines.get(i);
-    		}
-    	}
+        ArrayList<String> metaDataLines = null;
+        try {
+            metaDataLines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
+        }
+        catch (IOException e) {
+            logger.error("METADATA_FETCH_ERROR could not fetch meta data: " + e);
+        }
+        for (int i = 0; i < metaDataLines.size(); ++i) {
+            String[] metaData = metaDataLines.get(i).split("\\" + KVConstants.DELIM);
+            if (metaData[ServerMetaData.SERVER_NAME].equals(hostName)) {
+                return metaDataLines.get(i);
+            }
+        }
         logger.error("Error: could not find metadata for server \"" + getHostname());
         return null;
     }
@@ -576,7 +705,7 @@ public class KVServer implements IKVServer, Runnable {
     private void updateTimeStamp() {
         //Update timestamp on the server's Znode
         try {
-            String data = zkImplServer.readData(this.zkPath);         
+            String data = zkImplServer.readData(this.zkPath);
             String[] info = data.split(KVConstants.SPLIT_DELIM);
             zkImplServer.updateData(this.zkPath, getZnodeData(info[0], getCurrentTimeString()));
         } catch (KeeperException e) {
@@ -588,7 +717,7 @@ public class KVServer implements IKVServer, Runnable {
 
     private String getCurrentTimeString() {
         String ret = Long.toString(System.currentTimeMillis());
-        System.out.println("updating kvserver's timestamp.... " + ret);
+        //System.out.println("updating kvserver's timestamp.... " + ret);
         return ret;
     }
 
@@ -603,8 +732,8 @@ public class KVServer implements IKVServer, Runnable {
                 return false;
             }
 
-            this.primaryReplica.updateServerMetaData(pMetaData);
-            String[] pHash = {primaryReplica.getBeginHash().toString(), KVConstants.DELIM,  primaryReplica.getEndHash().toString()};            
+            this.primaryReplica = new ServerMetaData(pMetaData);
+            String[] pHash = {primaryReplica.getBeginHash().toString(16),  primaryReplica.getEndHash().toString(16)};
             try{
                 this.pReplica = true;
                 success = moveData(pHash, pReplicaName);
@@ -620,7 +749,7 @@ public class KVServer implements IKVServer, Runnable {
                 logger.error("Could not find meta data of server " + sReplicaName);
                 return false;
             }
-            this.secondaryReplica.updateServerMetaData(sMetaData);
+            this.secondaryReplica = new ServerMetaData(sMetaData);
             String[] sHash = {secondaryReplica.getBeginHash().toString(), KVConstants.DELIM, secondaryReplica.getEndHash().toString()};            
             try {
                 this.sReplica = true;
@@ -642,9 +771,9 @@ public class KVServer implements IKVServer, Runnable {
         try {
             zkImplServer.updateData(this.zkPath, getZnodeData("SERVER_STARTED", getCurrentTimeString()));
         } catch (KeeperException e) {
-        	logger.error("ERROR: Unable to update ZK " + e);
+            logger.error("ERROR: Unable to update ZK " + e);
         } catch (InterruptedException e) {
-        	logger.error("ERROR: ZK Interrupted" + e);
+            logger.error("ERROR: ZK Interrupted" + e);
         }
     }
 
@@ -655,11 +784,11 @@ public class KVServer implements IKVServer, Runnable {
         try {
             zkImplServer.updateData(this.zkPath, getZnodeData("SERVER_STOPPED", getCurrentTimeString()));
         } catch (KeeperException e) {
-        	logger.error("ERROR: Unable to update ZK " + e);
+            logger.error("ERROR: Unable to update ZK " + e);
         } catch (InterruptedException e) {
-        	logger.error("ERROR: ZK Interrupted" + e);
+            logger.error("ERROR: ZK Interrupted" + e);
         } catch (Exception e) {
-        	logger.error("ERROR: ZK Exception" + e);
+            logger.error("ERROR: ZK Exception" + e);
         }
         this.timeStamper.stop();
     }
@@ -672,9 +801,9 @@ public class KVServer implements IKVServer, Runnable {
         try {
             zkImplServer.updateData(this.zkPath, getZnodeData("SERVER_SHUTDOWN", getCurrentTimeString()));
         } catch (KeeperException e) {
-        	logger.error("ERROR: Unable to update ZK " + e);
+            logger.error("ERROR: Unable to update ZK " + e);
         } catch (InterruptedException e) {
-        	logger.error("ERROR: ZK Interrupted" + e);
+            logger.error("ERROR: ZK Interrupted" + e);
         }
         this.timeStamper.stop();
         this.close();
@@ -704,28 +833,28 @@ public class KVServer implements IKVServer, Runnable {
 
     @Override
     public boolean moveData(String[] hashRange, String targetName) 
-    	throws Exception {
+        throws Exception {
         // TODO Transfer a subset (range) of the KVServer's data to another KVServer (reallocation before
         // removing this server or adding a new KVServer to the ring); send a notification to the ECS,
         // if data transfer is completed.
         logger.debug("DEBUG: getHostname() = " + getHostname());
         logger.debug("DEBUG: targetName() = " + targetName);
         if(targetName.equals(getHostname())) return true;
-        boolean unlock = (!this.isStopped());
+        boolean unlock = !this.isStopped();
         lockWrite();
         StringBuilder toSend = new StringBuilder();
         toSend.append("MOVE_KVPAIRS" + KVConstants.DELIM);
         if(pReplica) {
             logger.debug("Writing to pReplica : " + targetName);
-            toSend.append("PREPLICA" + KVConstants.DELIM);    
+            toSend.append(KVConstants.PREPLICA + KVConstants.DELIM);
         }
         else if(sReplica) {
             logger.debug("Writing to sReplica: " + targetName);
-            toSend.append("SREPLICA" + KVConstants.DELIM);    
+            toSend.append(KVConstants.SREPLICA + KVConstants.DELIM);
         }
         else {
             logger.debug("Writing to Coordinator: " + targetName);
-            toSend.append("COORDINATOR" + KVConstants.DELIM);        
+            toSend.append(KVConstants.COORDINATOR + KVConstants.DELIM);
         }
         logger.debug("Command is: " + toSend.toString());
         boolean found = false;
@@ -740,7 +869,7 @@ public class KVServer implements IKVServer, Runnable {
                     //TODO this is because some white spaces get inserted in the file
                     //this if statement is a temporary workaround for that
                     if (line.trim().length() == 0) continue; 
-                    String[] kvp = line.split("\\" + KVConstants.DELIM);
+                    String[] kvp = line.split(KVConstants.SPLIT_DELIM);
                     if(this.moveAll || !isResponsible(kvp[0])) {
                         logger.debug(getHostname() + " not responsible for key " + kvp[0]);
                         found = true;
