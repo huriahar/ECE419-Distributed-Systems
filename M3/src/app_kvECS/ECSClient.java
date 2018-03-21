@@ -84,7 +84,8 @@ public class ECSClient implements IECSClient {
         }
         //true indicates that this is a list of crashed servers
         removeNodesDirectly(nodesToRemove, true);
-        //TODO addNodes
+        //TODO randomize cache strategy and size?
+        addNodes(nodesToRemove.size(), "FIFO", 5);
         return nocrashes;
     }
 
