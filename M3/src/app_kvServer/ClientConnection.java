@@ -123,7 +123,8 @@ public class ClientConnection implements Runnable {
                             continue;
                         }
                         // Check if server is responsible for this key
-                        if (!server.isResponsible(key) && command.equals("PUT")){
+                        if ((command.equals("PUT") && !server.isResponsible(key)) ||
+                            (command.equals("GET") && !server.serverOrReplicasResponsible(key))) {
                             sendMessage(new TextMessage("SERVER_NOT_RESPONSIBLE"));
                             TextMessage getMetaData = receiveMessage();
                             if(getMetaData.getMsg().equals("GET_METADATA")) {

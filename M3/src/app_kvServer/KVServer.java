@@ -692,22 +692,33 @@ public class KVServer implements IKVServer, Runnable {
         this.cache.print();
     }
 
-    public boolean isResponsible(String key) {
+    public boolean serverOrReplicasResponsible(String key) {
+        return isServerResponsible(key,this.metadata)       ||
+               isServerResponsible(key,this.primaryReplica) ||
+               isServerResponsible(key,this.secondaryReplica);
+    }
+
+    public boolean isServerResponsible(String key, ServerMetaData server) {
+        if(server == null) return false;
         BigInteger encodedKey = md5.encode(key);
-        logger.debug("DEBUG: key " + encodedKey + " bHash " + metadata.bHash + " eHash " + metadata.eHash);
+        logger.debug("DEBUG: key " + encodedKey + " bHash " + server.bHash + " eHash " + server.eHash);
         logger.debug("DEBUG: minHash " + KVConstants.MIN_HASH + " maxHash " + KVConstants.MAX_HASH);
         boolean ret = false, ret2 = false, ret3 = false;
-        if( (metadata.bHash).compareTo(metadata.eHash) < 0 ) {
-            ret = (encodedKey.compareTo(metadata.bHash) >= 0  && encodedKey.compareTo(metadata.eHash) < 0);
+        if( (server.bHash).compareTo(server.eHash) < 0 ) {
+            ret = (encodedKey.compareTo(server.bHash) >= 0  && encodedKey.compareTo(server.eHash) < 0);
             logger.debug("DEBUG: isResp? " + ret);
             return ret;
         } else {
-            ret2 = (encodedKey.compareTo(metadata.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0);
-            ret3 = (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(metadata.eHash) < 0);
+            ret2 = (encodedKey.compareTo(server.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0);
+            ret3 = (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(server.eHash) < 0);
             logger.debug("DEBUG: isResp? " + ret2);
             logger.debug("DEBUG: isResp? " + ret3);
             return (ret2 || ret3);
         }
+    }
+
+    public boolean isResponsible(String key) {
+        return isServerResponsible(key, this.metadata);
     }
 
     public String getServerReplicas() {
