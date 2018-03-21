@@ -1003,6 +1003,7 @@ public class KVServer implements IKVServer, Runnable {
         //If no data to move, and the target is one of your replicas, need to send them a msg
         //to make sure they delete their existing files, if any
         if(found || pReplica || sReplica) {
+            logger.debug("found? " + found + " pReplica " + pReplica + " sReplica " + sReplica);
             //Send to receiving server
             ServerMetaData targetMeta = new ServerMetaData(getMetaDataOfServer(targetName));
             KVStore sender = new KVStore(targetMeta.addr, targetMeta.port);
