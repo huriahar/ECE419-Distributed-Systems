@@ -264,17 +264,19 @@ public class ECS implements IECS {
     public boolean sendReplicas(IECSNode node) {
         boolean success = true;
         // Find the replicas of the given server
-        ArrayList<String> replicas = getReplicas(node);
-        String joinedReplicas = getReplicasString(replicas);
+        ArrayList<IECSNode> replicas = getReplicas(node);
+        String joinedReplicaNames = getReplicaNames(replicas);
+        String joinedReplicaPorts = getReplicaPorts(replicas);
         TextMessage response, message;
         // Step 1
         // Ask the rNode to update its replicas
-        message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_REPLICAS" + joinedReplicas);
+        message = new TextMessage("ECS" + KVConstants.DELIM + "UPDATE_REPLICAS" + joinedReplicaNames);
         try {
             try {
                 String data = ZKImpl.readData(getZKPath(node.getNodeName()));
                 String[] splitData = data.split(KVConstants.SPLIT_DELIM);
-                data = splitData[0]+KVConstants.DELIM +splitData[1]+KVConstants.DELIM +splitData[2]+KVConstants.DELIM +splitData[3]+joinedReplicas;
+                data = splitData[0]+KVConstants.DELIM +splitData[1]+KVConstants.DELIM +splitData[2]+KVConstants.DELIM +splitData[3]+joinedReplicaPorts;
+                System.out.println("UPDATING ZNODEEEEEEEEEEEE " + data);
                 ZKImpl.updateData(getZKPath(node.getNodeName()), data);
             } catch (KeeperException e) {
                 System.out.println("Error cannot update znode replicas");
@@ -434,25 +436,38 @@ public class ECS implements IECS {
         return currNode; 
     }
 
-    ArrayList<String> getReplicas(IECSNode currNode) {
-        ArrayList<String> replicas = new ArrayList<String>();
+    ArrayList<IECSNode> getReplicas(IECSNode currNode) {
+        ArrayList<IECSNode> replicas = new ArrayList<IECSNode>();
         // Give end hash of own server
         IECSNode primaryReplica = findNextNode(currNode.getNodeHashRange()[1]);
         if (!primaryReplica.getNodeName().equals(currNode.getNodeName())) {
-            replicas.add(primaryReplica.getNodeName());
+            replicas.add(primaryReplica);
             IECSNode secondaryReplica = findNextNode(primaryReplica.getNodeHashRange()[1]);
             if(!secondaryReplica.getNodeName().equals(currNode.getNodeName())) {
-                replicas.add(secondaryReplica.getNodeName());
+                replicas.add(secondaryReplica);
             }
         }
         return replicas;
     }
 
-    String getReplicasString(ArrayList<String> replicas) {
+    String getReplicaPorts(ArrayList<IECSNode> replicas) {
         String joinedReplicas = "";
         for (int i = 0; i < KVConstants.NUM_REPLICAS; ++i) {
             if (i < replicas.size()) {
-                joinedReplicas = joinedReplicas + KVConstants.DELIM + replicas.get(i);
+                joinedReplicas = joinedReplicas + KVConstants.DELIM + replicas.get(i).getNodePort();
+            }
+            else {
+                joinedReplicas = joinedReplicas + KVConstants.DELIM + KVConstants.ZERO_STRING;
+            }
+        }
+        return joinedReplicas;
+    }
+
+    String getReplicaNames(ArrayList<IECSNode> replicas) {
+        String joinedReplicas = "";
+        for (int i = 0; i < KVConstants.NUM_REPLICAS; ++i) {
+            if (i < replicas.size()) {
+                joinedReplicas = joinedReplicas + KVConstants.DELIM + replicas.get(i).getNodeName();
             }
             else {
                 joinedReplicas = joinedReplicas + KVConstants.DELIM + KVConstants.NULL_STRING;
@@ -460,6 +475,7 @@ public class ECS implements IECS {
         }
         return joinedReplicas;
     }
+
 
     private String getLastRemoved() {
         try {
@@ -637,7 +653,7 @@ public class ECS implements IECS {
             // Also create a new znode for the node
             // Update data on znode about server config and join ZK_ROOT group
             ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
-            String data = "SERVER_STOPPED" + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + KVConstants.TIMESTAMP_DEFAULT + KVConstants.DELIM + KVConstants.NULL_STRING + KVConstants.DELIM + KVConstants.NULL_STRING;
+            String data = "SERVER_STOPPED" + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + KVConstants.TIMESTAMP_DEFAULT + KVConstants.DELIM + KVConstants.ZERO_STRING + KVConstants.DELIM + KVConstants.ZERO_STRING;
             ZKImpl.updateData(getZKPath(node.getNodeName()), data);
             Thread.sleep(KVConstants.LAUNCH_TIMEOUT);
 

@@ -130,6 +130,7 @@ public class KVServer implements IKVServer, Runnable {
             info[0] = status;
             info[3] = timestamp;
             data = String.join(KVConstants.DELIM, info);
+            logger.debug("Reading znode..." + data);
         } catch (KeeperException e) {
             logger.error("ERROR: Unable to update ZK " + e);
         } catch (InterruptedException e) {
@@ -222,6 +223,15 @@ public class KVServer implements IKVServer, Runnable {
         if(value.equals("")){
             // 1- retrieve from disk    
             value = getValueFromDisk(key);            
+            if(value.equals("")) {
+                setRole(KVConstants.PREPLICA);
+                value = getValueFromDisk(key);            
+                if(value.equals("")) {
+                    setRole(KVConstants.SREPLICA);
+                    value = getValueFromDisk(key);            
+                }
+                setRole(KVConstants.COORDINATOR);
+            }
             if(!value.equals("")) {
                 // 2 - insert in cache
                 this.cache.insert(key, value);
@@ -266,9 +276,6 @@ public class KVServer implements IKVServer, Runnable {
                     logger.info("Connected to " 
                             + client.getInetAddress().getHostName() 
                             +  " on port " + client.getPort());
-
-                   updateTimeStamp(); 
-
                 }
                 catch (IOException e) {
                     logger.error("Error! " +
@@ -325,7 +332,7 @@ public class KVServer implements IKVServer, Runnable {
     public String onDisk(String key) throws IOException {
         String value = "";
         String key_val, get_value;
-        String filePath  = this.serverFilePath;
+        String filePath  = this.currFilePath;
         BufferedReader br = null;
         String KVPair;
         try {
@@ -341,9 +348,9 @@ public class KVServer implements IKVServer, Runnable {
             }
 
             if(!file.exists()) {
-                logger.error("File not found");
+                logger.debug("File " + this.currFilePath + " not found. Key " + key + " not on disk.");
             }
-            else{
+            else {
                 
                 FileReader fr = new FileReader(file);
                 br = new BufferedReader(fr);
@@ -712,7 +719,7 @@ public class KVServer implements IKVServer, Runnable {
                 String[] metaData = metaDataLines.get(i).split(KVConstants.SPLIT_DELIM);
                 String zkServerPath = KVConstants.ZK_SEP + KVConstants.ZK_ROOT + KVConstants.ZK_SEP + metaData[ServerMetaData.SERVER_NAME];
                 String[] znodedata = zkImplServer.readData(zkServerPath).split(KVConstants.SPLIT_DELIM);
-                marshalledData.append(metaData[ServerMetaData.SERVER_NAME] + KVConstants.DELIM + znodedata[4] + KVConstants.DELIM + znodedata[5] + KVConstants.NEWLINE_DELIM);
+                marshalledData.append(metaData[ServerMetaData.SERVER_PORT] + KVConstants.DELIM + znodedata[4] + KVConstants.DELIM + znodedata[5] + KVConstants.NEWLINE_DELIM);
             }
         } catch (IOException e) {
             marshalledData.append("REPLICA_FETCH_ERROR");
@@ -770,19 +777,6 @@ public class KVServer implements IKVServer, Runnable {
         logger.info("Set KVServer (" + metadata.getServerName() + ", " + metadata.getServerAddr() + ", " + metadata.getServerPort() + ") " +
                     "\nStart hash to: " + metadata.getBeginHash().toString(16) + "\nEnd hash to: " + metadata.getEndHash().toString(16));
         return true;
-    }
-
-    private void updateTimeStamp() {
-        //Update timestamp on the server's Znode
-        try {
-            String data = zkImplServer.readData(this.zkPath);
-            String[] info = data.split(KVConstants.SPLIT_DELIM);
-            zkImplServer.updateData(this.zkPath, getZnodeData(info[0], getCurrentTimeString()));
-        } catch (KeeperException e) {
-           logger.error("ERROR: Unable to update ZK " + e);
-        } catch (InterruptedException e) {
-           logger.error("ERROR: ZK Interrupted" + e);
-        }
     }
 
     private String getCurrentTimeString() {

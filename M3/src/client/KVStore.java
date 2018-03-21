@@ -12,7 +12,8 @@ import java.util.Set;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.TreeMap;
-
+import java.util.Random;
+import java.util.ArrayList;
 
 import java.net.UnknownHostException;
 import java.io.IOException;
@@ -36,6 +37,9 @@ public class KVStore implements KVCommInterface {
     private OutputStream output;
     private InputStream input;
     private TreeMap<BigInteger, ServerMetaData> ringNetwork;
+    private TreeMap<Integer, ServerMetaData> pReplicas;
+    private TreeMap<Integer, ServerMetaData> sReplicas;
+    private Random rand;
 
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
@@ -51,6 +55,9 @@ public class KVStore implements KVCommInterface {
         this.serverAddr = address;
         this.serverPort = port;
         this.ringNetwork = new TreeMap<BigInteger, ServerMetaData>();
+        this.pReplicas = new TreeMap<Integer, ServerMetaData>();
+        this.sReplicas = new TreeMap<Integer, ServerMetaData>();
+        this.rand = new Random();
         // Add the server address and port to the hash ring
         BigInteger serverHash = md5.encode(address + KVConstants.HASH_DELIM +
                 Integer.toString(port));
@@ -93,19 +100,46 @@ public class KVStore implements KVCommInterface {
         ringNetwork.put(nextNode.getHashRange()[1], nextNode);
         return currNode; 
     }
+
+    private boolean isConnected(String addr, int port) {
+        logger.debug("in isConnected.. checking for addr " + addr + " port " + port);
+        return (this.serverAddr.equals(addr) && this.serverPort == port);
+    }
 	
-	public void connectToResponsibleServer(String key) {
+	public void connectToResponsibleServer(String key, String cmd) {
 		BigInteger responsibleServerKey = getResponsibleServer(key);
 		ServerMetaData responsibleServerMeta = ringNetwork.get(responsibleServerKey);
+        if(responsibleServerMeta == null) {
+            //TODO make sure that after the coordinator crashes, client doesn't get stuck here!
+            logger.error("Responsible coordinator not on the ring network!");
+            return;
+        }
+        List<ServerMetaData> options = new ArrayList<ServerMetaData>();
+        options.add(responsibleServerMeta); 
+        //choose randomly between connecting to the coordinator or its replicas to distribute
+        //the load
+        ServerMetaData pReplica = pReplicas.get(responsibleServerMeta.getServerPort());
+        ServerMetaData sReplica = sReplicas.get(responsibleServerMeta.getServerPort());
+        if(pReplica != null) options.add(pReplica);
+        if(sReplica != null) options.add(sReplica);
 		
-		if ((responsibleServerMeta.getServerAddr() == this.serverAddr) && (responsibleServerMeta.getServerPort() == this.serverPort)) {
-			// Do nothing. Already connected to the correct server
+		if ((isConnected(responsibleServerMeta.getServerAddr(), responsibleServerMeta.getServerPort())) ||
+            (pReplica != null && cmd.equals(KVConstants.GET_CMD) && isConnected(pReplica.getServerAddr(), pReplica.getServerPort())) ||
+            (sReplica != null && cmd.equals(KVConstants.GET_CMD) && isConnected(sReplica.getServerAddr(), sReplica.getServerPort()))) {
+			// Do nothing. Already connected to the responsible server, either the coordinator
+            // or one of its replicas
 			return;
 		}
 		else {
+            logger.debug("Not connected to either replica or coord!");
+            //Randomly choose which one to connect to
+            int randomNum = rand.nextInt(options.size()); 
+            if(cmd.equals(KVConstants.PUT_CMD)) randomNum = 0;   //if this is a PUT, always connect to the coordinator, not one of the replicas
+            logger.debug("Choosing between COORD and REPLICAS.... randomNum is " + randomNum  + " and options size is " + options.size());
+            assert randomNum >= 0 && randomNum < options.size();
 			disconnect();
-			this.serverAddr = responsibleServerMeta.getServerAddr();
-			this.serverPort = responsibleServerMeta.getServerPort();
+			this.serverAddr = options.get(randomNum).getServerAddr();
+			this.serverPort = options.get(randomNum).getServerPort();
 			try {
 				connect();
 			} catch (IOException e) {
@@ -182,14 +216,16 @@ public class KVStore implements KVCommInterface {
     @Override
     public KVReplyMessage put(String key, String value)
             throws Exception {
+        logger.debug("in put: key  = " + key + " value  " + value);
         // step 1 - input validation
         if (!errorCheck(key, value)) {
+            logger.debug("error check failed in put: key  = " + key + " value  " + value);
             return new KVReplyMessage(key, value, KVMessage.StatusType.PUT_ERROR);
         }
         
         // Step2 - Figure out which server is responsible based on the information 
         // that KVStore has and connect to it
-        connectToResponsibleServer(key);
+        connectToResponsibleServer(key, KVConstants.PUT_CMD);
 
         // step 3 - send a PUT request to the server
         // Marshall the sending message
@@ -209,6 +245,7 @@ public class KVStore implements KVCommInterface {
             //TODO if server is stopped, do you return PUT/GET failed or SERVER_STOPPED?
         	// This means that my metaData on servers is incorrect - so handle that
             case SERVER_NOT_RESPONSIBLE:
+                logger.debug("SERVER is not responsible.... finding which one is...");
                 kvreply = retryRequest(key, value, KVConstants.PUT_CMD);
             default:
                 break;
@@ -224,7 +261,7 @@ public class KVStore implements KVCommInterface {
             return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
         }
 
-        connectToResponsibleServer(key);
+        connectToResponsibleServer(key, KVConstants.GET_CMD);
         // step 2 - send a PUT request to the server
         TextMessage message = new TextMessage(KVConstants.GET_CMD + KVConstants.DELIM + key);
         sendMessage(message);
@@ -275,9 +312,33 @@ public class KVStore implements KVCommInterface {
         else {
             // Update ServerMetaData
             updateMetaData(reply.getMsg());
+            //receive the second msg with the replica information
+            reply = receiveMessage();
+            if(!reply.getMsg().equals("REPLICA_FETCH_ERROR")) {
+                updateReplicaInformation(reply.getMsg());
+            }
             return (request.equals(KVConstants.PUT_CMD)) ? put(key, value) : get(key);
             
         }
+    }
+
+    private ServerMetaData findServerInRingNetwork(Integer port) {
+        for(Map.Entry<BigInteger, ServerMetaData> entry : ringNetwork.entrySet()) {
+            ServerMetaData node = entry.getValue();
+            if(node.getServerPort() == port) {
+               return node;
+            }
+        }
+        return null;
+    }
+
+    private void updateReplicaInformation(String marshalledData) {
+        String[] dataEntries = marshalledData.split(KVConstants.NEWLINE_DELIM);
+        for(int i = 0; i < dataEntries.length ; ++i) {
+            String[] entry = dataEntries[i].split(KVConstants.SPLIT_DELIM);
+            this.pReplicas.put(Integer.parseInt(entry[0]), findServerInRingNetwork(Integer.parseInt(entry[1])));
+            this.sReplicas.put(Integer.parseInt(entry[0]), findServerInRingNetwork(Integer.parseInt(entry[2])));
+        } 
     }
 
     private void updateMetaData(String marshalledData) {

@@ -20,6 +20,7 @@ public class KVConstants {
     public static final long TIMESTAMPER_SLEEP_TIME = 5000;    
     public static final int NUM_REPLICAS = 2;
     public static final String NULL_STRING = "NULL";
+    public static final String ZERO_STRING = "0";
     public static final String PREPLICA = "PREPLICA";
     public static final String SREPLICA = "SREPLICA";
     public static final String COORDINATOR = "COORDINATOR";

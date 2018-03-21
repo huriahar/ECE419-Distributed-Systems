@@ -123,13 +123,16 @@ public class ClientConnection implements Runnable {
                             continue;
                         }
                         // Check if server is responsible for this key
-                        if (!server.isResponsible(key)){
+                        if (!server.isResponsible(key) && command.equals("PUT")){
                             sendMessage(new TextMessage("SERVER_NOT_RESPONSIBLE"));
                             TextMessage getMetaData = receiveMessage();
                             if(getMetaData.getMsg().equals("GET_METADATA")) {
-                                sendMessage(new TextMessage(server.getMetaDataFromFile()));
-                                System.out.println(server.getServerReplicas());
-                                sendMessage(new TextMessage(server.getServerReplicas()));
+                                String metaFetchStatus = server.getMetaDataFromFile();
+                                sendMessage(new TextMessage(metaFetchStatus));
+                                if(!metaFetchStatus.equals("METADATA_FETCH_ERROR")) {
+                                    System.out.println(server.getServerReplicas());
+                                    sendMessage(new TextMessage(server.getServerReplicas()));
+                                }
                             } else {
                                 logger.info("ERROR!!! EXPECTED TO RECEIVE GET_METADATA MSG!!");
                             }
