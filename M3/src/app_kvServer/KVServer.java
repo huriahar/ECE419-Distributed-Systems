@@ -401,7 +401,6 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public boolean handleMoveKVPairs (String destination, String KVPairs) {
-        if (KVPairs == null) return true;
         boolean success = true;
         if (destination.equals(KVConstants.PREPLICA)) {
             // DELETE THE current pReplica file
@@ -431,6 +430,13 @@ public class KVServer implements IKVServer, Runnable {
         else {
             logger.error("MOVE_KVPAIRS destination is not COORDINATOR/PREPLICA/SREPLICA!");
             success = false;
+        }
+        //If there are no KVPairs to move, and the role of the server is currently a replica
+        //allow the replicas to delete their files first as that means they should not have
+        //any data in their replica files
+        if (KVPairs == null) {
+            setRole(KVConstants.COORDINATOR);
+            return true;
         }
         System.out.println("handleMoveKVPairs writing to file " + currFilePath);
         logger.debug("KVPairs: " + KVPairs);
@@ -994,7 +1000,9 @@ public class KVServer implements IKVServer, Runnable {
             logger.error("ERROR while moving data from server to target server" + targetName);
             return false;
         }
-        if(found) {
+        //If no data to move, and the target is one of your replicas, need to send them a msg
+        //to make sure they delete their existing files, if any
+        if(found || pReplica || sReplica) {
             //Send to receiving server
             ServerMetaData targetMeta = new ServerMetaData(getMetaDataOfServer(targetName));
             KVStore sender = new KVStore(targetMeta.addr, targetMeta.port);
