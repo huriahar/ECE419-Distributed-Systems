@@ -76,7 +76,7 @@ public class AdditionalTest extends TestCase {
     }
 
     // ------------------------------ tests start here -----------------------------------------//
-/*
+
     @Test
     public void  testInitialization() {
        try{
@@ -324,7 +324,7 @@ public class AdditionalTest extends TestCase {
         //get should be successful
         getKVPair(kvClient, "b", "bb", StatusType.GET_SUCCESS);
     }
-*/
+
     @Test
     public void testDetectServerCrash() {
         System.out.println("********** In 13 Test **************");

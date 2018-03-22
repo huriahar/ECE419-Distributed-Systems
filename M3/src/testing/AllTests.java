@@ -24,7 +24,11 @@ public class AllTests {
 	public static Test suite() {
 		TestSuite clientSuite = new TestSuite("Basic Storage ServerTest-Suite");
 		//clientSuite.addTestSuite(PerformanceTesting.class);
-		clientSuite.addTestSuite(AdditionalTest.class); 
+        //M1 tests
+		clientSuite.addTestSuite(InteractionTest.class); 
+        //M2 tests
+        clientSuite.addTestSuite(AdditionalTest.class); 
+        //M3 tests
 		return clientSuite;
 	}
 	
