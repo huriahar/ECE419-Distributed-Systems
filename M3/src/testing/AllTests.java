@@ -26,6 +26,9 @@ public class AllTests {
 		//clientSuite.addTestSuite(PerformanceTesting.class);
         //M1 tests
 		clientSuite.addTestSuite(InteractionTest.class); 
+		clientSuite.addTestSuite(MultipleClients.class); 
+		clientSuite.addTestSuite(MultipleClients.class); 
+		clientSuite.addTestSuite(CacheTests.class); 
         //M2 tests
         clientSuite.addTestSuite(AdditionalTest.class); 
         //M3 tests
