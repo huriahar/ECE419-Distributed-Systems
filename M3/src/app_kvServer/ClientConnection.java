@@ -84,7 +84,8 @@ public class ClientConnection implements Runnable {
                     else if (command.equals("MOVE_KVPAIRS")) {
                         // Receiving KVPairs from another server
                         String destination = msgContent[1];
-                        if (msgContent.length > 2) {
+                        if (msgContent.length >= 2) {
+                            logger.debug("handle move kvpairs....");
                             success = server.handleMoveKVPairs(destination, value);
                             String res = success ? "MOVE_SUCCESS" : "MOVE_FAILED";
                             sendMessage(new TextMessage(res));

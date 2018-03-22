@@ -406,6 +406,7 @@ public class KVServer implements IKVServer, Runnable {
             // DELETE THE current pReplica file
             try {
                 Files.deleteIfExists(Paths.get(pReplicaFilePath));
+                logger.debug("deleted preplcia file");
             } catch (IOException ex) {
                 // File permission problems are caught here.
                 logger.error("Permission problems " + ex);
@@ -417,6 +418,7 @@ public class KVServer implements IKVServer, Runnable {
             // DELETE THE current sReplica file
             try {
                 Files.deleteIfExists(Paths.get(sReplicaFilePath));
+                logger.debug("deleted sreplcia file");
             } catch (IOException ex) {
                 // File permission problems are caught here.
                 logger.error("Permission problems " + ex);
@@ -434,7 +436,9 @@ public class KVServer implements IKVServer, Runnable {
         //If there are no KVPairs to move, and the role of the server is currently a replica
         //allow the replicas to delete their files first as that means they should not have
         //any data in their replica files
-        if (KVPairs == null) {
+        logger.debug("in handleMoveKVPairs: KVPairs = " + KVPairs);
+        if (KVPairs.equals(null) || KVPairs.equals("")) {
+            logger.debug("nothing to do...");
             setRole(KVConstants.COORDINATOR);
             return true;
         }

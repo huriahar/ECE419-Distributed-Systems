@@ -625,19 +625,30 @@ public class ECS implements IECS {
     public String checkZKStatus(String path, long timeout) {
         //Check status of ZK
         String data = null;
+        String[] zNodeData = {""};
         long currTime = System.currentTimeMillis();
         try {
             data = ZKImpl.readData(path);
+            zNodeData = data.split(KVConstants.SPLIT_DELIM);
+            printDebug(data);
+            printDebug("Current time: " + currTime + " and timeout " + timeout);
+            printDebug("Timed out? : " + (currTime > timeout));
+            logger.debug("server status is " + zNodeData[0]);
+            while(currTime < timeout && !zNodeData[0].equals("SERVER_LAUNCHED")) {
+                logger.debug("server status is " + zNodeData[0]);
+                currTime = System.currentTimeMillis();
+                data = ZKImpl.readData(path);
+                printDebug(data);
+                printDebug("Timed out? : " + (currTime > timeout));
+                zNodeData = data.split(KVConstants.SPLIT_DELIM);
+                printDebug(data);
+            }
         } catch (KeeperException e) {
             logger.error("ERROR: Keeper Exception for ZK: " + e);
         } catch (InterruptedException e) {
             logger.error("ERROR: Interrupted Exception for ZK: " + e);
         }
-        String[] zNodeData = data.split(KVConstants.SPLIT_DELIM);
-        while(currTime > timeout || !zNodeData[0].equals("SERVER_LAUNCHED")) {
-            currTime = System.currentTimeMillis();
-            zNodeData = data.split(KVConstants.SPLIT_DELIM);
-        }
+        logger.debug("returning...");
         return zNodeData[0];
     }
 

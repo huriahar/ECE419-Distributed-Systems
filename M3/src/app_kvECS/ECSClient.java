@@ -85,7 +85,9 @@ public class ECSClient implements IECSClient {
         //true indicates that this is a list of crashed servers
         removeNodesDirectly(nodesToRemove, true);
         //TODO randomize cache strategy and size?
-        addNodes(nodesToRemove.size(), "FIFO", 5);
+        if(nodesToRemove.size() > 0) {
+            addNodes(nodesToRemove.size(), "FIFO", 5);
+        }
         return nocrashes;
     }
 
@@ -93,12 +95,6 @@ public class ECSClient implements IECSClient {
         String[] tokens = cmdLine.split("\\s+");
 
         switch (tokens[0]) {
-            case "quit":
-                stop = true;
-                disconnect();
-                System.out.println(PROMPT + "Application exit!");
-                break;
-
             // init numNodes cacheSize cacheStrategy
             case "init":
                 if(tokens.length == 4) {
@@ -288,8 +284,6 @@ public class ECSClient implements IECSClient {
         sb.append(PROMPT).append("\t\t\t ");
         sb.append("ALL | DEBUG | INFO | WARN | ERROR | FATAL | OFF \n");
         
-        sb.append(PROMPT).append("quit ");
-        sb.append("\t\t\t exits the program");
         System.out.println(sb.toString());
     }
     
@@ -391,6 +385,7 @@ public class ECSClient implements IECSClient {
 
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
+        logger.debug("in addNode");
         if(ecsInstance.availableServersCount() == 0) return null;
         IECSNode node = null;
         if(ecsInstance.ringNetworkSize() == 0) {
@@ -420,6 +415,7 @@ public class ECSClient implements IECSClient {
 
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
+        logger.debug("in setupNodes");
         Collection<IECSNode> nodes = new ArrayList<IECSNode>();
         int counter = 0;
         while(counter < count) {
@@ -438,6 +434,7 @@ public class ECSClient implements IECSClient {
     }
 
     public IECSNode setupFirstNode(String cacheStrategy, int cacheSize) {
+        logger.debug("in setupFirstNode");
         //This function should only be used to setup the first node on the ring network
         boolean success = false;
     	// This is called before launching the servers - decides which nodes to add in hashRing, adds them
@@ -474,19 +471,23 @@ public class ECSClient implements IECSClient {
     public boolean awaitNodes(int count, int timeout) throws Exception {
         String path = null, status = null;
         int counter = 0;
-        long endTimeMillis = System.currentTimeMillis() + timeout*4;
+        long endTimeMillis = System.currentTimeMillis() + timeout*KVConstants.LAUNCH_TIMEOUT;
+        logger.debug("SIZE OF nodesLaunched = " + nodesLaunched.size());
         for(IECSNode entry : nodesLaunched) {
             path = ecsInstance.getZKPath(entry.getNodeName());
             if(path != null) {
                 status = ecsInstance.checkZKStatus(path,endTimeMillis); 
+                logger.debug("status of server " + entry.getNodeName() + " is " + status);
                 if(status.equals("SERVER_LAUNCHED")) {
                     counter++;                
                 }
                 if(System.currentTimeMillis() > endTimeMillis) {
+                    logger.debug("current time is greater than endTimeMillis "  +endTimeMillis);
                     return false;
                 }   
             }
         }
+        logger.debug("counter = " + counter + " count = " + count);
         return (counter == count);
     }
 
