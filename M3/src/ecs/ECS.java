@@ -769,10 +769,10 @@ public class ECS implements IECS {
                                 success = success & sendMoveKVPairs(currNode, nextNode, true);
                             }
                         }
-                        if (prevNode != currNode) {
+                        if (prevNode != currNode && (!nodesCrashed ||  (nodesCrashed && !nodeInList(prevNode, nodes)))) {
                             success = success & sendReplicas(prevNode);
                         }
-                        if (prevPrevNode != currNode) {
+                        if (prevPrevNode != currNode && (!nodesCrashed ||  (nodesCrashed && !nodeInList(prevPrevNode, nodes)))) {
                             success = success & sendReplicas(prevPrevNode);
                         }
                     } catch (IOException io) {
