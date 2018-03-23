@@ -104,7 +104,7 @@ public class ECSClient implements IECSClient {
                         int cacheSize = Integer.parseInt(tokens[3]);
                         if(numNodes <= ecsInstance.availableServers()) {
                             if (KVCache.isValidStrategy(cacheStrategy)) {
-                                nodesLaunched = addNodes(numNodes, cacheStrategy, cacheSize);
+                                addNodes(numNodes, cacheStrategy, cacheSize);
                                 if(nodesLaunched == null) {
                                     printError(PROMPT + "Unable to start any KVServers");
                                     logger.error("Unable to launch any KVServers");
@@ -471,7 +471,7 @@ public class ECSClient implements IECSClient {
     public boolean awaitNodes(int count, int timeout) throws Exception {
         String path = null, status = null;
         int counter = 0;
-        long endTimeMillis = System.currentTimeMillis() + timeout*KVConstants.LAUNCH_TIMEOUT;
+        long endTimeMillis = System.currentTimeMillis() + timeout;
         logger.debug("SIZE OF nodesLaunched = " + nodesLaunched.size());
         for(IECSNode entry : nodesLaunched) {
             path = ecsInstance.getZKPath(entry.getNodeName());
@@ -526,6 +526,10 @@ public class ECSClient implements IECSClient {
     @Override
     public IECSNode getNodeByKey(String Key) {
         return ecsInstance.getNodeByKey(Key);
+    }
+
+    public Collection<IECSNode> getNodesLaunched() {
+        return nodesLaunched;
     }
 
     public static void main(String[] args) {

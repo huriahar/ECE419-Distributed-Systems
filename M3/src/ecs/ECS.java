@@ -634,7 +634,7 @@ public class ECS implements IECS {
             printDebug("Current time: " + currTime + " and timeout " + timeout);
             printDebug("Timed out? : " + (currTime > timeout));
             logger.debug("server status is " + zNodeData[0]);
-            while(currTime < timeout && !zNodeData[0].equals("SERVER_LAUNCHED")) {
+            while(currTime < timeout && zNodeData[0].equals("SERVER_INITIATED")) {
                 logger.debug("server status is " + zNodeData[0]);
                 currTime = System.currentTimeMillis();
                 data = ZKImpl.readData(path);
@@ -664,7 +664,7 @@ public class ECS implements IECS {
             // Also create a new znode for the node
             // Update data on znode about server config and join ZK_ROOT group
             ZKImpl.joinGroup(KVConstants.ZK_ROOT, node.getNodeName());
-            String data = "SERVER_STOPPED" + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + KVConstants.TIMESTAMP_DEFAULT + KVConstants.DELIM + KVConstants.ZERO_STRING + KVConstants.DELIM + KVConstants.ZERO_STRING;
+            String data = "SERVER_INITIATED" + KVConstants.DELIM + node.getNodeHost() + KVConstants.DELIM + node.getNodePort() + KVConstants.DELIM + KVConstants.TIMESTAMP_DEFAULT + KVConstants.DELIM + KVConstants.ZERO_STRING + KVConstants.DELIM + KVConstants.ZERO_STRING;
             ZKImpl.updateData(getZKPath(node.getNodeName()), data);
             Thread.sleep(KVConstants.LAUNCH_TIMEOUT);
 
