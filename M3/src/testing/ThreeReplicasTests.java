@@ -17,6 +17,7 @@ import ecs.*;
 import java.util.ArrayList;
 import app_kvECS.*;
 import java.util.Collection;
+import java.util.Collections;
 import java.math.BigInteger;
 import common.*;
 import java.lang.Process;
@@ -24,13 +25,14 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 
-public class ReplicasTests extends TestCase {
+
+public class ThreeReplicasTests extends TestCase {
     
     private ECSClient ecsClient;
     Collection<IECSNode> nodes;
 
 	public void setUp() {
-        ecsClient = new ECSClient("testECS.config", "localhost");
+        ecsClient = new ECSClient("testECSThree.config", "localhost");
         ecsClient.setLevel("INFO");
         try {
             Process p = Runtime.getRuntime().exec(new String[]{"csh","-c","rm -rf SERVER_5000*"});
@@ -103,114 +105,99 @@ public class ReplicasTests extends TestCase {
     // ------------------------------ tests start here -----------------------------------------//
 
     @Test
-    public void testDetectServerCrash() {
+    public void testReplicaFileContent() {
         System.out.println("********** In 1 Test **************");
-        nodes = ecsClient.addNodes(1, "LRU", 5);
-        IECSNode node1 = nodes.iterator().next();
-        Exception ex = null;
-        try {
-            Runtime run = Runtime.getRuntime();
-            //kill_knserver.py finds this pattern with the given port and kills the process
-            //java     11515 elsaye10   23u  IPv6 547623      0t0  TCP *:50005 (LISTEN)
-            String[] launchCmd = {"python", "kill_kvserver.py", Integer.toString(node1.getNodePort())};
-            Process proc;
-            proc = run.exec(launchCmd);
-            TimeUnit.SECONDS.sleep(10);
-        } catch (InterruptedException e) {
-            ex = e;
-        } catch (IOException e) {
-            ex = e;
-        }
-        assertTrue(ex == null);
-        boolean nocrashes = ecsClient.checkServerStatus();
-        assertFalse(nocrashes);
-   }
-
-    @Test
-    public void testReplicaFileContentTwoNodes() {
-        System.out.println("********** In 3 Test **************");
-        nodes = ecsClient.addNodes(2, "LRU", 5);
+        nodes = ecsClient.addNodes(3, "LRU", 5);
         Iterator<IECSNode> it = nodes.iterator();
+        //Collections.sort(nodes, new IECSNodeComparator());
+        IECSNode node1 = it.next();
+        IECSNode temp;
+        //Node 1 should contain 50003 - where the key b maps
         assertTrue(ecsClient.start());
         //Connect client to server and put KV pair
         KVStore kvClient = new KVStore("localhost", 50003);
         connectToKVServer(kvClient);
-        putKVPair(kvClient, "b", "bb", StatusType.PUT_SUCCESS);
         putKVPair(kvClient, "a", "aa", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "b", "bb", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "g", "gg", StatusType.PUT_SUCCESS);
         kvClient.disconnect();
 
-
         //Check the content of the coordinator replica files
-        String fileName = "SERVER_50003"; 
+        String fileName = "SERVER_50001"; 
+        readLineFromFile(Paths.get(fileName), true, "g|gg");
+
+        fileName = "SERVER_50001_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+        fileName = "SERVER_50001_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+
+        fileName = "SERVER_50003"; 
         readLineFromFile(Paths.get(fileName), true, "b|bb");
 
         fileName = "SERVER_50003_PRIMARY"; 
         readLineFromFile(Paths.get(fileName), true, "a|aa");
 
+        fileName = "SERVER_50003_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), true, "g|gg");
+
         fileName = "SERVER_50006"; 
         readLineFromFile(Paths.get(fileName), true, "a|aa");
 
         fileName = "SERVER_50006_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "g|gg");
+
+        fileName = "SERVER_50006_SECONDARY"; 
         readLineFromFile(Paths.get(fileName), true, "b|bb");
 
     }
 
     @Test
-    public void testPersistentDataAfterCrash() {
-        System.out.println("********** In 5 Test **************");
-        nodes = ecsClient.addNodes(2, "LRU", 5);
+    public void testReplicaEmptyFile() {
+        System.out.println("********** In 1 Test **************");
+        nodes = ecsClient.addNodes(3, "LRU", 5);
         Iterator<IECSNode> it = nodes.iterator();
+        //Collections.sort(nodes, new IECSNodeComparator());
         IECSNode node1 = it.next();
-        IECSNode node2 = it.next();
+        IECSNode temp;
+        //Node 1 should contain 50003 - where the key b maps
         assertTrue(ecsClient.start());
-
         //Connect client to server and put KV pair
-        KVStore kvClient = new KVStore("localhost", node1.getNodePort());
+        KVStore kvClient = new KVStore("localhost", 50003);
         connectToKVServer(kvClient);
+        putKVPair(kvClient, "a", "aa", StatusType.PUT_SUCCESS);
         putKVPair(kvClient, "b", "bb", StatusType.PUT_SUCCESS);
         kvClient.disconnect();
 
-        //Kill the server
-        Exception ex = null;
-        try {
-            Runtime run = Runtime.getRuntime();
-            //kill_knserver.py finds this pattern with the given port and kills the process
-            //java     11515 elsaye10   23u  IPv6 547623      0t0  TCP *:50005 (LISTEN)
-            String[] launchCmd = {"python", "kill_kvserver.py", Integer.toString(node1.getNodePort())};
-            Process proc;
-            proc = run.exec(launchCmd);
-            TimeUnit.SECONDS.sleep(10);
-        } catch (InterruptedException e) {
-            ex = e;
-        } catch (IOException e) {
-            ex = e;
-        }
-        assertTrue(ex == null);
-        boolean nocrashes = ecsClient.checkServerStatus();
-        assertFalse(nocrashes);
+        //Check the content of the coordinator replica files
+        String fileName = "SERVER_50001"; 
+        readLineFromFile(Paths.get(fileName), true, null);
 
-        //Client connects to active server and tries to get the KV pair.
-        //Then client connects to the other active server and tries to get the KV
-        //pair. One of the servers should be the one from earlier and the other
-        //is the crashed server's replacement. Both should contain the KV pait either
-        //as a replica or coordinator
-        nodes = ecsClient.getNodesLaunched();
-        assertTrue(ecsClient.start());
-        System.out.println("nodes.size = " + nodes.size());
-        it = nodes.iterator();
-        node1 = it.next();
-        node2 = it.next();
-        kvClient = new KVStore("localhost", node1.getNodePort());
-        connectToKVServer(kvClient);
-        getKVPair(kvClient, "b", "bb", StatusType.GET_SUCCESS);
-        kvClient.disconnect();
+        fileName = "SERVER_50001_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
 
-        //Client reconnects to active server and tries to get the KV pair
-        kvClient = new KVStore("localhost", node1.getNodePort());
-        connectToKVServer(kvClient);
-        getKVPair(kvClient, "b", "bb", StatusType.GET_SUCCESS);
-        kvClient.disconnect();
-   }
+        fileName = "SERVER_50001_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
 
+        fileName = "SERVER_50003"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+        fileName = "SERVER_50003_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+
+        fileName = "SERVER_50003_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), false, null);
+
+        fileName = "SERVER_50006"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+
+        fileName = "SERVER_50006_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), false, null);
+
+        fileName = "SERVER_50006_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+    }
 }
+
 
