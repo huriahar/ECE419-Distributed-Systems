@@ -325,28 +325,4 @@ public class AdditionalTest extends TestCase {
         getKVPair(kvClient, "b", "bb", StatusType.GET_SUCCESS);
     }
 
-    @Test
-    public void testDetectServerCrash() {
-        System.out.println("********** In 13 Test **************");
-        nodes = ecsClient.addNodes(1, "LRU", 5);
-        IECSNode node1 = nodes.iterator().next();
-        Exception ex = null;
-        try {
-            Runtime run = Runtime.getRuntime();
-            //kill_knserver.py finds this pattern with the given port and kills the process
-            //java     11515 elsaye10   23u  IPv6 547623      0t0  TCP *:50005 (LISTEN)
-            String[] launchCmd = {"python", "kill_kvserver.py", Integer.toString(node1.getNodePort())};
-            Process proc;
-            proc = run.exec(launchCmd);
-            TimeUnit.SECONDS.sleep(10);
-        } catch (InterruptedException e) {
-            ex = e;
-        } catch (IOException e) {
-            ex = e;
-        }
-        assertTrue(ex == null);
-        boolean nocrashes = ecsClient.checkServerStatus();
-        assertFalse(nocrashes);
-   }
-
 }

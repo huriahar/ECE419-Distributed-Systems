@@ -25,13 +25,14 @@ public class AllTests {
 		TestSuite clientSuite = new TestSuite("Basic Storage ServerTest-Suite");
 		//clientSuite.addTestSuite(PerformanceTesting.class);
         //M1 tests
-		clientSuite.addTestSuite(InteractionTest.class); 
-		clientSuite.addTestSuite(MultipleClients.class); 
-		clientSuite.addTestSuite(MultipleClients.class); 
-		clientSuite.addTestSuite(CacheTests.class); 
+		//clientSuite.addTestSuite(InteractionTest.class); 
+		//clientSuite.addTestSuite(MultipleClients.class); 
+		//clientSuite.addTestSuite(MultipleClients.class); 
+		//clientSuite.addTestSuite(CacheTests.class); 
         //M2 tests
-        clientSuite.addTestSuite(AdditionalTest.class); 
+        //clientSuite.addTestSuite(AdditionalTest.class); 
         //M3 tests
+        clientSuite.addTestSuite(ReplicasTests.class); 
 		return clientSuite;
 	}
 	
