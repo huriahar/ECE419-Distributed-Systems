@@ -4,6 +4,12 @@ import org.junit.Test;
 
 import junit.framework.TestCase;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import client.KVStore;
 import common.messages.KVMessage;
 import common.messages.KVMessage.StatusType;
@@ -75,6 +81,25 @@ public class ReplicasTests extends TestCase {
         assertTrue(response != null && response.getStatus().equals(expectedStatus));
     }
 
+    public void readLineFromFile(Path filePath, boolean expectToFind, String value) {
+        Exception ex = null;
+        ArrayList<String> lines = new ArrayList<String>();
+        try {
+            lines = new ArrayList<>(Files.readAllLines(filePath, StandardCharsets.UTF_8));
+        } catch(IOException e) {
+            ex = e;
+        }
+        if(expectToFind) {
+            assertTrue(ex == null);
+            if(value == null) {
+                assertTrue(lines.isEmpty());
+            } else {
+                assertTrue(lines.get(0).equals(value));
+            }
+        } else {
+            assertTrue(ex != null);
+        }
+    }
     // ------------------------------ tests start here -----------------------------------------//
 
     @Test
@@ -100,6 +125,43 @@ public class ReplicasTests extends TestCase {
         boolean nocrashes = ecsClient.checkServerStatus();
         assertFalse(nocrashes);
    }
+
+    @Test
+    public void testReplicaFileContentTwoNodes() {
+        System.out.println("********** In 3 Test **************");
+        nodes = ecsClient.addNodes(2, "LRU", 5);
+        Iterator<IECSNode> it = nodes.iterator();
+        IECSNode node1 = it.next();
+        IECSNode node2 = it.next();
+        IECSNode temp;
+        //Node 1 should contain 50003 - where the key b maps
+        if(node1.getNodePort() > node2.getNodePort()) {
+            temp = node1;
+            node1 = node2;
+            node2 = temp;
+        }
+        assertTrue(ecsClient.start());
+        //Connect client to server and put KV pair
+        KVStore kvClient = new KVStore("localhost", 50003);
+        connectToKVServer(kvClient);
+        putKVPair(kvClient, "b", "bb", StatusType.PUT_SUCCESS);
+        kvClient.disconnect();
+
+
+        //Check the content of the coordinator replica files
+        String fileName = "SERVER_" + node1.getNodePort(); 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+        fileName = "SERVER_" + node1.getNodePort() + "_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), false, null);
+
+        fileName = "SERVER_" + node2.getNodePort(); 
+        readLineFromFile(Paths.get(fileName), true, null);
+
+        fileName = "SERVER_" + node2.getNodePort() + "_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+    }
 
     @Test
     public void testPersistentDataAfterCrash() {
