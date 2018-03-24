@@ -35,7 +35,7 @@ public class ThreeReplicasTests extends TestCase {
         ecsClient = new ECSClient("testECSThree.config", "localhost");
         ecsClient.setLevel("INFO");
         try {
-            Process p = Runtime.getRuntime().exec(new String[]{"csh","-c","rm -rf SERVER_5000*"});
+            Process p = Runtime.getRuntime().exec(new String[]{"csh","-c","rm -rf SERVER_5000* SERVER_6000*"});
         } catch (IOException e) {
             System.out.println("could not rm -rf: " + e); 
         }
@@ -198,6 +198,154 @@ public class ThreeReplicasTests extends TestCase {
         readLineFromFile(Paths.get(fileName), true, "b|bb");
 
     }
+
+    @Test
+    public void testRightReplicaData() {
+        System.out.println("********** In 1 Test **************");
+        nodes = ecsClient.addNodes(3, "LRU", 5);
+        Iterator<IECSNode> it = nodes.iterator();
+        //Collections.sort(nodes, new IECSNodeComparator());
+        IECSNode node1 = it.next();
+        IECSNode temp;
+        //Node 1 should contain 50003 - where the key b maps
+        assertTrue(ecsClient.start());
+        //Connect client to server and put KV pair
+        KVStore kvClient = new KVStore("localhost", 50003);
+        connectToKVServer(kvClient);
+        putKVPair(kvClient, "a", "aa", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "b", "bb", StatusType.PUT_SUCCESS);
+        kvClient.disconnect();
+
+        //Check the content of the coordinator replica files
+        String fileName = "SERVER_50001"; 
+        readLineFromFile(Paths.get(fileName), true, null);
+
+        fileName = "SERVER_50001_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+        fileName = "SERVER_50001_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+
+        fileName = "SERVER_50003"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+        fileName = "SERVER_50003_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+
+        fileName = "SERVER_50003_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), false, null);
+
+        fileName = "SERVER_50006"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+
+        fileName = "SERVER_50006_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), false, null);
+
+        fileName = "SERVER_50006_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+    }
+
+    @Test
+    public void testReplicaUpdateWithNodeRemoval() {
+        System.out.println("********** In 6 Test **************");
+        nodes = ecsClient.addNodes(3, "LRU", 5);
+        Iterator<IECSNode> it = nodes.iterator();
+        //Collections.sort(nodes, new IECSNodeComparator());
+        IECSNode node1 = it.next();
+        IECSNode temp;
+        //Node 1 should contain 50003 - where the key b maps
+        assertTrue(ecsClient.start());
+        //Connect client to server and put KV pair
+        KVStore kvClient = new KVStore("localhost", 50003);
+        connectToKVServer(kvClient);
+        putKVPair(kvClient, "a", "aa", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "b", "bb", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "g", "gg", StatusType.PUT_SUCCESS);
+        kvClient.disconnect();
+
+        //Check the content of the coordinator replica files
+        String fileName = "SERVER_50001"; 
+        readLineFromFile(Paths.get(fileName), true, "g|gg");
+
+        fileName = "SERVER_50001_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+        fileName = "SERVER_50001_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+
+        fileName = "SERVER_50003"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+        fileName = "SERVER_50003_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+
+        fileName = "SERVER_50003_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), true, "g|gg");
+
+        fileName = "SERVER_50006"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+
+        fileName = "SERVER_50006_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "g|gg");
+
+        fileName = "SERVER_50006_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+        
+        Exception ex = null;
+        //Kill all the servers on the network
+        try {
+            //Kill the server
+            Runtime run = Runtime.getRuntime();
+            //kill_knserver.py finds this pattern with the given port and kills the process
+            //java     11515 elsaye10   23u  IPv6 547623      0t0  TCP *:50005 (LISTEN)
+            String[] launchCmd = {"python", "kill_kvserver.py", "50003"};
+            Process proc;
+            proc = run.exec(launchCmd);
+            TimeUnit.SECONDS.sleep(10);
+
+        } catch (InterruptedException e) {
+            ex = e;
+        } catch (IOException e) {
+            ex = e;
+        }
+        assertTrue(ex == null);
+
+        boolean nocrashes = ecsClient.checkServerStatus();
+        assertFalse(nocrashes);
+
+        //Check the content of the coordinator replica files
+        fileName = "SERVER_50001"; 
+        readLineFromFile(Paths.get(fileName), true, "g|gg");
+
+        fileName = "SERVER_50001_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+        fileName = "SERVER_50001_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+
+        fileName = "SERVER_50003"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+        fileName = "SERVER_50003_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+
+        fileName = "SERVER_50003_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), true, "g|gg");
+
+        fileName = "SERVER_50006"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+
+        fileName = "SERVER_50006_PRIMARY"; 
+        readLineFromFile(Paths.get(fileName), true, "g|gg");
+
+        fileName = "SERVER_50006_SECONDARY"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+        
+
+   }
+
+
 }
 
 

@@ -33,7 +33,7 @@ public class ReplicasTests extends TestCase {
         ecsClient = new ECSClient("testECS.config", "localhost");
         ecsClient.setLevel("INFO");
         try {
-            Process p = Runtime.getRuntime().exec(new String[]{"csh","-c","rm -rf SERVER_6000*"});
+            Process p = Runtime.getRuntime().exec(new String[]{"csh","-c","rm -rf SERVER_6000* SERVER_5000*"});
         } catch (IOException e) {
             System.out.println("could not rm -rf: " + e); 
         }
@@ -212,6 +212,28 @@ public class ReplicasTests extends TestCase {
         kvClient.disconnect();
    }
 
+
+    @Test
+    public void testGetFromReplica() {
+        System.out.println("********** In 7 Test **************");
+        nodes = ecsClient.addNodes(2, "LRU", 5);
+        Iterator<IECSNode> it = nodes.iterator();
+        assertTrue(ecsClient.start());
+        //Connect client to server and put KV pair which hashes to this server
+        KVStore kvClient = new KVStore("localhost", 50003);
+        connectToKVServer(kvClient);
+        putKVPair(kvClient, "b", "bb", StatusType.PUT_SUCCESS);
+        kvClient.disconnect();
+
+        kvClient = new KVStore("localhost", 50006);
+        connectToKVServer(kvClient);
+        getKVPair(kvClient, "b", "bb", StatusType.GET_SUCCESS);
+        //Should not get reconnected but get serviced by the replica which is this server
+        assertTrue(kvClient.getServerPort() == 50006);
+        kvClient.disconnect();
+        
+
+   }
     @Test
     public void testAllServerCrash() {
         System.out.println("********** In 8 Test **************");
@@ -249,6 +271,24 @@ public class ReplicasTests extends TestCase {
         nodesNew = ecsClient.getNodesLaunched();
         System.out.println("nodes.size = " + nodesNew.size());
         assertTrue(nodesNew.size()==nodes.size());
+   }
+
+
+    @Test
+    public void testPutToReplica() {
+        System.out.println("********** In 9 Test **************");
+        nodes = ecsClient.addNodes(2, "LRU", 5);
+        Iterator<IECSNode> it = nodes.iterator();
+        assertTrue(ecsClient.start());
+        //Connect client to server and put KV pair which does not hash to this server
+        KVStore kvClient = new KVStore("localhost", 50006);
+        connectToKVServer(kvClient);
+        putKVPair(kvClient, "b", "bb", StatusType.PUT_SUCCESS);
+        //Should have gotten reconnected to the right server
+        assertTrue(kvClient.getServerPort() == 50003);
+        kvClient.disconnect();
+        
+
    }
 
     @Test

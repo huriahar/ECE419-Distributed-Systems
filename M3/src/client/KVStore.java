@@ -188,6 +188,10 @@ public class KVStore implements KVCommInterface {
         }
     }
 
+    public int getServerPort() {
+        return this.serverPort;
+    }
+
     private boolean errorCheck (String key, String value) {
         boolean result = true;
         if (key.length() < 1) {
