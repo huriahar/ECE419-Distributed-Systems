@@ -33,7 +33,7 @@ public class ReplicasTests extends TestCase {
         ecsClient = new ECSClient("testECS.config", "localhost");
         ecsClient.setLevel("INFO");
         try {
-            Process p = Runtime.getRuntime().exec(new String[]{"csh","-c","rm -rf SERVER_5000*"});
+            Process p = Runtime.getRuntime().exec(new String[]{"csh","-c","rm -rf SERVER_6000*"});
         } catch (IOException e) {
             System.out.println("could not rm -rf: " + e); 
         }
@@ -212,5 +212,95 @@ public class ReplicasTests extends TestCase {
         kvClient.disconnect();
    }
 
+    @Test
+    public void testAllServerCrash() {
+        System.out.println("********** In 8 Test **************");
+        nodes = ecsClient.addNodes(2, "LRU", 5);
+        Iterator<IECSNode> it = nodes.iterator();
+        IECSNode node1 = it.next();
+        IECSNode node2 = it.next();
+        assertTrue(ecsClient.start());
+
+        Exception ex = null;
+        //Kill all the servers on the network
+        try {
+            for(IECSNode nodeOnNetwork : nodes) {
+                //Kill the server
+                Runtime run = Runtime.getRuntime();
+                //kill_knserver.py finds this pattern with the given port and kills the process
+                //java     11515 elsaye10   23u  IPv6 547623      0t0  TCP *:50005 (LISTEN)
+                String[] launchCmd = {"python", "kill_kvserver.py", Integer.toString(nodeOnNetwork.getNodePort())};
+                Process proc;
+                proc = run.exec(launchCmd);
+            }       
+            TimeUnit.SECONDS.sleep(10);
+
+        } catch (InterruptedException e) {
+            ex = e;
+        } catch (IOException e) {
+            ex = e;
+        }
+        assertTrue(ex == null);
+
+        boolean nocrashes = ecsClient.checkServerStatus();
+        assertFalse(nocrashes);
+
+        Collection<IECSNode> nodesNew;
+        nodesNew = ecsClient.getNodesLaunched();
+        System.out.println("nodes.size = " + nodesNew.size());
+        assertTrue(nodesNew.size()==nodes.size());
+   }
+
+    @Test
+    public void testNetworkCrashWithClient() {
+        System.out.println("********** In 10 Test **************");
+        nodes = ecsClient.addNodes(2, "LRU", 5);
+        Iterator<IECSNode> it = nodes.iterator();
+        IECSNode node1 = it.next();
+        IECSNode node2 = it.next();
+        assertTrue(ecsClient.start());
+
+        //Connect client to server and put KV pair
+        KVStore kvClient = new KVStore("localhost", node1.getNodePort());
+        connectToKVServer(kvClient);
+        putKVPair(kvClient, "b", "bb", StatusType.PUT_SUCCESS);
+        kvClient.disconnect();
+
+        Exception ex = null;
+        //Kill all the servers on the network
+        try {
+            for(IECSNode nodeOnNetwork : nodes) {
+                //Kill the server
+                Runtime run = Runtime.getRuntime();
+                //kill_knserver.py finds this pattern with the given port and kills the process
+                //java     11515 elsaye10   23u  IPv6 547623      0t0  TCP *:50005 (LISTEN)
+                String[] launchCmd = {"python", "kill_kvserver.py", Integer.toString(nodeOnNetwork.getNodePort())};
+                Process proc;
+                proc = run.exec(launchCmd);
+            }       
+            TimeUnit.SECONDS.sleep(10);
+
+        } catch (InterruptedException e) {
+            ex = e;
+        } catch (IOException e) {
+            ex = e;
+        }
+        assertTrue(ex == null);
+
+        boolean nocrashes = ecsClient.checkServerStatus();
+        assertFalse(nocrashes);
+
+        nodes = ecsClient.getNodesLaunched();
+        assertTrue(ecsClient.start());
+        System.out.println("nodes.size = " + nodes.size());
+        it = nodes.iterator();
+        node1 = it.next();
+        node2 = it.next();
+        kvClient = new KVStore("localhost", node1.getNodePort());
+        connectToKVServer(kvClient);
+        getKVPair(kvClient, "b", "bb", StatusType.GET_SUCCESS);
+        kvClient.disconnect();
+
+   }
 }
 
