@@ -5,13 +5,19 @@ import org.junit.Test;
 import junit.framework.TestCase;
 
 import client.KVStore;
+import common.KVConstants;
 import common.messages.KVMessage;
 import common.messages.KVMessage.StatusType;
 import ecs.*;
+
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import app_kvECS.*;
 import java.util.Collection;
 import java.lang.Process;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
@@ -20,24 +26,27 @@ import java.nio.file.Paths;
 import java.nio.file.Path;
 
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class PerformanceTesting extends TestCase {
-    
+
     private ECSClient ecsClient;
-    Collection<IECSNode> nodes;
+    ArrayList<IECSNode> nodes;
+    ArrayList<KVStore> clients;
     long startTime;
-    private String keyFilePath = System.getProperty("user.dir") + "/maildir/blair-l/sent_items";
+    private String keyFilePath = System.getProperty("user.dir") + "/maildir/blair-l/inbox";
     private static final Path enronData = Paths.get("enron.txt");
-    
-	public void setUp() {
+
+    public void setUp() {
         System.out.println("Initializing tests");
         ecsClient = new ECSClient("testPerformance.config", "localhost");
         ecsClient.setLevel("INFO");
+        nodes = new ArrayList<IECSNode>();
+        clients = new ArrayList<KVStore>();
         clearStorage();
-        this.startTime = System.currentTimeMillis();
-	}
+    }
 
-	public void tearDown() {
+    public void tearDown() {
         System.out.println("Tearing down tests");
         ecsClient.shutdown();
         ecsClient.disconnect();
@@ -47,16 +56,16 @@ public class PerformanceTesting extends TestCase {
             System.out.println("Delay caused an exception");
         }
         System.out.println("END TIMING FOR THIS TEST " + (System.currentTimeMillis() - this.startTime));
-	}
+    }
 
     public void clearStorage() {
         try {
-            Process p = Runtime.getRuntime().exec(new String[]{"csh","-c","rm -rf SERVER_500*"});
+            Runtime.getRuntime().exec(new String[]{"csh","-c","rm -rf SERVER_8* outserver* lastRemoved.txt"});
             System.out.println("Cleared Storage"); 
         } catch (IOException e) {
             System.out.println("could not rm -rf: " + e); 
         }
-    }    
+    }
 
     // ------------------------------ helper functions for tests --------------------------------//
     public void connectToKVServer(KVStore kvClient) {
@@ -79,8 +88,9 @@ public class PerformanceTesting extends TestCase {
             System.out.println("ERROR when getting key: " + e);
             ex = e;
         }
-        assertTrue(response != null && response.getStatus().equals(expectedStatus)
-        && response.getValue().equals(value));
+        assertTrue(response != null);
+        assertTrue(response.getStatus().equals(expectedStatus));
+        //assertTrue(response.getValue().equals(value));
     }
 
     public void putKVPair(KVStore kvClient, String key, String value, StatusType expectedStatus, StatusType expectedStatus2) {
@@ -129,54 +139,12 @@ public class PerformanceTesting extends TestCase {
         return value.toString(); 
     } 
 
-/*
-    public void  clientOneServer(int numClients, String strategy) 
-                   throws RuntimeException {
-
-       nodes = ecsClient.addNodes(1, strategy, 3);
-       IECSNode node = nodes.iterator().next();
-       assertTrue(ecsClient.start()); 
-
-       Collection<KVStore> clients = new ArrayList<KVStore>();
-
-        for(int i = 0 ; i < numClients; i++) {    
-           clients.add(new KVStore("localhost", node.getNodePort()));
-        }
-
-        for(KVStore kvClients: clients) {
-            clearStorage();
-            connectToKVServer(kvClients);
-            putKVPair(kvClients, "a", "1",StatusType.PUT_SUCCESS);
-            putKVPair(kvClients, "b", "1",StatusType.PUT_SUCCESS);
-            putKVPair(kvClients, "c", "1",StatusType.PUT_SUCCESS);
-            getKVPair(kvClients, "a", "1",StatusType.GET_SUCCESS);
-            getKVPair(kvClients, "a", "1",StatusType.GET_SUCCESS);
-            getKVPair(kvClients, "a", "1",StatusType.GET_SUCCESS);
-            getKVPair(kvClients, "b", "1",StatusType.GET_SUCCESS);
-            getKVPair(kvClients, "b", "1",StatusType.GET_SUCCESS);
-            putKVPair(kvClients, "d", "1",StatusType.PUT_SUCCESS);
-            putKVPair(kvClients, "e", "1",StatusType.PUT_SUCCESS);
-            getKVPair(kvClients, "a", "1",StatusType.GET_SUCCESS);
-            getKVPair(kvClients, "b", "1",StatusType.GET_SUCCESS);
-        }
-        
-    
-        for(KVStore kvClients: clients) {
-            kvClients.disconnect();
-        }   
-       
-        clients.clear();  
-        Collection<String> names = new ArrayList<String>();
-        names.add(node.getNodeName());
-        assertTrue(ecsClient.removeNodes(names));
-        names.clear();
-   }
-*/
-    public void testBasicFunctions(int numServers, int cacheSize, String strategy) {
+    public void launchServers(int numServers, int cacheSize, String strategy) {
         System.out.println("Running test for numServers " + numServers + " cacheSize " + cacheSize + " strategy " + strategy);
         clearStorage();
-        long startTime = System.currentTimeMillis();
-        nodes = ecsClient.addNodes(numServers, strategy, cacheSize);
+        //long startTime = System.currentTimeMillis();
+        nodes.clear();
+        nodes = (ArrayList<IECSNode>) ecsClient.addNodes(numServers, strategy, cacheSize);
         IECSNode node = nodes.iterator().next();
         assertTrue(ecsClient.start()); 
         
@@ -184,155 +152,95 @@ public class PerformanceTesting extends TestCase {
         KVStore kvClient = new KVStore("localhost", node.getNodePort());
         connectToKVServer(kvClient);
         return;
-        /*
-        ArrayList<String> lines = new ArrayList<>();
-        try {
-            lines = new ArrayList(Files.readAllLines(this.enronData, StandardCharsets.UTF_8));
-        } catch (IOException e ) {
-            System.out.println(e);
-            return;
-        }
-        for(String line : lines) {
-            String[] kvp = line.split("\\|");
-            putKVPair(kvClient, kvp[0], kvp[1], StatusType.PUT_SUCCESS, StatusType.PUT_UPDATE);
-        }
-        for(String line : lines) {
-            String[] kvp = line.split("\\|");
-            getKVPair(kvClient, kvp[0], kvp[1], StatusType.GET_SUCCESS);
-        }
-        long endTime = System.currentTimeMillis() - startTime;
-        System.out.println("Duration for numServers " + numServers + " cacheSize " + cacheSize + " strategy " + strategy);
-        */
     }
-/*
-    public void  clientServer(int numClients, int numServers, String strategy) 
-                   throws RuntimeException {
 
-       nodes = ecsClient.addNodes(numServers, strategy, 3);
-       assertTrue(ecsClient.start()); 
-
-       Collection<String> names = new ArrayList<String>();
-       Collection<KVStore> clients = new ArrayList<KVStore>();
-
-        for(IECSNode node : nodes) {
-            names.add(node.getNodeName());
-           for(int i = 0 ; i < (numClients/numServers); i++) {    
-              clients.add(new KVStore("localhost", node.getNodePort()));
+    public void launchClients(int numClients) {
+        clients.clear();
+        System.out.println("Starting with numClients: " + numClients + " and numServers: " + nodes.size());
+        int numServers = nodes.size();
+        if (numClients > numServers) {
+            int clientsPerServer = numClients/numServers;
+            for (int i = 0; i < numServers; ++i) {
+                for (int j = 0; j < clientsPerServer; ++j) {
+                    clients.add(new KVStore("localhost", nodes.get(i).getNodePort()));
+                }
+            }
+            numClients -= clientsPerServer*numServers;
+        }
+        assert(numClients <= numServers);
+        assert(nodes.size() > 0);
+        for (int i = 0; i < numClients; ++i) {
+            IECSNode node = nodes.get(i);
+            assert(node != null);
+            clients.add(new KVStore("localhost", node.getNodePort()));
+        }
+        System.out.println("Added the following clients:");
+        for (int i = 0; i < clients.size(); ++i) {
+            connectToKVServer(clients.get(i));
+            System.out.println("Client " + i + " connected to port " + clients.get(i).getServerPort());
+        }
+    }
+    
+    public String getValueFromFile (File filePath) {
+        ArrayList<String> lines = null;
+        try {
+            lines = new ArrayList<String>(Files.readAllLines(filePath.toPath(), StandardCharsets.UTF_8));
+        }
+        catch (IOException ex) {
+            System.out.println(ex);
+            return "";
+        }
+        return String.join(KVConstants.NEWLINE_DELIM, lines);
+    }
+    
+    public void populateStorageService() {
+        File folder = new File(keyFilePath);
+        File[] listOfFiles = folder.listFiles();
+        String value = "";
+        int clientIdx = 0;
+        for (int i = 0; i < listOfFiles.length; ++i) {
+            if (listOfFiles[i].isFile()) {
+                value = getValueFromFile(listOfFiles[i]);
+                clientIdx = i % clients.size();
+                putKVPair(clients.get(clientIdx), listOfFiles[i].getName(), value.trim(), StatusType.PUT_SUCCESS, StatusType.PUT_UPDATE);
             }
         }
-
-        for(KVStore kvClients: clients) {
-            connectToKVServer(kvClients);
-            clearStorage();
-            putKVPair(kvClients, "a", "1",StatusType.PUT_SUCCESS, StatusType.PUT_UPDATE);
-            putKVPair(kvClients, "b", "1",StatusType.PUT_SUCCESS, StatusType.PUT_UPDATE);
-            putKVPair(kvClients, "c", "1",StatusType.PUT_SUCCESS, StatusType.PUT_UPDATE);
-            getKVPair(kvClients, "a", "1",StatusType.GET_SUCCESS);
-            getKVPair(kvClients, "a", "1",StatusType.GET_SUCCESS);
-            getKVPair(kvClients, "a", "1",StatusType.GET_SUCCESS);
-            getKVPair(kvClients, "b", "1",StatusType.GET_SUCCESS);
-            getKVPair(kvClients, "b", "1",StatusType.GET_SUCCESS);
-            putKVPair(kvClients, "d", "1",StatusType.PUT_SUCCESS, StatusType.PUT_UPDATE);
-            putKVPair(kvClients, "e", "1",StatusType.PUT_SUCCESS, StatusType.PUT_UPDATE);
-            getKVPair(kvClients, "a", "1",StatusType.GET_SUCCESS);
-            getKVPair(kvClients, "b", "1",StatusType.GET_SUCCESS);
-        }
-    
-        for(KVStore kvClients: clients) {
-            kvClients.disconnect();
-        }   
-       
-        clients.clear();  
-        assertTrue(ecsClient.removeNodes(names));
-        names.clear();
     }
-*/
+    
+    public void retrieveKeys() {
+        File folder = new File(keyFilePath);
+        File[] listOfFiles = folder.listFiles();
+        int clientIdx = 0;
+        String value;
+        for (int i = 0; i < listOfFiles.length; ++i) {
+            if (listOfFiles[i].isFile()) {
+                clientIdx = i % clients.size();
+                value = getValueFromFile(listOfFiles[i]);
+                getKVPair(clients.get(clientIdx), listOfFiles[i].getName(), value.trim(), StatusType.GET_SUCCESS);
+            }
+        }
+    }
 
-    public long printDelta() {
+    public void printDelta() {
         long delta = (System.currentTimeMillis() - this.startTime);
         System.out.println("END TIMING FOR THIS TEST " + delta);
-        this.startTime = System.currentTimeMillis();
-        return delta;
     }
 
-
-
-/*
-    @Test
-    public void  testInitialization() {
-       try{
-            System.out.println("********** In 1 Test **************");
-            
-            nodes = ecsClient.addNodes(1, "LRU", 5);
-            assertTrue(ecsClient.start()); 
-            //assertTrue(ecsClient.shutdown());
-            assertTrue(ecsClient.stop());
-        } catch (Exception io) {
-            throw new RuntimeException(io);
-        }
-    } 
     // ------------------------------ tests start here -----------------------------------------//
-   
-    @Test
-    public void testOneClientOneServer() {
-       try{
-           clientOneServer(1, "FIFO"); 
-           long t1 = printDelta(); 
-            clearStorage();
 
-           clientOneServer(1, "LRU"); 
-           long t2 = printDelta(); 
-            clearStorage();
-
-           clientOneServer(1, "LFU"); 
-           long t3 = printDelta(); 
-            clearStorage();
-
-            System.out.println("FIFO t = " + t1 + " LRU t = " + t2 + " LFU t = " + t3);
-        } catch (Exception io) {
-            throw new RuntimeException(io);
-        }
-    } 
-*/
     @Test
     public void testParams() {
-            int [] numServers = {1};
-            int [] cacheSize = {1};
-            String [] cacheStrategy = {"FIFO", "LRU", "LFU"};
-            for(int i : numServers) {
-                for(int j : cacheSize) {
-                    for(String k : cacheStrategy) {
-                        testBasicFunctions(i, j, k);
-                    }
-                }                
-            }
-
+        int numServers = 1;
+        int cacheSize = 5;
+        String [] cacheStrategy = {"FIFO", "LRU", "LFU"};
+        String strategy = cacheStrategy[1];
+        int numClients = 20;
+        launchServers(numServers, cacheSize, strategy);
+        launchClients(numClients);
+        this.startTime = System.currentTimeMillis();
+        populateStorageService();
+        retrieveKeys();
+        System.out.println("Done with numServers: " + numServers + " strategy: "+ strategy + " size: " + cacheSize + " and numClients " + numClients);
+        printDelta();
     }
-/*
-    @Test
-    public void testClientServer() {
-       try{
-            int [] num = {5};
-            for(int i = 0; i < num.length; i++) {
-                for(int j = i; j < num.length; j++) {
-                    System.out.println("----------------------numClients: " + num[i] + " numServer: " + num[j] + "-----------------------------"); 
-                   clientServer(num[i], num[j], "FIFO"); 
-                   long t1 = printDelta(); 
-
-                   clientServer(num[i], num[j], "LRU"); 
-                   long t2 = printDelta(); 
-
-                   clientServer(num[i], num[j], "LFU"); 
-                   long t3 = printDelta(); 
-
-                    System.out.println("FIFO t = " + t1 + " LRU t = " + t2 + " LFU t = " + t3);
-                }                
-
-            }
-
-        } catch (Exception io) {
-            throw new RuntimeException(io);
-        }
-    } 
-*/ 
 }
