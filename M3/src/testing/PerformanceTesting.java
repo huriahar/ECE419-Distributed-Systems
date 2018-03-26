@@ -142,15 +142,9 @@ public class PerformanceTesting extends TestCase {
     public void launchServers(int numServers, int cacheSize, String strategy) {
         System.out.println("Running test for numServers " + numServers + " cacheSize " + cacheSize + " strategy " + strategy);
         clearStorage();
-        //long startTime = System.currentTimeMillis();
         nodes.clear();
         nodes = (ArrayList<IECSNode>) ecsClient.addNodes(numServers, strategy, cacheSize);
-        IECSNode node = nodes.iterator().next();
         assertTrue(ecsClient.start()); 
-        
-        System.out.println("Connecting test for numServers " + numServers + " cacheSize " + cacheSize + " strategy " + strategy);
-        KVStore kvClient = new KVStore("localhost", node.getNodePort());
-        connectToKVServer(kvClient);
         return;
     }
 
@@ -230,11 +224,11 @@ public class PerformanceTesting extends TestCase {
 
     @Test
     public void testParams() {
-        int numServers = 1;
+        int numServers = 20;        // 1, 5, 20
         int cacheSize = 5;
         String [] cacheStrategy = {"FIFO", "LRU", "LFU"};
-        String strategy = cacheStrategy[1];
-        int numClients = 20;
+        String strategy = cacheStrategy[0];
+        int numClients = 1;         // 1, 5, 20
         launchServers(numServers, cacheSize, strategy);
         launchClients(numClients);
         this.startTime = System.currentTimeMillis();

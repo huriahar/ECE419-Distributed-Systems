@@ -23,7 +23,7 @@ public class AdditionalTest extends TestCase {
     private ECSClient ecsClient;
     Collection<IECSNode> nodes;
 
-	public void setUp() {
+    public void setUp() {
         ecsClient = new ECSClient("testECS.config", "localhost");
         ecsClient.setLevel("INFO");
         try {
@@ -31,12 +31,12 @@ public class AdditionalTest extends TestCase {
         } catch (IOException e) {
             System.out.println("could not rm -rf: " + e); 
         }
-	}
+    }
 
-	public void tearDown() {
+    public void tearDown() {
         ecsClient.shutdown();
         ecsClient.disconnect();
-	}
+    }
 
     // ------------------------------ helper functions for tests --------------------------------//
     public void connectToKVServer(KVStore kvClient) {

@@ -222,13 +222,13 @@ public class KVServer implements IKVServer, Runnable {
         String value = this.cache.getValue(key);
         if(value.equals("")){
             // 1- retrieve from disk    
-            value = getValueFromDisk(key);            
+            value = getValueFromDisk(key);
             if(value.equals("")) {
                 setRole(KVConstants.PREPLICA);
-                value = getValueFromDisk(key);            
+                value = getValueFromDisk(key);
                 if(value.equals("")) {
                     setRole(KVConstants.SREPLICA);
-                    value = getValueFromDisk(key);            
+                    value = getValueFromDisk(key);
                 }
                 setRole(KVConstants.COORDINATOR);
             }
@@ -237,13 +237,11 @@ public class KVServer implements IKVServer, Runnable {
                 this.cache.insert(key, value);
             } 
         }
-        //this.cache.print();
         return value;
     }
 
     public void putKV(String key, String value) throws Exception{
         this.cache.insert(key, value);
-        //this.cache.print();
         storeKV(key, value);
     }
 
@@ -703,26 +701,54 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public boolean serverOrReplicasResponsible(String key) {
-        return isServerResponsible(key,this.metadata)       ||
+        /*return isServerResponsible(key,this.metadata)       ||
                isServerResponsible(key,this.primaryReplica) ||
-               isServerResponsible(key,this.secondaryReplica);
+               isServerResponsible(key,this.secondaryReplica);*/
+        if (isServerResponsible(key, this.metadata)) {
+            return true;
+        }
+        else {
+            setRole(KVConstants.PREPLICA);
+            String value = "";
+            try {
+                value = onDisk(key);
+            }
+            catch (IOException ex) {
+                logger.error(ex);
+            }
+            setRole(KVConstants.COORDINATOR);
+            if (!value.equals("")) {
+                return true;
+            }
+            else {
+                setRole(KVConstants.SREPLICA);
+                try {
+                    value = onDisk(key);
+                }
+                catch (IOException ex) {
+                    logger.error(ex);
+                }
+                setRole(KVConstants.COORDINATOR);
+                if (!value.equals("")) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+        }
     }
 
     public boolean isServerResponsible(String key, ServerMetaData server) {
         if(server == null) return false;
         BigInteger encodedKey = md5.encode(key);
-        logger.debug("DEBUG: key " + encodedKey + " bHash " + server.bHash + " eHash " + server.eHash);
-        logger.debug("DEBUG: minHash " + KVConstants.MIN_HASH + " maxHash " + KVConstants.MAX_HASH);
         boolean ret = false, ret2 = false, ret3 = false;
         if( (server.bHash).compareTo(server.eHash) < 0 ) {
             ret = (encodedKey.compareTo(server.bHash) >= 0  && encodedKey.compareTo(server.eHash) < 0);
-            logger.debug("DEBUG: isResp? " + ret);
             return ret;
         } else {
             ret2 = (encodedKey.compareTo(server.bHash) >= 0 && encodedKey.compareTo(KVConstants.MAX_HASH) < 0);
             ret3 = (encodedKey.compareTo(KVConstants.MIN_HASH) >= 0 && encodedKey.compareTo(server.eHash) < 0);
-            logger.debug("DEBUG: isResp? " + ret2);
-            logger.debug("DEBUG: isResp? " + ret3);
             return (ret2 || ret3);
         }
     }

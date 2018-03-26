@@ -122,7 +122,6 @@ public class KVStore implements KVCommInterface {
         ServerMetaData sReplica = sReplicas.get(responsibleServerMeta.getServerPort());
         if(pReplica != null) options.add(pReplica);
         if(sReplica != null) options.add(sReplica);
-		
 		if ((isConnected(responsibleServerMeta.getServerAddr(), responsibleServerMeta.getServerPort())) ||
             (pReplica != null && cmd.equals(KVConstants.GET_CMD) && isConnected(pReplica.getServerAddr(), pReplica.getServerPort())) ||
             (sReplica != null && cmd.equals(KVConstants.GET_CMD) && isConnected(sReplica.getServerAddr(), sReplica.getServerPort()))) {
@@ -131,7 +130,6 @@ public class KVStore implements KVCommInterface {
 			return;
 		}
 		else {
-            logger.debug("Not connected to either replica or coord!");
             //Randomly choose which one to connect to
             int randomNum = rand.nextInt(options.size()); 
             if(cmd.equals(KVConstants.PUT_CMD)) randomNum = 0;   //if this is a PUT, always connect to the coordinator, not one of the replicas

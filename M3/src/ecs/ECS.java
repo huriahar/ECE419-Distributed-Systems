@@ -256,7 +256,7 @@ public class ECS implements IECS {
         IECSNode node;        
         for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
             node = entry.getValue();
-            logger.debug(node.getNodeName() + " : " + node.getNodeHashRange()[0] + " : " + node.getNodeHashRange()[1]);
+            logger.debug(node.getNodeName() + " : " + node.getNodeHashRange()[0].toString(16) + " : " + node.getNodeHashRange()[1].toString(16));
             
         }               
     }
