@@ -12,7 +12,7 @@ public class KVCacheFIFO extends KVCache {
     // Using a linked list implementation of a queue
     // Maintians FIFO order but allows random deletion
     private LinkedList<String> fifo = new LinkedList<String>();
-    private Map<String, String> kvp_map = new HashMap();
+    private Map<String, String> kvp_map = new HashMap<String, String>();
 
     public KVCacheFIFO(int cacheSize) {
         super(cacheSize, "FIFO");
@@ -76,13 +76,13 @@ public class KVCacheFIFO extends KVCache {
     @Override
     public void print(){
         System.out.println("FIFO queue: ");
-        Iterator i = fifo.iterator();
+        Iterator<String> i = fifo.iterator();
         while (i.hasNext()) {
             System.out.println(i.next());
         }
         System.out.println("FIFO kvp: ");
         Set<Entry<String,String>> kvp_set = kvp_map.entrySet();
-        for(Entry entry: kvp_set) {
+        for(Entry<String, String> entry: kvp_set) {
             System.out.println("Key="+entry.getKey()+", Value="+entry.getValue());
         }
     }

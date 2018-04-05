@@ -30,7 +30,6 @@ public class ECSClient implements IECSClient {
 
     private Collection<IECSNode> nodesLaunched;
     private boolean stop = false;
-    private int timeout = KVConstants.LAUNCH_TIMEOUT;
 
     public ECSClient(String zkHostname, int zkPort) {
         this("ecs.config", "localhost");
@@ -38,17 +37,17 @@ public class ECSClient implements IECSClient {
     }
 
     public ECSClient (String configFile, String ugmachine) {
-    	Path ecsConfig = Paths.get(configFile);
+        Path ecsConfig = Paths.get(configFile);
         this.nodesLaunched = new ArrayList<IECSNode>();
-    	// If file doesn't exist or does not point to a valid file
-    	if (!Files.exists(ecsConfig)) {
-    		printError("ECS Config file does not exist! " + ecsConfig);
+        // If file doesn't exist or does not point to a valid file
+        if (!Files.exists(ecsConfig)) {
+            printError("ECS Config file does not exist! " + ecsConfig);
             logger.error("ECS Config file does not exist!");
             System.exit(1);
-    	}
-    	else {
+        }
+        else {
             this.ecsInstance = new ECS(ecsConfig, ugmachine);
-    	} 
+        } 
     }
 
     public void run() {
@@ -226,8 +225,8 @@ public class ECSClient implements IECSClient {
                         }    
                     }
                 }
-                break;            
-    
+                break;
+
             case "logLevel":
                 if (tokens.length == 2) {
                     String level = setLevel(tokens[1]);
@@ -250,7 +249,7 @@ public class ECSClient implements IECSClient {
 
             default:
                 printError("Unknown command");
-                printHelp();            
+                printHelp();
                 break;
         }
     }
@@ -323,7 +322,7 @@ public class ECSClient implements IECSClient {
     }
 
     public void disconnect() {
-        ecsInstance.disconnect();    
+        ecsInstance.disconnect();
     }
 
     private void printError(String error) {
@@ -374,7 +373,6 @@ public class ECSClient implements IECSClient {
         return success;
     }
 
-
     @Override
     public boolean shutdown() {
         boolean success = true;
@@ -385,7 +383,6 @@ public class ECSClient implements IECSClient {
 
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
-        logger.debug("in addNode");
         if(ecsInstance.availableServersCount() == 0) return null;
         IECSNode node = null;
         if(ecsInstance.ringNetworkSize() == 0) {
@@ -415,7 +412,6 @@ public class ECSClient implements IECSClient {
 
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
-        logger.debug("in setupNodes");
         Collection<IECSNode> nodes = new ArrayList<IECSNode>();
         int counter = 0;
         while(counter < count) {
@@ -424,21 +420,20 @@ public class ECSClient implements IECSClient {
         }
         //Await nodes queries ZK nodes for a status update
         try {
-			if(!awaitNodes(count, KVConstants.LAUNCH_TIMEOUT)) {
+            if(!awaitNodes(count, KVConstants.LAUNCH_TIMEOUT)) {
                 logger.error("awaitNodes times out! servers are not responsive");
             }
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         return nodes;
     }
 
     public IECSNode setupFirstNode(String cacheStrategy, int cacheSize) {
-        logger.debug("in setupFirstNode");
         //This function should only be used to setup the first node on the ring network
         boolean success = false;
-    	// This is called before launching the servers - decides which nodes to add in hashRing, adds them
-    	IECSNode node = ecsInstance.initAddNodesToHashRing();
+        // This is called before launching the servers - decides which nodes to add in hashRing, adds them
+        IECSNode node = ecsInstance.initAddNodesToHashRing();
         if(node == null) {
             logger.debug("Could not find lastRemoved in the list of available servers!");
             logger.debug("Will look for any available server..");
@@ -449,13 +444,13 @@ public class ECSClient implements IECSClient {
             logger.info("SUCCESS. Launched KVServer :" + node.getNodeName());
         } 
         else {
-            logger.error("ERROR. Unable to launch KVServer :" + node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());           
+            logger.error("ERROR. Unable to launch KVServer :" + node.getNodeName() + " Host: " + node.getNodeHost()+ " Port: " + node.getNodePort());
         }
         //Update meta data and setup cache config for node
         success = ecsInstance.sendMetaDataUpdate(node);
         success = success & ecsInstance.setupNodesCacheConfigOneNode(node, cacheStrategy, cacheSize);
         if(!success) {
-        	logger.error("Unable to do meta data update for servers");
+            logger.error("Unable to do meta data update for servers");
         }
         return node;
     }
@@ -472,22 +467,18 @@ public class ECSClient implements IECSClient {
         String path = null, status = null;
         int counter = 0;
         long endTimeMillis = System.currentTimeMillis() + timeout;
-        logger.debug("SIZE OF nodesLaunched = " + nodesLaunched.size());
         for(IECSNode entry : nodesLaunched) {
             path = ecsInstance.getZKPath(entry.getNodeName());
             if(path != null) {
-                status = ecsInstance.checkZKStatus(path,endTimeMillis); 
-                logger.debug("status of server " + entry.getNodeName() + " is " + status);
+                status = ecsInstance.checkZKStatus(path,endTimeMillis);
                 if(status.equals("SERVER_LAUNCHED")) {
-                    counter++;                
+                    counter++;
                 }
                 if(System.currentTimeMillis() > endTimeMillis) {
-                    logger.debug("current time is greater than endTimeMillis "  +endTimeMillis);
                     return false;
-                }   
+                }
             }
         }
-        logger.debug("counter = " + counter + " count = " + count);
         return (counter == count);
     }
 

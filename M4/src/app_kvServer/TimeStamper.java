@@ -30,7 +30,7 @@ public class TimeStamper implements Runnable {
     private void updateTimeStamp() {
         //Update timestamp on the server's Znode
         try {
-            String data = zkImplServer.readData(this.zkPath);         
+            String data = zkImplServer.readData(this.zkPath);
             String[] info = data.split(KVConstants.SPLIT_DELIM);
             info[3] = getCurrentTimeString();
             data = String.join(KVConstants.DELIM, info);
@@ -46,13 +46,10 @@ public class TimeStamper implements Runnable {
 
     private String getCurrentTimeString() {
         String ret = Long.toString(System.currentTimeMillis());
-        //System.out.println("updating kvserver's timestamp.... " + ret);
         return ret;
     }
 
     public void stop() {
         this.isRunning = false;
     }
-
-
 } 

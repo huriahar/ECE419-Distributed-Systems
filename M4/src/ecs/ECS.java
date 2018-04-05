@@ -35,8 +35,8 @@ import java.util.concurrent.TimeUnit;
 public class ECS implements IECS {
     private static final int BUFFER_SIZE = 1024;
     private static final int DROP_SIZE = 128 * BUFFER_SIZE;
-    public static final String metaFile = "metaDataECS.config";            
-    public static final String lastRemovedFile = "lastRemoved.txt";    
+    public static final String metaFile = "metaDataECS.config";
+    public static final String lastRemovedFile = "lastRemoved.txt";
     private Path configFile;
     private Path metaDataFile;
     private Socket ECSSocket;
@@ -51,8 +51,8 @@ public class ECS implements IECS {
     private String ugmachine;
     //For the autotester
     private String zkHostname;
-    private int zkPort;    
-    
+    private int zkPort;
+
     private ZKImplementation ZKImpl;
 
     public ECS(Path configFile, String ugmachine) {
@@ -89,7 +89,7 @@ public class ECS implements IECS {
             logger.error("Unable to create group in Zookeeper " + e);
         }
     }
-    
+
     public void setZKInfo(String zkHostname, int zkPort) {
         this.zkHostname = zkHostname;
         this.zkPort = zkPort;
@@ -181,11 +181,11 @@ public class ECS implements IECS {
         } 
         return success;
     }
-    
+
     public boolean start(IECSNode node) {
         boolean success = true;
         TextMessage message, response; 
-            
+
         try { 
             message = new TextMessage("ECS" + KVConstants.DELIM + "START_NODE");
             response = sendNodeMessage(message, node);
@@ -204,11 +204,11 @@ public class ECS implements IECS {
         return success;
     }
 
-        
+
     public boolean stop(IECSNode node) {
         boolean success= true;
         TextMessage message, response; 
-        
+
         try { 
             message = new TextMessage("ECS"  + KVConstants.DELIM + "STOP_NODE");
             response = sendNodeMessage(message, node);
@@ -230,7 +230,6 @@ public class ECS implements IECS {
 
     public void deleteMetaDataFile() throws IOException {
        Files.deleteIfExists(metaDataFile); 
-
     }
 
     public void updateMetaDataFile() throws IOException {
@@ -244,8 +243,7 @@ public class ECS implements IECS {
                             node.getNodeHost() + KVConstants.DELIM +
                             node.getNodePort() + KVConstants.DELIM +
                             node.getNodeHashRange()[0].toString(16) + KVConstants.DELIM +
-                            node.getNodeHashRange()[1].toString(16));      
-
+                            node.getNodeHashRange()[1].toString(16));
         }
         printRing();
         Files.write(metaDataFile, metaDataContent, StandardCharsets.UTF_8);
@@ -253,12 +251,12 @@ public class ECS implements IECS {
     }
 
     public void printRing() {
-        IECSNode node;        
+        IECSNode node;
         for(Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
             node = entry.getValue();
             logger.debug(node.getNodeName() + " : " + node.getNodeHashRange()[0].toString(16) + " : " + node.getNodeHashRange()[1].toString(16));
             
-        }               
+        }
     }
 
     public boolean sendReplicas(IECSNode node) {
@@ -276,7 +274,6 @@ public class ECS implements IECS {
                 String data = ZKImpl.readData(getZKPath(node.getNodeName()));
                 String[] splitData = data.split(KVConstants.SPLIT_DELIM);
                 data = splitData[0]+KVConstants.DELIM +splitData[1]+KVConstants.DELIM +splitData[2]+KVConstants.DELIM +splitData[3]+joinedReplicaPorts;
-                System.out.println("UPDATING ZNODEEEEEEEEEEEE " + data);
                 ZKImpl.updateData(getZKPath(node.getNodeName()), data);
             } catch (KeeperException e) {
                 System.out.println("Error cannot update znode replicas");
@@ -299,8 +296,8 @@ public class ECS implements IECS {
             logger.error("REPLICA_UPDATE_FAILED: Update for KVServer failed: " + ex);
         }
         return success;
-    } 
-   
+    }
+
     public boolean sendMetaDataUpdate(IECSNode rNode) {
         boolean success = true;
         TextMessage response, message;
@@ -372,7 +369,7 @@ public class ECS implements IECS {
  
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
         //Select node from available, update hashing, add to hashRing and alert all servers to upate metaData 
-        IECSNode currNode = new ECSNode(), nextNode = new ECSNode();     
+        IECSNode currNode = new ECSNode(), nextNode = new ECSNode();
         BigInteger serverHash = new BigInteger("0", 16);
         boolean success = true;
         try { 
@@ -383,7 +380,7 @@ public class ECS implements IECS {
                 logger.info("SUCCESS. Launched KVServer :" + currNode.getNodeName());
             } 
             else {
-                logger.error("ERROR. Unable to launch KVServer :" + currNode.getNodeName() + " Host: " + currNode.getNodeHost()+ " Port: " + currNode.getNodePort());           
+                logger.error("ERROR. Unable to launch KVServer :" + currNode.getNodeName() + " Host: " + currNode.getNodeHost()+ " Port: " + currNode.getNodePort());
                 return null;
             }
             // Update hashes of current and next server on the ring network
@@ -413,21 +410,17 @@ public class ECS implements IECS {
             IECSNode prevNode = findPrevNode(currNode);
             if(prevNode != currNode) {
                 success = success & sendReplicas(prevNode);
-                logger.debug("Step 1");
             }
-            
+
             IECSNode prevPrevNode = findPrevNode(prevNode);
             if(prevPrevNode != currNode) {
                 success = success & sendReplicas(prevPrevNode);
-                logger.debug("Step 2");
             }
             success = success & sendReplicas(currNode);
-            logger.debug("Step 3");
 
             if(!success) {
                 logger.error("in addNode: unable to update metaData in Servers");
             }
-    
 
         }catch (IOException io) {
             logger.error("Unable to write to metaDataFile"); 
@@ -476,7 +469,6 @@ public class ECS implements IECS {
         return joinedReplicas;
     }
 
-
     private String getLastRemoved() {
         try {
             File f = new File(ECS.lastRemovedFile);
@@ -507,7 +499,6 @@ public class ECS implements IECS {
         if(lastRemovedName != null){
             lastRemovedName = lastRemovedName.split(KVConstants.SPLIT_DELIM)[0];
         }
-    
         try { 
             // Initialize own hashRing
             for(Map.Entry<IECSNode, String> entry : allAvailableServers.entrySet()) {
@@ -530,19 +521,17 @@ public class ECS implements IECS {
                     }
                 }
             }
-             
             //Once all nodes are added, write to metaDataFile
             updateMetaDataFile();   
             //the alert will be called once launching of the servers is done from ECSClient
         } catch (IOException io) {
             logger.error("Unable to write to metaDataFile");
         }
-        
         return chosenNode; 
     }
 
     public boolean setupNodesCacheConfigOneNode(IECSNode node, String cacheStrategy, int cacheSize) {
-        TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "SETUP_NODE" + KVConstants.DELIM + cacheStrategy + KVConstants.DELIM + cacheSize); 
+        TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "SETUP_NODE" + KVConstants.DELIM + cacheStrategy + KVConstants.DELIM + cacheSize);
         TextMessage response;
         boolean success = true;
         try {
@@ -560,20 +549,20 @@ public class ECS implements IECS {
         } catch(IOException ex) {
             logger.error("ERROR: Failed in Setup for KVServer: " + node.getNodeName()); 
             success = false;
-        } 
+        }
         return success;
     }
 
     public Collection<IECSNode> setupNodesCacheConfig(Collection<IECSNode> nodes, String cacheStrategy, int cacheSize) {
         Collection<IECSNode> nodesResult = new ArrayList<IECSNode>();
-        TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "SETUP_NODE" + KVConstants.DELIM + cacheStrategy + KVConstants.DELIM + cacheSize); 
+        TextMessage message = new TextMessage("ECS" + KVConstants.DELIM + "SETUP_NODE" + KVConstants.DELIM + cacheStrategy + KVConstants.DELIM + cacheSize);
         TextMessage response;
         for(IECSNode node : nodes) {
             try {
                 response = sendNodeMessage(message, node);
                 if(response.getMsg().equals("SETUP_SUCCESS")) {
-                    logger.info("SUCCESS: Setup for KVServer: " + node.getNodeName()); 
-                    nodesResult.add(node); 
+                    logger.info("SUCCESS: Setup for KVServer: " + node.getNodeName());
+                    nodesResult.add(node);
                 }
                 else if(response.getMsg().equals("SETUP_FAILED")) {
                     logger.error("ERROR: Failed in Setup for KVServer: " + node.getNodeName());
@@ -581,7 +570,7 @@ public class ECS implements IECS {
                     logger.error("ERROR: Failed in Setup for KVServer: " + node.getNodeName());
                 }
             } catch(IOException ex) {
-                logger.error("ERROR: Failed in Setup for KVServer: " + node.getNodeName()); 
+                logger.error("ERROR: Failed in Setup for KVServer: " + node.getNodeName());
             } 
         }
         return nodesResult;
@@ -630,25 +619,16 @@ public class ECS implements IECS {
         try {
             data = ZKImpl.readData(path);
             zNodeData = data.split(KVConstants.SPLIT_DELIM);
-            printDebug(data);
-            printDebug("Current time: " + currTime + " and timeout " + timeout);
-            printDebug("Timed out? : " + (currTime > timeout));
-            logger.debug("server status is " + zNodeData[0]);
             while(currTime < timeout && zNodeData[0].equals("SERVER_INITIATED")) {
-                logger.debug("server status is " + zNodeData[0]);
                 currTime = System.currentTimeMillis();
                 data = ZKImpl.readData(path);
-                printDebug(data);
-                printDebug("Timed out? : " + (currTime > timeout));
                 zNodeData = data.split(KVConstants.SPLIT_DELIM);
-                printDebug(data);
             }
         } catch (KeeperException e) {
             logger.error("ERROR: Keeper Exception for ZK: " + e);
         } catch (InterruptedException e) {
             logger.error("ERROR: Interrupted Exception for ZK: " + e);
         }
-        logger.debug("returning...");
         return zNodeData[0];
     }
 
@@ -659,7 +639,7 @@ public class ECS implements IECS {
 
         Runtime run = Runtime.getRuntime();
         try {
-            String[] launchCmd = {"m3ssh.sh", ugmachine, System.getProperty("user.dir"), node.getNodeName(), node.getNodeHost(), Integer.toString(node.getNodePort())};
+            String[] launchCmd = {"m2ssh.sh", ugmachine, System.getProperty("user.dir"), node.getNodeName(), node.getNodeHost(), Integer.toString(node.getNodePort())};
             proc = run.exec(launchCmd);
             // Also create a new znode for the node
             // Update data on znode about server config and join ZK_ROOT group
@@ -1041,7 +1021,7 @@ public class ECS implements IECS {
             deleteMetaDataFile();
         } catch (IOException ex) {
             logger.error("ERROR: Unable to delete ECS MetaData File");
-            success = false;            
+            success = false;
         }
             
         return success;
@@ -1056,7 +1036,7 @@ public class ECS implements IECS {
             deleteMetaDataFile();
         } catch (IOException ex) {
             logger.error("ERROR: Unable to delete ECS MetaData File");
-            return false;            
+            return false;
         }
         return true;
     }

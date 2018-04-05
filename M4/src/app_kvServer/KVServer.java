@@ -18,9 +18,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -209,7 +207,7 @@ public class KVServer implements IKVServer, Runnable {
             logger.error("ERROR: " + ex); 
         }
         if(value.equals(""))
-            return false;    
+            return false;
         return true;
     }
 
@@ -221,7 +219,7 @@ public class KVServer implements IKVServer, Runnable {
         //TODO what if asked for a KVpair that is not on disk
         String value = this.cache.getValue(key);
         if(value.equals("")){
-            // 1- retrieve from disk    
+            // 1- retrieve from disk
             value = getValueFromDisk(key);
             if(value.equals("")) {
                 setRole(KVConstants.PREPLICA);
@@ -235,7 +233,7 @@ public class KVServer implements IKVServer, Runnable {
             if(!value.equals("")) {
                 // 2 - insert in cache
                 this.cache.insert(key, value);
-            } 
+            }
         }
         return value;
     }
@@ -251,7 +249,6 @@ public class KVServer implements IKVServer, Runnable {
 
     public void clearStorage(){
         clearCache();
-
         File file = new File(this.serverFilePath);
         file.delete();
     }
@@ -340,7 +337,6 @@ public class KVServer implements IKVServer, Runnable {
 
             try {
                 lock = channel.tryLock();
-
             } catch (OverlappingFileLockException e) {
                  //logger.error("Overlapping File Lock Error: " + e.getMessage());
             }
@@ -349,7 +345,6 @@ public class KVServer implements IKVServer, Runnable {
                 logger.debug("File " + this.currFilePath + " not found. Key " + key + " not on disk.");
             }
             else {
-                
                 FileReader fr = new FileReader(file);
                 br = new BufferedReader(fr);
                 KVPair = br.readLine();
@@ -590,7 +585,6 @@ public class KVServer implements IKVServer, Runnable {
 
     public void storeKV(String key, String value) throws IOException {
         String filePath  = this.currFilePath;
-        BufferedWriter wr  = null;
         boolean toBeDeleted = false; 
 
         String curVal = onDisk(key);
@@ -626,7 +620,7 @@ public class KVServer implements IKVServer, Runnable {
         String key_val;
         String KVPair;
         String filePath  = this.currFilePath; 
-        StringBuffer stringBuffer = new StringBuffer();            
+        StringBuffer stringBuffer = new StringBuffer();
         BufferedReader br = null;
         BufferedWriter wr  = null;
         String newPair = key + "|" + value ;
@@ -635,7 +629,7 @@ public class KVServer implements IKVServer, Runnable {
             File file = new File(filePath);
             
             FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
-            FileLock lock = channel.lock();            
+            FileLock lock = channel.lock();
 
             try {
                 lock = channel.tryLock();
@@ -701,9 +695,6 @@ public class KVServer implements IKVServer, Runnable {
     }
 
     public boolean serverOrReplicasResponsible(String key) {
-        /*return isServerResponsible(key,this.metadata)       ||
-               isServerResponsible(key,this.primaryReplica) ||
-               isServerResponsible(key,this.secondaryReplica);*/
         if (isServerResponsible(key, this.metadata)) {
             return true;
         }
@@ -760,8 +751,7 @@ public class KVServer implements IKVServer, Runnable {
     public String getServerReplicas() {
         StringBuilder marshalledData = new StringBuilder();
         try {
-            ArrayList<String> metaDataLines = new ArrayList<>(Files.readAllLines(this.metaDataFile,
-                                                         StandardCharsets.UTF_8));
+            ArrayList<String> metaDataLines = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
             for (int i = 0; i < metaDataLines.size(); ++i) {
                 String[] metaData = metaDataLines.get(i).split(KVConstants.SPLIT_DELIM);
                 String zkServerPath = KVConstants.ZK_SEP + KVConstants.ZK_ROOT + KVConstants.ZK_SEP + metaData[ServerMetaData.SERVER_NAME];
@@ -784,8 +774,7 @@ public class KVServer implements IKVServer, Runnable {
     public String getMetaDataFromFile() {
         StringBuilder marshalledData = new StringBuilder();
         try {
-            ArrayList<String> metaData = new ArrayList<>(Files.readAllLines(this.metaDataFile,
-                                                        StandardCharsets.UTF_8));
+            ArrayList<String> metaData = new ArrayList<>(Files.readAllLines(this.metaDataFile, StandardCharsets.UTF_8));
             for(String line : metaData) {
                 marshalledData.append(line + KVConstants.NEWLINE_DELIM);
             }
@@ -871,7 +860,7 @@ public class KVServer implements IKVServer, Runnable {
                 return false;
             }
             this.secondaryReplica = new ServerMetaData(sMetaData);
-            String[] sHash = {secondaryReplica.getBeginHash().toString(), KVConstants.DELIM, secondaryReplica.getEndHash().toString()};            
+            String[] sHash = {secondaryReplica.getBeginHash().toString(), KVConstants.DELIM, secondaryReplica.getEndHash().toString()};
             try {
                 this.sReplica = true;
                 success = moveData(sHash, sReplicaName);
@@ -1002,8 +991,7 @@ public class KVServer implements IKVServer, Runnable {
         try {
             Path serverPath = Paths.get(this.serverFilePath);
             if(Files.exists(serverPath)) {
-                ArrayList<String> keyValuePairs = new ArrayList<>(Files.readAllLines(serverPath,
-                                                             StandardCharsets.UTF_8));
+                ArrayList<String> keyValuePairs = new ArrayList<>(Files.readAllLines(serverPath, StandardCharsets.UTF_8));
                 for(String line : keyValuePairs) {
                     //TODO this is because some white spaces get inserted in the file
                     //this if statement is a temporary workaround for that

@@ -42,19 +42,6 @@ public class KVCache implements IKVCache {
         return KVCache.cacheSize;
     }
 
-    private CacheStrategy cacheStrategyStrToEnum(String strategy) {
-        switch(strategy) {
-            case "FIFO":
-                return CacheStrategy.FIFO;
-            case "LRU":
-                return CacheStrategy.LRU;
-            case "LFU":
-                return CacheStrategy.LFU;
-            default:
-                return CacheStrategy.None;
-        } 
-    }
-
     @Override
     public synchronized void insert(String key, String value){
     }

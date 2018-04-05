@@ -100,7 +100,7 @@ public class KVClient implements IKVClient {
                             }
                         }
 
-                        try {   
+                        try {
                             KVMessage reply = clientStore.put(key, msg.toString());
                             StatusType status = reply.getStatus();
                             if (status == KVMessage.StatusType.PUT_ERROR) {
@@ -133,8 +133,8 @@ public class KVClient implements IKVClient {
                                 logger.error(PROMPT + "SERVER_STOPPED! Server not accepting any requests at the moment.");
                             }
                             else if (status == KVMessage.StatusType.SERVER_WRITE_LOCK) {
-                            	System.out.println(PROMPT + "SERVER_WRITE_LOCK! Server not accepting any put requests at the moment.");
-                            	logger.error(PROMPT + "SERVER_WRITE_LOCK! Server not accepting any put requests at the moment.");
+                                System.out.println(PROMPT + "SERVER_WRITE_LOCK! Server not accepting any put requests at the moment.");
+                                logger.error(PROMPT + "SERVER_WRITE_LOCK! Server not accepting any put requests at the moment.");
                             }
                             else if (status == KVMessage.StatusType.SERVER_WRITE_LOCK) {
                                 System.out.println(PROMPT + "SERVER_WRITE_LOCK! Server not accepting any put requests at the moment.");
@@ -185,12 +185,12 @@ public class KVClient implements IKVClient {
                     }
                     catch (Exception ex) {
                         printError("Get Failed. Exception" + ex);
-                        logger.error("Get Failed. Exception: " + ex);   
+                        logger.error("Get Failed. Exception: " + ex);
                     }
                 }
                 else {
                     printError("Invalid number of parameters for command \"get\"");
-                    printHelp();                   
+                    printHelp();
                 }
                 break;
 
@@ -211,12 +211,12 @@ public class KVClient implements IKVClient {
                 break;
 
             case "help":
-                printHelp(); 
+                printHelp();
                 break;
 
             default:
                 printError("Unknown command");
-                printHelp();            
+                printHelp();
                 break;
         }
     }
@@ -291,17 +291,17 @@ public class KVClient implements IKVClient {
     }
 
     @Override
-    public void newConnection(String hostname, int port) 
+    public void newConnection(String hostname, int port)
         throws UnknownHostException, IOException {
         // TODO Auto-generated method stub
         clientStore = new KVStore(hostname, port);
         try {
-            clientStore.connect();    
+            clientStore.connect();
         }
         catch (Exception ex) {
-            printError("Unable to establish connection with " + hostname + 
+            printError("Unable to establish connection with " + hostname +
                 " at port " + port);
-            logger.error("Unable to establish connection with " + hostname + 
+            logger.error("Unable to establish connection with " + hostname +
                 " at port " + port);
         }
         clientStore.addListener(this);

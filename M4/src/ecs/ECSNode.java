@@ -16,11 +16,11 @@ public class ECSNode implements IECSNode{
     }
     
     public ECSNode(String data, String delim) {
-    	this.meta = new ServerMetaData(data, delim);
+        this.meta = new ServerMetaData(data, delim);
     }
-    
+
     public ECSNode() {
-    	
+
     }
 
     /**
@@ -46,10 +46,9 @@ public class ECSNode implements IECSNode{
      * @return  array of two strings representing the low and high range of the hashes that the given node is responsible for
      */
     public BigInteger[] getNodeHashRange() {
-    	BigInteger [] hashRange = {this.meta.bHash, this.meta.eHash};
+        BigInteger [] hashRange = {this.meta.bHash, this.meta.eHash};
         return hashRange;    
     }
-
 
     /**
      * @return  the name of the node (ie "Server 8.8.8.8")
@@ -86,10 +85,10 @@ public class ECSNode implements IECSNode{
     public void setNodeEndHash(BigInteger eHash) {
         this.meta.setEndHash(eHash);
     }
-    
+
     public void printMeta() {
-    	System.out.println("Server Name: " + meta.getServerName() + " ServerAddr: " + meta.getServerAddr() + " ServerPort: " + meta.getServerPort());
-    	if ((meta.getBeginHash() != null) && (meta.getEndHash() != null))
-    		System.out.println("Server bHash: " + meta.getBeginHash().toString(16) + " eHash: " + meta.getEndHash().toString(16));
+        System.out.println("Server Name: " + meta.getServerName() + " ServerAddr: " + meta.getServerAddr() + " ServerPort: " + meta.getServerPort());
+        if ((meta.getBeginHash() != null) && (meta.getEndHash() != null))
+            System.out.println("Server bHash: " + meta.getBeginHash().toString(16) + " eHash: " + meta.getEndHash().toString(16));
     }
 }

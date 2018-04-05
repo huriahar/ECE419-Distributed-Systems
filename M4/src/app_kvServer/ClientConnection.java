@@ -46,7 +46,7 @@ public class ClientConnection implements Runnable {
         this.clientSocket = clientSocket;
         this.isOpen = true;
     }
-    
+
     /**
      * Initializes and starts the client connection. 
      * Loops until the connection is closed or aborted by the client.
@@ -167,7 +167,7 @@ public class ClientConnection implements Runnable {
                 catch (IOException ioe) {
                     logger.error("Error! Connection lost!");
                     isOpen = false;
-                }               
+                }
             }
         }
         catch (IOException ioe) {
@@ -283,12 +283,11 @@ public class ClientConnection implements Runnable {
                 default:
                     logger.error("Unknown ECS cmd!");
                     return;
-            } 
+            }
         }
         catch (Exception ex) {
             logger.error("ERROR! could not send ACK back to ECS!");
         }
-
     }
 
     private void handlePutCmd (String key, String value) {
@@ -388,7 +387,7 @@ public class ClientConnection implements Runnable {
         byte[] bufferBytes = new byte[BUFFER_SIZE];
         
         /* read first char from stream */
-        byte read = (byte) input.read();    
+        byte read = (byte) input.read();
         boolean reading = true;
 
         while(read != 10 && read != -1 && reading) {/* CR, LF, error */
@@ -408,20 +407,20 @@ public class ClientConnection implements Runnable {
                 bufferBytes = new byte[BUFFER_SIZE];
                 index = 0;
             } 
-            
+
             /* only read valid characters, i.e. letters and constants */
             bufferBytes[index] = read;
             index++;
-            
+
             /* stop reading is DROP_SIZE is reached */
             if(msgBytes != null && msgBytes.length + index >= DROP_SIZE) {
                 reading = false;
             }
-            
+
             /* read next char from stream */
             read = (byte) input.read();
         }
-        
+
         if(msgBytes == null){
             tmp = new byte[index];
             System.arraycopy(bufferBytes, 0, tmp, 0, index);
@@ -431,11 +430,10 @@ public class ClientConnection implements Runnable {
             System.arraycopy(msgBytes, 0, tmp, 0, msgBytes.length);
             System.arraycopy(bufferBytes, 0, tmp, msgBytes.length, index);
         }
-        
+
         msgBytes = tmp;
 
         if (new String(msgBytes).trim().isEmpty()) throw new IOException();
-        
         /* build final String */
         TextMessage msg = new TextMessage(msgBytes);
         logger.info("RECEIVE \t<" 

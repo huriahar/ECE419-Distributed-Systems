@@ -37,7 +37,7 @@ public class ServerMetaData {
             this.eHash = null;
         }
     }
-    
+
     public ServerMetaData() {
         
     }
@@ -84,15 +84,15 @@ public class ServerMetaData {
     public void setEndHash(BigInteger e) {
         this.eHash = e;
     }
-    
+
     public String getServerName() {
         return this.name;
     }
-    
+
     public String getServerAddr() {
         return this.addr;
     }
-    
+
     public int getServerPort() {
         return this.port;
     }
@@ -100,20 +100,19 @@ public class ServerMetaData {
     public BigInteger getBeginHash() {
         return this.bHash;
     }
-    
+
     public BigInteger getEndHash() {
         return this.eHash;
     }
-    
+
     public BigInteger[] getHashRange() {
         BigInteger[] hashRange = {this.bHash, this.eHash};
         return hashRange;
     }
-    
+
     public void printMeta() {
         System.out.println("Server Name: " + getServerName() + " ServerAddr: " + getServerAddr() + " ServerPort: " + getServerPort());
         if ((getBeginHash() != null) && (getEndHash() != null))
             System.out.println("Server bHash: " + getBeginHash().toString(16) + " eHash: " + getEndHash().toString(16));
     }
 }
-

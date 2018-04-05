@@ -63,14 +63,14 @@ public class KVStore implements KVCommInterface {
                 Integer.toString(port));
 
         ServerMetaData serverNode = new ServerMetaData(null, address, port, null, null);
-		// Setup begin and end hashing for server
-		serverNode = updateMetaData(serverHash, serverNode);
-		ringNetwork.put(serverHash, serverNode);
+        // Setup begin and end hashing for server
+        serverNode = updateMetaData(serverHash, serverNode);
+        ringNetwork.put(serverHash, serverNode);
     }
 
-	public ServerMetaData updateMetaData(BigInteger nodeHash, ServerMetaData currNode) {
-		
-		assert currNode != null;
+    public ServerMetaData updateMetaData(BigInteger nodeHash, ServerMetaData currNode) {
+        
+        assert currNode != null;
 
         ServerMetaData nextNode = new ServerMetaData();
         // Only one in network, so start and end are yours
@@ -89,7 +89,7 @@ public class KVStore implements KVCommInterface {
             nextNode = ringNetwork.firstEntry().getValue();
         }
         else {
-        	//currNode is at beginning or in between
+            //currNode is at beginning or in between
             nextNode = ringNetwork.higherEntry(nodeHash).getValue();
         }
         // nextNode authority only goes as far currently added node
@@ -105,10 +105,10 @@ public class KVStore implements KVCommInterface {
         logger.debug("in isConnected.. checking for addr " + addr + " port " + port);
         return (this.serverAddr.equals(addr) && this.serverPort == port);
     }
-	
-	public void connectToResponsibleServer(String key, String cmd) {
-		BigInteger responsibleServerKey = getResponsibleServer(key);
-		ServerMetaData responsibleServerMeta = ringNetwork.get(responsibleServerKey);
+    
+    public void connectToResponsibleServer(String key, String cmd) {
+        BigInteger responsibleServerKey = getResponsibleServer(key);
+        ServerMetaData responsibleServerMeta = ringNetwork.get(responsibleServerKey);
         if(responsibleServerMeta == null) {
             //TODO make sure that after the coordinator crashes, client doesn't get stuck here!
             logger.error("Responsible coordinator not on the ring network!");
@@ -122,29 +122,29 @@ public class KVStore implements KVCommInterface {
         ServerMetaData sReplica = sReplicas.get(responsibleServerMeta.getServerPort());
         if(pReplica != null) options.add(pReplica);
         if(sReplica != null) options.add(sReplica);
-		if ((isConnected(responsibleServerMeta.getServerAddr(), responsibleServerMeta.getServerPort())) ||
+        if ((isConnected(responsibleServerMeta.getServerAddr(), responsibleServerMeta.getServerPort())) ||
             (pReplica != null && cmd.equals(KVConstants.GET_CMD) && isConnected(pReplica.getServerAddr(), pReplica.getServerPort())) ||
             (sReplica != null && cmd.equals(KVConstants.GET_CMD) && isConnected(sReplica.getServerAddr(), sReplica.getServerPort()))) {
-			// Do nothing. Already connected to the responsible server, either the coordinator
+            // Do nothing. Already connected to the responsible server, either the coordinator
             // or one of its replicas
-			return;
-		}
-		else {
+            return;
+        }
+        else {
             //Randomly choose which one to connect to
             int randomNum = rand.nextInt(options.size()); 
             if(cmd.equals(KVConstants.PUT_CMD)) randomNum = 0;   //if this is a PUT, always connect to the coordinator, not one of the replicas
             logger.debug("Choosing between COORD and REPLICAS.... randomNum is " + randomNum  + " and options size is " + options.size());
             assert randomNum >= 0 && randomNum < options.size();
-			disconnect();
-			this.serverAddr = options.get(randomNum).getServerAddr();
-			this.serverPort = options.get(randomNum).getServerPort();
-			try {
-				connect();
-			} catch (IOException e) {
-				logger.error("Unable to connect to " + serverAddr + " at " + serverPort);
-			}
-		}
-	}
+            disconnect();
+            this.serverAddr = options.get(randomNum).getServerAddr();
+            this.serverPort = options.get(randomNum).getServerPort();
+            try {
+                connect();
+            } catch (IOException e) {
+                logger.error("Unable to connect to " + serverAddr + " at " + serverPort);
+            }
+        }
+    }
 
     @Override
     public void connect() 
@@ -167,7 +167,7 @@ public class KVStore implements KVCommInterface {
             for (IKVClient listener : listeners) {
                 listener.handleStatus(IKVClient.SocketStatus.DISCONNECTED);
             }
-        } 
+        }
         catch (IOException ioe) {
             logger.error("Unable to close connection!");
         }
@@ -245,7 +245,7 @@ public class KVStore implements KVCommInterface {
         // step 4 - retry put if possible
         switch(kvreply.getStatus()){
             //TODO if server is stopped, do you return PUT/GET failed or SERVER_STOPPED?
-        	// This means that my metaData on servers is incorrect - so handle that
+            // This means that my metaData on servers is incorrect - so handle that
             case SERVER_NOT_RESPONSIBLE:
                 logger.debug("SERVER is not responsible.... finding which one is...");
                 kvreply = retryRequest(key, value, KVConstants.PUT_CMD);
@@ -272,10 +272,7 @@ public class KVStore implements KVCommInterface {
         TextMessage reply = receiveMessage();
         String[] tokens = (reply.getMsg()).split("\\" + KVConstants.DELIM);
         String getStatus = tokens[0];
-        
-//        if (tokens.length < 2) {
-//            return new KVReplyMessage(key, null, KVMessage.StatusType.GET_ERROR);
-//        }
+
         if (getStatus.equals("GET_SUCCESS")) {
             // Success! Combine the remaining tokens to get value
             // Done as value can contain DELIM
@@ -340,7 +337,7 @@ public class KVStore implements KVCommInterface {
             String[] entry = dataEntries[i].split(KVConstants.SPLIT_DELIM);
             this.pReplicas.put(Integer.parseInt(entry[0]), findServerInRingNetwork(Integer.parseInt(entry[1])));
             this.sReplicas.put(Integer.parseInt(entry[0]), findServerInRingNetwork(Integer.parseInt(entry[2])));
-        } 
+        }
     }
 
     private void updateMetaData(String marshalledData) {
@@ -349,7 +346,6 @@ public class KVStore implements KVCommInterface {
         for(int i = 0; i < dataEntries.length ; ++i) {
             ServerMetaData meta = new ServerMetaData(dataEntries[i]);
             BigInteger serverHash = md5.encode(meta.getServerAddr() + KVConstants.HASH_DELIM + meta.getServerPort());
-
             this.ringNetwork.put(serverHash, meta);
         }
         printRing();
