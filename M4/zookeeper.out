@@ -1,0 +1,41 @@
+2018-03-25 23:07:54,794 [myid:] - INFO  [main:QuorumPeerConfig@136] - Reading configuration from: /nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../conf/zoo.cfg
+2018-03-25 23:07:54,798 [myid:] - INFO  [main:DatadirCleanupManager@78] - autopurge.snapRetainCount set to 3
+2018-03-25 23:07:54,798 [myid:] - INFO  [main:DatadirCleanupManager@79] - autopurge.purgeInterval set to 0
+2018-03-25 23:07:54,798 [myid:] - INFO  [main:DatadirCleanupManager@101] - Purge task is not scheduled.
+2018-03-25 23:07:54,798 [myid:] - WARN  [main:QuorumPeerMain@116] - Either no config or no quorum defined in config, running  in standalone mode
+2018-03-25 23:07:54,807 [myid:] - INFO  [main:QuorumPeerConfig@136] - Reading configuration from: /nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../conf/zoo.cfg
+2018-03-25 23:07:54,807 [myid:] - INFO  [main:ZooKeeperServerMain@98] - Starting server
+2018-03-25 23:07:54,821 [myid:] - INFO  [main:Environment@100] - Server environment:zookeeper.version=3.4.11-01dfa343025f1839ebbd394166f71ed405be102e, built on 03/19/2018 17:17 GMT
+2018-03-25 23:07:54,821 [myid:] - INFO  [main:Environment@100] - Server environment:host.name=ug162.eecg.toronto.edu
+2018-03-25 23:07:54,821 [myid:] - INFO  [main:Environment@100] - Server environment:java.version=1.8.0_162
+2018-03-25 23:07:54,821 [myid:] - INFO  [main:Environment@100] - Server environment:java.vendor=Oracle Corporation
+2018-03-25 23:07:54,821 [myid:] - INFO  [main:Environment@100] - Server environment:java.home=/usr/lib/jvm/java-8-openjdk-amd64/jre
+2018-03-25 23:07:54,821 [myid:] - INFO  [main:Environment@100] - Server environment:java.class.path=/nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../build/classes:/nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../build/lib/slf4j-log4j12-1.6.1.jar:/nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../build/lib/slf4j-api-1.6.1.jar:/nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../build/lib/netty-3.10.5.Final.jar:/nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../build/lib/log4j-1.2.16.jar:/nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../build/lib/jline-0.9.94.jar:/nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../build/lib/audience-annotations-0.5.0.jar:/nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../lib/*.jar:/nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../zookeeper-*.jar:/nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../src/java/lib/ivy-2.4.0.jar:/nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3/zookeeper-3.4.11/bin/../conf:
+2018-03-25 23:07:54,821 [myid:] - INFO  [main:Environment@100] - Server environment:java.library.path=/usr/java/packages/lib/amd64:/usr/lib/x86_64-linux-gnu/jni:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/lib/jni:/lib:/usr/lib
+2018-03-25 23:07:54,821 [myid:] - INFO  [main:Environment@100] - Server environment:java.io.tmpdir=/tmp
+2018-03-25 23:07:54,821 [myid:] - INFO  [main:Environment@100] - Server environment:java.compiler=<NA>
+2018-03-25 23:07:54,822 [myid:] - INFO  [main:Environment@100] - Server environment:os.name=Linux
+2018-03-25 23:07:54,822 [myid:] - INFO  [main:Environment@100] - Server environment:os.arch=amd64
+2018-03-25 23:07:54,822 [myid:] - INFO  [main:Environment@100] - Server environment:os.version=4.9.0-6-amd64
+2018-03-25 23:07:54,822 [myid:] - INFO  [main:Environment@100] - Server environment:user.name=huriahar
+2018-03-25 23:07:54,822 [myid:] - INFO  [main:Environment@100] - Server environment:user.home=/homes/h/huriahar
+2018-03-25 23:07:54,822 [myid:] - INFO  [main:Environment@100] - Server environment:user.dir=/nfs/ug/homes-1/h/huriahar/ece419/ECE419-Distributed-Systems/M3
+2018-03-25 23:07:54,831 [myid:] - INFO  [main:ZooKeeperServer@825] - tickTime set to 2000
+2018-03-25 23:07:54,831 [myid:] - INFO  [main:ZooKeeperServer@834] - minSessionTimeout set to -1
+2018-03-25 23:07:54,831 [myid:] - INFO  [main:ZooKeeperServer@843] - maxSessionTimeout set to -1
+2018-03-25 23:07:54,838 [myid:] - INFO  [main:ServerCnxnFactory@117] - Using org.apache.zookeeper.server.NIOServerCnxnFactory as server connection factory
+2018-03-25 23:07:54,840 [myid:] - INFO  [main:NIOServerCnxnFactory@89] - binding to port 0.0.0.0/0.0.0.0:2181
+2018-03-25 23:07:54,841 [myid:] - ERROR [main:ZooKeeperServerMain@66] - Unexpected exception, exiting abnormally
+java.net.BindException: Address already in use
+	at sun.nio.ch.Net.bind0(Native Method)
+	at sun.nio.ch.Net.bind(Net.java:433)
+	at sun.nio.ch.Net.bind(Net.java:425)
+	at sun.nio.ch.ServerSocketChannelImpl.bind(ServerSocketChannelImpl.java:223)
+	at sun.nio.ch.ServerSocketAdaptor.bind(ServerSocketAdaptor.java:74)
+	at sun.nio.ch.ServerSocketAdaptor.bind(ServerSocketAdaptor.java:67)
+	at org.apache.zookeeper.server.NIOServerCnxnFactory.configure(NIOServerCnxnFactory.java:90)
+	at org.apache.zookeeper.server.ZooKeeperServerMain.runFromConfig(ZooKeeperServerMain.java:119)
+	at org.apache.zookeeper.server.ZooKeeperServerMain.initializeAndRun(ZooKeeperServerMain.java:89)
+	at org.apache.zookeeper.server.ZooKeeperServerMain.main(ZooKeeperServerMain.java:55)
+	at org.apache.zookeeper.server.quorum.QuorumPeerMain.initializeAndRun(QuorumPeerMain.java:119)
+	at org.apache.zookeeper.server.quorum.QuorumPeerMain.main(QuorumPeerMain.java:81)
