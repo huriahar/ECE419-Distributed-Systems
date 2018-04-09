@@ -345,7 +345,7 @@ public class KVStore implements KVCommInterface {
         String[] dataEntries = marshalledData.split(KVConstants.NEWLINE_DELIM);
         for(int i = 0; i < dataEntries.length ; ++i) {
             ServerMetaData meta = new ServerMetaData(dataEntries[i]);
-            BigInteger serverHash = md5.encode(meta.getServerAddr() + KVConstants.HASH_DELIM + meta.getServerPort());
+            BigInteger serverHash = meta.getEndHash();
             this.ringNetwork.put(serverHash, meta);
         }
         printRing();

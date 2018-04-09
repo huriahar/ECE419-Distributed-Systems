@@ -20,4 +20,6 @@ public interface IECS {
     public Map<String, IECSNode> getNodes();
 
     public IECSNode getNodeByKey(String Key);
+
+    public boolean balanceServerLoad();
 }

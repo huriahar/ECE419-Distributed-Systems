@@ -56,8 +56,9 @@ public class ECSClient implements IECSClient {
             System.out.print(PROMPT);
 
             try {
-                boolean nocrashes = this.checkServerStatus();
-                if(nocrashes) {
+                boolean success = balanceServerLoad();
+                success = success & this.checkServerStatus();
+                if(success) {
                     String cmdLine = stdin.readLine();
                     this.handleCommand(cmdLine);
                 }
@@ -88,6 +89,10 @@ public class ECSClient implements IECSClient {
             addNodes(nodesToRemove.size(), "FIFO", 5);
         }
         return nocrashes;
+    }
+
+    private boolean balanceServerLoad() {
+        return ecsInstance.balanceServerLoad();
     }
 
     private void handleCommand (String cmdLine) {

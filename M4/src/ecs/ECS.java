@@ -1,6 +1,7 @@
 package ecs;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.TreeMap;
 import java.util.Map;
 import java.util.HashMap;
@@ -11,6 +12,9 @@ import java.io.IOException;
 import java.lang.InterruptedException;
 import java.net.SocketException;
 
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.OutputStream;
 import java.io.InputStream;
 import java.io.File;
@@ -227,6 +231,174 @@ public class ECS implements IECS {
         return success;
     }
 
+    private Integer getNumKeysResponsible(IECSNode node) {
+        // For now, just get the key count directly by reading the server
+        // coordinator file
+        // Ideally, should send a message to server and get the data through messages
+        // Oh well
+        String serverFile = KVConstants.SERVER + node.getNodePort();
+        int numLines = 0;
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader(serverFile));
+            while (reader.readLine() != null) numLines++;
+            reader.close();
+        } catch (FileNotFoundException e) {
+            logger.error("File not found: " + serverFile);
+        } catch (IOException e) {
+            logger.error("IOException while trying to read file: " + serverFile);
+        }
+        return numLines;
+    }
+
+    // Std Dev = sqrt (1/(N-1) * sum ((Xi - Xbar)^2))
+    // Xi: Number of keys that server i is responsible for
+    // Xbar : Ideal number of keys that server i should be responsible for
+    private double getStdDevServerLoad() {
+        int totalServers = ringNetworkSize();
+        assert(totalServers > 1);
+        HashMap<String, Integer> serverLoads = new HashMap<String, Integer>();
+        IECSNode node;
+        int totalKeys = 0;
+        for (Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
+            node = entry.getValue();
+            Integer numKeysResponsible = getNumKeysResponsible(node);
+            serverLoads.put(node.getNodeName(), numKeysResponsible);
+            totalKeys += numKeysResponsible;
+            logger.debug(node.getNodeName() + " : " + numKeysResponsible);
+        }
+        double avgLoad = (double)totalKeys/totalServers, result = 0;
+        for (Map.Entry<String, Integer> entry : serverLoads.entrySet()) {
+            int serverLoad = entry.getValue();
+            result += (serverLoad - avgLoad)*(serverLoad - avgLoad);
+        }
+        result /= (double)(totalServers - 1);
+        return Math.sqrt(result);
+    }
+
+    // Get the encoded md5 hash for all keys in the network and return in
+    // descending order
+    private ArrayList<BigInteger> getAllKeysHash() {
+        ArrayList<BigInteger> keysHash = new ArrayList<BigInteger>();
+        IECSNode node;
+        String serverFile, line, key;
+        for (Map.Entry<BigInteger, IECSNode> entry : ringNetwork.entrySet()) {
+            node = entry.getValue();
+            serverFile = KVConstants.SERVER + node.getNodePort();
+            try {
+                BufferedReader reader = new BufferedReader(new FileReader(serverFile));
+                line = reader.readLine();
+                while (line != null) {
+                    if (line.trim().length() == 0) {
+                        line = reader.readLine();
+                        continue;
+                    }
+                    key = line.split(KVConstants.SPLIT_DELIM)[0];
+                    keysHash.add(md5.encode(key));
+                    line = reader.readLine();
+                }
+                reader.close();
+            } catch (FileNotFoundException e) {
+                logger.error("File not found: " + serverFile);
+            } catch (IOException e) {
+                logger.error("IOException while trying to read file: " + serverFile);
+            }
+        }
+        Collections.sort(keysHash, Collections.reverseOrder());
+        return keysHash;
+    }
+
+    public boolean balanceServerLoad() {
+        int numServers = ringNetworkSize();
+        // No need to balance load
+        if (numServers == 0 || numServers == 1) {
+            return true;
+        }
+        double initStdDev = getStdDevServerLoad();
+        ArrayList<BigInteger> keysHash = getAllKeysHash();
+        int numKeys = keysHash.size();
+        // Check that there is at least 1 key per server
+        boolean atLeastOneKey = ((int) Math.floor((double)numKeys/numServers) >= 1);
+        printDebug("Initial StdDev : " + initStdDev);
+        boolean success = true;
+        if (initStdDev >= 2.0 && atLeastOneKey) {
+            logger.debug("Initial ringNetwork:");
+            printRing();
+            int keysPerServer = (int) Math.rint((float)numKeys/numServers);
+            int assignedServers = 0;
+            Map.Entry<BigInteger, IECSNode> entry = null;
+            BigInteger serverEndHash = null, serverBeginHash = null;
+            BigInteger prevEndHash = null, firstEndHash = null;
+            int firstKeyIdx = 0, lastKeyIdx;
+            // Need this to keep track of original server locations
+            TreeMap<BigInteger, IECSNode> origRingNetwork = new TreeMap<BigInteger, IECSNode>();
+            origRingNetwork = (TreeMap<BigInteger, IECSNode>) ringNetwork.clone();
+            IECSNode node;
+            while (assignedServers < (numServers - 1)) {
+                // First server
+                if (assignedServers == 0) {
+                    entry = ringNetwork.lastEntry();
+                    serverEndHash = entry.getKey();
+                    // Get the first key index lower than the first server
+                    for (int i = 0; i < numKeys; ++i) {
+                        int res = keysHash.get(i).compareTo(serverEndHash);
+                        // If current key hash is less than the first server hash
+                        if (res == -1) {
+                            firstKeyIdx = i;
+                            break;
+                        }
+                    }
+                    prevEndHash = serverEndHash;
+                    firstEndHash = serverEndHash;
+                }
+
+                lastKeyIdx = (firstKeyIdx + keysPerServer - 1)%numKeys;
+                serverBeginHash = keysHash.get(lastKeyIdx).subtract(BigInteger.ONE);
+                node = entry.getValue();
+                node.setNodeBeginHash(serverBeginHash);
+                node.setNodeEndHash(serverEndHash);
+                ringNetwork.remove(prevEndHash);
+                ringNetwork.put(serverEndHash, node);
+                assignedServers++;
+                firstKeyIdx = (lastKeyIdx + 1)%numKeys;
+                entry = origRingNetwork.lowerEntry(prevEndHash);
+                serverEndHash = serverBeginHash;
+                prevEndHash = entry.getKey();
+            }
+            // For the last server
+            node = entry.getValue();
+            node.setNodeBeginHash(firstEndHash);
+            node.setNodeEndHash(serverBeginHash);
+            ringNetwork.remove(prevEndHash);
+            ringNetwork.put(serverBeginHash, node);
+            logger.debug("Final ringNetwork:");
+            printRing();
+
+            try {
+                deleteMetaDataFile();
+                updateMetaDataFile();
+            } catch (IOException e) {
+                logger.error("Unable to update metadata file");
+            }
+
+            // Send UPDATE_METDATA msg to every server
+            for (Map.Entry<BigInteger, IECSNode> server : ringNetwork.entrySet()) {
+                IECSNode curNode = server.getValue();
+                success = sendMetaDataUpdate(curNode);
+            }
+
+            for (Map.Entry<BigInteger, IECSNode> dst : ringNetwork.entrySet()) {
+                for (Map.Entry<BigInteger, IECSNode> src : ringNetwork.entrySet()) {
+                    // Get keys from every other server
+                    if (src.getKey() != dst.getKey()) {
+                        success = success & sendMoveKVPairs(src.getValue(), dst.getValue(), false);
+                    }
+                }
+            }
+            double finalStdDev = getStdDevServerLoad();
+            logger.debug("Final StdDev: " + finalStdDev);
+        }
+        return success;
+    }
 
     public void deleteMetaDataFile() throws IOException {
        Files.deleteIfExists(metaDataFile); 

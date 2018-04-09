@@ -90,9 +90,9 @@ public class KVServer implements IKVServer, Runnable {
         }
         String[] zNodeData = data.split("\\" + KVConstants.DELIM);
         this.metadata = new ServerMetaData(name, zNodeData[1], Integer.parseInt(zNodeData[2]), null, null);
-        this.serverFilePath = "SERVER_" + Integer.toString(zkPort);
-        this.pReplicaFilePath = "SERVER_" + Integer.toString(zkPort) + "_PRIMARY";
-        this.sReplicaFilePath = "SERVER_" + Integer.toString(zkPort) + "_SECONDARY";
+        this.serverFilePath = KVConstants.SERVER + Integer.toString(zkPort);
+        this.pReplicaFilePath = KVConstants.SERVER + Integer.toString(zkPort) + "_PRIMARY";
+        this.sReplicaFilePath = KVConstants.SERVER + Integer.toString(zkPort) + "_SECONDARY";
         // Delete Replica files, if they exist
         try {
             Files.deleteIfExists(Paths.get(pReplicaFilePath));
