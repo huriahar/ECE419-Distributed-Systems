@@ -26,7 +26,7 @@ import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 
 
-public class ThreeReplicasTests extends TestCase {
+public class M4Test extends TestCase {
     
     private ECSClient ecsClient;
     Collection<IECSNode> nodes;
@@ -105,6 +105,26 @@ public class ThreeReplicasTests extends TestCase {
     // ------------------------------ tests start here -----------------------------------------//
 
 
+    @Test
+    public void testDistributedEvenNumberKeys() {
+        System.out.println("********** In 1 Test **************");
+        nodes = ecsClient.addNodes(2, "LRU", 5);
+        Iterator<IECSNode> it = nodes.iterator();
+        assertTrue(ecsClient.start());
+        //Connect client to server and put KV pair
+        KVStore kvClient = new KVStore("localhost", 50006);
+        connectToKVServer(kvClient);
+        putKVPair(kvClient, "bb", "bb", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "aa", "aa", StatusType.PUT_SUCCESS);
+        kvClient.disconnect();
+
+        //Check the content of the files to double check if the keys are hashed 
+        String fileName = "SERVER_50003"; 
+        readLineFromFile(Paths.get(fileName), true, "b|bb");
+
+        fileName = "SERVER_50006"; 
+        readLineFromFile(Paths.get(fileName), true, "a|aa");
+    }
 
 
 }
