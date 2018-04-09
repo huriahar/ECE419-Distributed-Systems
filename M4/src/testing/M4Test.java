@@ -127,14 +127,24 @@ public class M4Test extends TestCase {
         }
         return success;
     }
-    // ------------------------------ tests start here -----------------------------------------//
 
+    public int getFileSize(Path filePath) {
+        Exception ex = null;
+        ArrayList<String> lines = new ArrayList<String>();
+        try {
+            lines = new ArrayList<>(Files.readAllLines(filePath, StandardCharsets.UTF_8));
+        } catch(IOException e) {
+            ex = e;
+        }
+        assertTrue(ex == null);
+        return lines.size();
+    }
+    // ------------------------------ tests start here -----------------------------------------//
 
     @Test
     public void testDistributedEvenNumberKeys() {
         System.out.println("********** In 1 Test **************");
         nodes = ecsClient.addNodes(2, "LRU", 5);
-        Iterator<IECSNode> it = nodes.iterator();
         assertTrue(ecsClient.start());
         //Connect client to server and put KV pair
         KVStore kvClient = new KVStore("localhost", 50006);
@@ -146,29 +156,22 @@ public class M4Test extends TestCase {
         kvClient.disconnect();
 
         boolean success = ecsClient.balanceServerLoad();
+        assertTrue(success);
 
-        if(success) {
-            //Check the content of the files to double check if the keys are hashed evenly 
-            String fileName = "SERVER_50006"; 
-            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "cc|bb"));
-
-            fileName = "SERVER_50006"; 
-            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "dd|bb"));
-            
-            fileName = "SERVER_50003"; 
-            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "aa|bb"));
-     
-            fileName = "SERVER_50003"; 
-            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "bb|bb"));
-        }
-
+        //Check the content of the files to double check if the keys are hashed evenly 
+        String fileName = "SERVER_50006"; 
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "cc|bb"));
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "dd|bb"));
+        
+        fileName = "SERVER_50003"; 
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "aa|bb"));
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "bb|bb"));
     }
 
     @Test
     public void testDistributedOddNumberKeys() {
         System.out.println("********** In 2 Test **************");
         nodes = ecsClient.addNodes(2, "LRU", 5);
-        Iterator<IECSNode> it = nodes.iterator();
         assertTrue(ecsClient.start());
         //Connect client to server and put KV pair
         KVStore kvClient = new KVStore("localhost", 50006);
@@ -179,18 +182,112 @@ public class M4Test extends TestCase {
         kvClient.disconnect();
 
         boolean success = ecsClient.balanceServerLoad();
+        assertTrue(success);
 
-        if(success) {
-            //Check the content of the files to double check if the keys are hashed evenly 
-            String fileName = "SERVER_50006"; 
-            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "cc|bb"));
+        //Check the content of the files to double check if the keys are hashed evenly 
+        String fileName = "SERVER_50006"; 
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "cc|bb"));
 
-            fileName = "SERVER_50003"; 
-            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "dd|bb"));
-     
-            fileName = "SERVER_50003"; 
-            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "bb|bb"));
-        }
-
+        fileName = "SERVER_50003"; 
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "dd|bb"));
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "bb|bb"));
     }
+
+    @Test
+    public void testDistributionWithExistingData() {
+        System.out.println("********** In 3 Test **************");
+        nodes = ecsClient.addNodes(2, "LRU", 5);
+        assertTrue(ecsClient.start());
+        //Connect client to server and put KV pair
+        KVStore kvClient = new KVStore("localhost", 50006);
+        connectToKVServer(kvClient);
+        putKVPair(kvClient, "bb", "bb", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "cc", "bb", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "dd", "bb", StatusType.PUT_SUCCESS);
+        kvClient.disconnect();
+
+        boolean success = ecsClient.balanceServerLoad();
+        assertTrue(success);
+
+        kvClient = new KVStore("localhost", 50003);
+        connectToKVServer(kvClient);
+        getKVPair(kvClient, "bb", "bb", StatusType.GET_SUCCESS);
+
+        putKVPair(kvClient, "ee", "ee", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "ff", "ff", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "gg", "gg", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "hh", "hh", StatusType.PUT_SUCCESS);
+
+        success = ecsClient.balanceServerLoad();
+        assertTrue(success);
+
+        //Check the content of the files to double check if the keys are hashed evenly 
+        String fileName = "SERVER_50006"; 
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "cc|bb"));
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "dd|bb"));
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "ee|ee"));
+
+        fileName = "SERVER_50003"; 
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "bb|bb"));
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "ff|ff"));
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "gg|gg"));
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "hh|hh"));
+    }
+
+    @Test
+    public void testDistributionPersistentData() {
+        System.out.println("********** In 4 Test **************");
+        nodes = ecsClient.addNodes(2, "LRU", 5);
+        assertTrue(ecsClient.start());
+        //Connect client to server and put KV pair
+        KVStore kvClient = new KVStore("localhost", 50006);
+        connectToKVServer(kvClient);
+        putKVPair(kvClient, "bb", "bb", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "cc", "bb", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "dd", "bb", StatusType.PUT_SUCCESS);
+        kvClient.disconnect();
+
+        //Remove the first server
+        Collection<String> names = new ArrayList<String>();
+        names.add("server7");
+        names.add("server4");
+        assertTrue(ecsClient.removeNodes(names));
+
+        nodes = ecsClient.addNodes(2, "LRU", 5);
+        Iterator<IECSNode> it = nodes.iterator();
+        assertTrue(ecsClient.start());
+        boolean success = ecsClient.balanceServerLoad();
+        assertTrue(success);
+
+        //Check the content of the files to double check if the keys are hashed evenly 
+        String fileName = "SERVER_50006"; 
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "cc|bb"));
+
+        fileName = "SERVER_50003"; 
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "dd|bb"));
+        assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "bb|bb"));
+    }
+
+    @Test
+    public void testManyKeys() {
+        System.out.println("********** In 5 Test **************");
+        nodes = ecsClient.addNodes(2, "LRU", 5);
+        Iterator<IECSNode> it = nodes.iterator();
+        assertTrue(ecsClient.start());
+        //Connect client to server and put KV pair
+        KVStore kvClient = new KVStore("localhost", 50006);
+        connectToKVServer(kvClient);
+        for(int i  = 0; i < 100; i++) {
+            putKVPair(kvClient, "k" + String.valueOf(i), "v" + String.valueOf(i), StatusType.PUT_SUCCESS);
+        }
+        kvClient.disconnect();
+
+        boolean success = ecsClient.balanceServerLoad();
+        assertTrue(success);
+        String fileName = "SERVER_50006"; 
+        assertTrue(getFileSize(Paths.get(fileName)) == 50);
+        fileName = "SERVER_50003"; 
+        assertTrue(getFileSize(Paths.get(fileName)) == 50);
+    }
+
 }
