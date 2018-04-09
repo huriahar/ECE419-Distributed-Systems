@@ -34,7 +34,9 @@ public class AllTests {
         //M3 tests
         //clientSuite.addTestSuite(ReplicasTests.class); 
         //clientSuite.addTestSuite(ThreeReplicasTests.class); 
-		clientSuite.addTestSuite(PerformanceTesting.class);
+		//clientSuite.addTestSuite(PerformanceTesting.class);
+        //M4 tests
+        clientSuite.addTestSuite(M4Test.class); 
 		return clientSuite;
 	}
 	
