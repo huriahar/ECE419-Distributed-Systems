@@ -91,7 +91,7 @@ public class ECSClient implements IECSClient {
         return nocrashes;
     }
 
-    private boolean balanceServerLoad() {
+    public boolean balanceServerLoad() {
         return ecsInstance.balanceServerLoad();
     }
 

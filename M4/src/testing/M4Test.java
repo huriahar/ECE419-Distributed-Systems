@@ -32,7 +32,7 @@ public class M4Test extends TestCase {
     Collection<IECSNode> nodes;
 
 	public void setUp() {
-        ecsClient = new ECSClient("testECSThree.config", "localhost");
+        ecsClient = new ECSClient("testECS.config", "localhost");
         ecsClient.setLevel("INFO");
         try {
             Process p = Runtime.getRuntime().exec(new String[]{"csh","-c","rm -rf SERVER_5000* SERVER_6000*"});
@@ -102,6 +102,31 @@ public class M4Test extends TestCase {
             assertTrue(ex != null);
         }
     }
+
+    public boolean checkIfKeyInFile(Path filePath, boolean expectToFind, String value) {
+        Exception ex = null;
+        boolean success = false;
+        ArrayList<String> lines = new ArrayList<String>();
+        try {
+            lines = new ArrayList<>(Files.readAllLines(filePath, StandardCharsets.UTF_8));
+        } catch(IOException e) {
+            ex = e;
+        }
+        if(expectToFind) {
+            assertTrue(ex == null);
+            if(value == null) {
+                assertTrue(lines.isEmpty());
+            } else {
+                for(String line: lines) {
+                    if(line.equals(value))
+                        success = true;
+                }
+            }
+        } else {
+            assertTrue(ex != null);
+        }
+        return success;
+    }
     // ------------------------------ tests start here -----------------------------------------//
 
 
@@ -115,16 +140,57 @@ public class M4Test extends TestCase {
         KVStore kvClient = new KVStore("localhost", 50006);
         connectToKVServer(kvClient);
         putKVPair(kvClient, "bb", "bb", StatusType.PUT_SUCCESS);
-        putKVPair(kvClient, "aa", "aa", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "cc", "bb", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "dd", "bb", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "aa", "bb", StatusType.PUT_SUCCESS);
         kvClient.disconnect();
 
-        //Check the content of the files to double check if the keys are hashed 
-        String fileName = "SERVER_50003"; 
-        readLineFromFile(Paths.get(fileName), true, "b|bb");
+        boolean success = ecsClient.balanceServerLoad();
 
-        fileName = "SERVER_50006"; 
-        readLineFromFile(Paths.get(fileName), true, "a|aa");
+        if(success) {
+            //Check the content of the files to double check if the keys are hashed evenly 
+            String fileName = "SERVER_50006"; 
+            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "cc|bb"));
+
+            fileName = "SERVER_50006"; 
+            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "dd|bb"));
+            
+            fileName = "SERVER_50003"; 
+            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "aa|bb"));
+     
+            fileName = "SERVER_50003"; 
+            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "bb|bb"));
+        }
+
     }
 
+    @Test
+    public void testDistributedOddNumberKeys() {
+        System.out.println("********** In 2 Test **************");
+        nodes = ecsClient.addNodes(2, "LRU", 5);
+        Iterator<IECSNode> it = nodes.iterator();
+        assertTrue(ecsClient.start());
+        //Connect client to server and put KV pair
+        KVStore kvClient = new KVStore("localhost", 50006);
+        connectToKVServer(kvClient);
+        putKVPair(kvClient, "bb", "bb", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "cc", "bb", StatusType.PUT_SUCCESS);
+        putKVPair(kvClient, "dd", "bb", StatusType.PUT_SUCCESS);
+        kvClient.disconnect();
 
+        boolean success = ecsClient.balanceServerLoad();
+
+        if(success) {
+            //Check the content of the files to double check if the keys are hashed evenly 
+            String fileName = "SERVER_50006"; 
+            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "cc|bb"));
+
+            fileName = "SERVER_50003"; 
+            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "dd|bb"));
+     
+            fileName = "SERVER_50003"; 
+            assertTrue(checkIfKeyInFile(Paths.get(fileName), true, "bb|bb"));
+        }
+
+    }
 }
