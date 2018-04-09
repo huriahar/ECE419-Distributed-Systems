@@ -25,6 +25,7 @@ public class KVConstants {
     public static final String SREPLICA = "SREPLICA";
     public static final String COORDINATOR = "COORDINATOR";
     public static final String SERVER = "SERVER_";
+    public static final double MIN_STDEV = 1.6;
     // Consistent Hashing
     public static final BigInteger MIN_HASH = new BigInteger("00000000000000000000000000000000", 16);
     public static final BigInteger MAX_HASH = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16);

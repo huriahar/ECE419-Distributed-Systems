@@ -320,7 +320,7 @@ public class ECS implements IECS {
         boolean atLeastOneKey = ((int) Math.floor((double)numKeys/numServers) >= 1);
         printDebug("Initial StdDev : " + initStdDev);
         boolean success = true;
-        if (initStdDev >= 1.6  && atLeastOneKey) {
+        if (initStdDev >= KVConstants.MIN_STDEV && atLeastOneKey) {
             logger.debug("Initial ringNetwork:");
             printRing();
             int keysPerServer = (int) Math.rint((float)numKeys/numServers);
