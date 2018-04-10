@@ -240,7 +240,15 @@ public class ECS implements IECS {
         int numLines = 0;
         try {
             BufferedReader reader = new BufferedReader(new FileReader(serverFile));
-            while (reader.readLine() != null) numLines++;
+            String line = reader.readLine();
+            while ( line != null ) {
+                if (line.trim().length() == 0) {
+                    line = reader.readLine();
+                    continue;
+                }
+                numLines++;
+                line = reader.readLine();
+            }
             reader.close();
         } catch (FileNotFoundException e) {
             logger.error("File not found: " + serverFile);
